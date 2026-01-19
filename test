@@ -1587,7 +1587,7 @@ local function StartHolonHUB()
     end)
 
     local Window = OrionLib:MakeWindow({
-        Name = "Holon HUB v1.3.6",
+        Name = "Holon HUB v1.3.5",
         HidePremium = false,
         SaveConfig = true,
         ConfigFolder = "HolonHUB",
@@ -2601,31 +2601,39 @@ local BarrierSec = SubTab:AddSection({
 
 local destroyBarrier = false
 BarrierSec:AddToggle({
-    Name = "家のバリア破壊 (作成中)",
+    Name = "家のバリア破壊 (強化版)",
     Default = false,
     Callback = function(v)
         destroyBarrier = v
         if v then
             task.spawn(function()
                 local char = LocalPlayer.Character
+                local root = char and char:FindFirstChild("HumanoidRootPart")
                 local hum = char and char:FindFirstChild("Humanoid")
-                local originalWs = hum and hum.WalkSpeed or 16
                 
-                if hum then hum.WalkSpeed = 0 end
+                -- 実行中は少しだけ速度を落として、アイテムがバリアに当たりやすくする
+                if hum then hum.WalkSpeed = 5 end
                 
-                while destroyBarrier and LocalPlayer.Character do
+                while destroyBarrier and LocalPlayer.Character and root do
                     local mt = ReplicatedStorage:FindFirstChild("MenuToys")
                     local st = mt and mt:FindFirstChild("SpawnToyRemoteFunction")
                     
                     if st then
+                        -- 固定座標ではなく「自分の少し前」の座標にオカリナを生成する
+                        -- これにより、バリアに密着して実行すればバリアに干渉できます
+                        local spawnPos = root.CFrame * CFrame.new(0, 0, -2) 
+                        
                         pcall(function()
-                            st:InvokeServer("ToyOcarina", CFrame.new(184.148834, -5.54824972, 0))
+                            -- 連射速度を上げて負荷をかけ、物理判定をバグらせる
+                            st:InvokeServer("ToyOcarina", spawnPos)
                         end)
                     end
-                    task.wait(1.5)
+                    -- 待機時間を短くして「破壊」の成功率を上げます
+                    task.wait(0.1) 
                 end
                 
-                if hum then hum.WalkSpeed = originalWs end
+                -- オフにした時にスピードを戻す
+                if hum then hum.WalkSpeed = 16 end
             end)
         end
     end
