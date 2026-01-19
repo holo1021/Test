@@ -1725,7 +1725,9 @@ MoveSec:AddToggle({
                         
                         bv.Velocity = vel
                         
-                        hum.PlatformStand = true
+                        if not hum.Sit then
+                            hum.PlatformStand = true
+                        end
                     else
                         break
                     end
