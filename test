@@ -1587,7 +1587,7 @@ local function StartHolonHUB()
     end)
 
     local Window = OrionLib:MakeWindow({
-        Name = "Holon HUB v1.3.5",
+        Name = "Holon HUB v1.3.6",
         HidePremium = false,
         SaveConfig = true,
         ConfigFolder = "HolonHUB",
