@@ -19,7 +19,7 @@ local RobloxID = "najayou777"
 local DetailIcon = "rbxassetid://7733964719"
 
 -- リンク集を表示する共通関数（認証画面とメイン画面で使い回せます）
-local function AddDetailContent(Tab)
+local function AddDetailContent(Tab, OrionLib)
     Tab:AddButton({
         Name = "TikTok",
         Callback = function()
@@ -1587,12 +1587,12 @@ local function StartHolonHUB()
     end)
 
     local Window = OrionLib:MakeWindow({
-        Name = "Holon HUB v1.3.5",
+        Name = "Holon HUB v1.3.6",
         HidePremium = false,
         SaveConfig = true,
         ConfigFolder = "HolonHUB",
         IntroEnabled = true,
-        IntroText = "Holon HUB Load!"
+        IntroText = "Holon HUB Loaded!"
     })
 
 -- プレイヤーリスト取得関数
@@ -1758,7 +1758,7 @@ ProtectSec:AddToggle({ Name = "アンチ掴み", Default = false, Callback = fun
 
 local gucciConn = nil
 ProtectSec:AddToggle({ 
-    Name = "Anti Gucci", 
+    Name = "アンチグッチ", 
     Default = false, 
     Callback = function(v) 
         if v then
@@ -2601,39 +2601,31 @@ local BarrierSec = SubTab:AddSection({
 
 local destroyBarrier = false
 BarrierSec:AddToggle({
-    Name = "家のバリア破壊 (強化版)",
+    Name = "家のバリア破壊 (作成中)",
     Default = false,
     Callback = function(v)
         destroyBarrier = v
         if v then
             task.spawn(function()
                 local char = LocalPlayer.Character
-                local root = char and char:FindFirstChild("HumanoidRootPart")
                 local hum = char and char:FindFirstChild("Humanoid")
+                local originalWs = hum and hum.WalkSpeed or 16
                 
-                -- 実行中は少しだけ速度を落として、アイテムがバリアに当たりやすくする
-                if hum then hum.WalkSpeed = 5 end
+                if hum then hum.WalkSpeed = 0 end
                 
-                while destroyBarrier and LocalPlayer.Character and root do
+                while destroyBarrier and LocalPlayer.Character do
                     local mt = ReplicatedStorage:FindFirstChild("MenuToys")
                     local st = mt and mt:FindFirstChild("SpawnToyRemoteFunction")
                     
                     if st then
-                        -- 固定座標ではなく「自分の少し前」の座標にオカリナを生成する
-                        -- これにより、バリアに密着して実行すればバリアに干渉できます
-                        local spawnPos = root.CFrame * CFrame.new(0, 0, -2) 
-                        
                         pcall(function()
-                            -- 連射速度を上げて負荷をかけ、物理判定をバグらせる
-                            st:InvokeServer("ToyOcarina", spawnPos)
+                            st:InvokeServer("ToyOcarina", CFrame.new(184.148834, -5.54824972, 0))
                         end)
                     end
-                    -- 待機時間を短くして「破壊」の成功率を上げます
-                    task.wait(0.1) 
+                    task.wait(1.5)
                 end
                 
-                -- オフにした時にスピードを戻す
-                if hum then hum.WalkSpeed = 16 end
+                if hum then hum.WalkSpeed = originalWs end
             end)
         end
     end
@@ -2997,7 +2989,7 @@ PianoManualSec:AddButton({
 })
 
 local DetailTab = Window:MakeTab({Name = "詳細", Icon = DetailIcon})
-AddDetailContent(DetailTab)
+AddDetailContent(DetailTab, OrionLib)
 
 -- 通知（起動時）
 OrionLib:MakeNotification({
@@ -3057,7 +3049,7 @@ else
 
     -- 詳細タブ
     local AuthDetailTab = AuthWindow:MakeTab({Name = "詳細", Icon = DetailIcon})
-    AddDetailContent(AuthDetailTab)
+    AddDetailContent(AuthDetailTab, OrionLib)
     
     OrionLib:Init()
 end
