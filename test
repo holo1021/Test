@@ -1659,7 +1659,7 @@ local function StartHolonHUB()
     local Window = OrionLib:MakeWindow({
         Name = "Holon HUB v1.3.5",
         HidePremium = false,
-        SaveConfig = true,
+        SaveConfig = false, -- Disable to prevent interference on init
         ConfigFolder = "HolonHUB",
         IntroEnabled = true,
         IntroText = "Holon HUB Loaded!"
@@ -1675,6 +1675,9 @@ local function getPList()
     return plist
 end
 
+-- Table to manage UI elements
+local UIElements = {}
+
 -- --- TAB: MAIN ---
 local MainTab = Window:MakeTab({
 	Name = "Main",
@@ -1689,24 +1692,28 @@ local PlayerTab = Window:MakeTab({
 
 local MoveSec = PlayerTab:AddSection({ Name = "Movement" })
 
-MoveSec:AddSlider({
-    Name = "WalkSpeed", Min = 16, Max = 300, Default = 16, Increment = 1,
+-- Set current status as default
+local currentWS = (LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid")) and LocalPlayer.Character.Humanoid.WalkSpeed or 16
+walkSpeed = currentWS
+
+UIElements.WalkSpeedSlider = MoveSec:AddSlider({
+    Name = "WalkSpeed", Min = 16, Max = 300, Default = currentWS, Increment = 1,
     Callback = function(v) walkSpeed = v end
 })
 
-MoveSec:AddToggle({
+UIElements.WalkSpeedToggle = MoveSec:AddToggle({
     Name = "Enable WalkSpeed", Default = false,
     Callback = function(v) 
         useWalkSpeed = v 
     end
 })
 
-MoveSec:AddSlider({
+UIElements.JumpPowerSlider = MoveSec:AddSlider({
     Name = "JumpPower", Min = 16, Max = 300, Default = 25, Increment = 1,
     Callback = function(v) jumpPower = v end
 })
 
-MoveSec:AddToggle({
+UIElements.JumpPowerToggle = MoveSec:AddToggle({
     Name = "Enable JumpPower", Default = false,
     Callback = function(v) 
         useJumpPower = v 
@@ -1716,7 +1723,7 @@ MoveSec:AddToggle({
     end
 })
 
-MoveSec:AddToggle({
+UIElements.NoclipToggle = MoveSec:AddToggle({
     Name = "Noclip", Default = false,
     Callback = function(v) 
         noclip = v 
@@ -1732,7 +1739,7 @@ MoveSec:AddToggle({
     end
 })
 
-MoveSec:AddToggle({
+UIElements.InfiniteJumpToggle = MoveSec:AddToggle({
     Name = "Infinite Jump", Default = false,
     Callback = function(v) infiniteJump = v end
 })
@@ -1740,7 +1747,7 @@ MoveSec:AddToggle({
 local vflyEnabled = false
 local vflySpeed = 1
 
-MoveSec:AddToggle({
+UIElements.VFlyToggle = MoveSec:AddToggle({
     Name = "VFly",
     Default = false,
     Callback = function(v)
@@ -1814,7 +1821,7 @@ MoveSec:AddToggle({
     end
 })
 
-MoveSec:AddSlider({
+UIElements.VFlySpeedSlider = MoveSec:AddSlider({
     Name = "VFly Speed",
     Min = 1, Max = 10, Default = 1,
     Callback = function(v) vflySpeed = v end
@@ -1822,12 +1829,12 @@ MoveSec:AddSlider({
 
 local ProtectSec = PlayerTab:AddSection({ Name = "Protection" })
 
-ProtectSec:AddToggle({ Name = "Anti-Explosion", Default = false, Callback = function(v) antiExplosion = v end })
-ProtectSec:AddToggle({ Name = "Anti-Fire", Default = false, Callback = function(v) antiFire = v end })
-ProtectSec:AddToggle({ Name = "Anti-Grab", Default = false, Callback = function(v) antiGrab = v end })
+UIElements.AntiExplosionToggle = ProtectSec:AddToggle({ Name = "Anti-Explosion", Default = false, Callback = function(v) antiExplosion = v end })
+UIElements.AntiFireToggle = ProtectSec:AddToggle({ Name = "Anti-Fire", Default = false, Callback = function(v) antiFire = v end })
+UIElements.AntiGrabToggle = ProtectSec:AddToggle({ Name = "Anti-Grab", Default = false, Callback = function(v) antiGrab = v end })
 
 local gucciConn = nil
-ProtectSec:AddToggle({ 
+UIElements.AntiGucciToggle = ProtectSec:AddToggle({ 
     Name = "Anti Gucci", 
     Default = false, 
     Callback = function(v) 
@@ -1868,7 +1875,7 @@ ProtectSec:AddToggle({
 
 local PlayerViewSec = PlayerTab:AddSection({ Name = "View/Camera" })
 
-PlayerViewSec:AddToggle({
+UIElements.ThirdPersonToggle = PlayerViewSec:AddToggle({
     Name = "Third Person",
     Default = false,
     Callback = function(v) 
@@ -1884,11 +1891,12 @@ PlayerViewSec:AddToggle({
     end 
 })
 
-PlayerViewSec:AddSlider({
+local currentFOV = Camera.FieldOfView
+UIElements.FOVSlider = PlayerViewSec:AddSlider({
     Name = "FOV",
     Min = 30,
     Max = 120,
-    Default = 70,
+    Default = currentFOV,
     Color = Color3.fromRGB(255,255,255),
     Increment = 1,
     Callback = function(v)
@@ -1907,7 +1915,7 @@ local targetMainName = "" -- New variable to store the name
 local tpDropdown = nil
 
 local pDropMain
-pDropMain = MainSec:AddDropdown({
+UIElements.MainTargetDropdown = MainSec:AddDropdown({
     Name = "Main Target",
     Default = LocalPlayer.DisplayName .. " (@" .. LocalPlayer.Name .. ")",
     Options = getPList(),
@@ -1918,6 +1926,7 @@ pDropMain = MainSec:AddDropdown({
         targetMain = Players:FindFirstChild(targetMainName) or LocalPlayer
     end    
 })
+pDropMain = UIElements.MainTargetDropdown
 
 Players.PlayerAdded:Connect(function()
     task.wait(0.5)
@@ -1932,7 +1941,7 @@ Players.PlayerRemoving:Connect(function()
 end)
 
 -- Effect enable toggle
-MainSec:AddToggle({
+UIElements.EffectToggle = MainSec:AddToggle({
 	Name = "Enable Effect",
 	Default = false,
 	Callback = function(v)
@@ -1941,7 +1950,7 @@ MainSec:AddToggle({
 })
 
 -- Mode selection dropdown
-MainSec:AddDropdown({
+UIElements.ModeDropdown = MainSec:AddDropdown({
 	Name = "Select Mode",
 	Default = "Wing",
 	Options = {"Wing","Heart","Star","Vortex","Sphere","Rotate","Pet","Text","MagicCircle","MagicCircle2","MagicCircle3","FloatStone","Merkaba","Cube","MirrorPlayer","Beam","BackGuard"},
@@ -2043,7 +2052,7 @@ MainSec:AddButton({
 task.spawn(refreshToyList)
 
 -- Combined mode toggle
-MainSec:AddToggle({
+UIElements.CombinedToggle = MainSec:AddToggle({
 	Name = "Use Combined Mode",
 	Default = false,
 	Callback = function(v)
@@ -2129,14 +2138,14 @@ local CombineSec = ModeSetTab:AddSection({
     Name = "Combine Settings"
 })
 
-CombineSec:AddDropdown({
+UIElements.CombineMode1 = CombineSec:AddDropdown({
     Name = "Combine: Mode 1",
     Default = "Wing",
     Options = {"Wing","Heart","Star","Vortex","Sphere","Rotate","Pet","Text","MagicCircle","MagicCircle2","MagicCircle3","FloatStone","Merkaba","Cube","MirrorPlayer","Beam","BackGuard"},
     Callback = function(v) cfg.Combined.Mode1 = v end
 })
 
-CombineSec:AddSlider({
+UIElements.CombineMode1Count = CombineSec:AddSlider({
     Name = "Mode 1 Count",
     Min = 1,
     Max = 200,
@@ -2147,14 +2156,14 @@ CombineSec:AddSlider({
     Callback = function(v) cfg.Combined.Mode1Count = v end    
 })
 
-CombineSec:AddDropdown({
+UIElements.CombineMode2 = CombineSec:AddDropdown({
     Name = "Combine: Mode 2",
     Default = "Rotate",
     Options = {"Wing","Heart","Star","Vortex","Sphere","Rotate","Pet","Text","MagicCircle","MagicCircle2","MagicCircle3","FloatStone","Merkaba","Cube","MirrorPlayer","Beam","BackGuard"},
     Callback = function(v) cfg.Combined.Mode2 = v end
 })
 
-CombineSec:AddSlider({
+UIElements.CombineMode2Count = CombineSec:AddSlider({
     Name = "Mode 2 Count",
     Min = 1,
     Max = 200,
@@ -2265,7 +2274,7 @@ local GlobalSec = ConfigTab:AddSection({
 })
 
 -- 1. Follow toggle
-GlobalSec:AddToggle({
+UIElements.FollowToggle = GlobalSec:AddToggle({
     Name = "Follow Player",
     Default = true,
     Callback = function(v)
@@ -2298,26 +2307,26 @@ GlobalSec:AddButton({
     end
 })
 
-GlobalSec:AddSlider({
+UIElements.OrientationSlider = GlobalSec:AddSlider({
     Name = "Toy Orientation",
     Min = -180, Max = 180, Default = -90,
     Callback = function(v) GLOBAL_ANGLE = v end
 })
 
-GlobalSec:AddSlider({
+UIElements.MaxToysSlider = GlobalSec:AddSlider({
     Name = "Max Toys to Use",
     Min = 1, Max = 200, Default = cfg.Global.MaxToys or 100,
     Callback = function(v) cfg.Global.MaxToys = v end
 })
 
-GlobalSec:AddToggle({
+UIElements.AutoWidthToggle = GlobalSec:AddToggle({
     Name = "Auto-Width",
     Default = true,
     Callback = function(v) autoWidth = v end
 })
 
 -- Animation speed multiplier (processed as 10x for decimals)
-GlobalSec:AddSlider({
+UIElements.AnimSpeedSlider = GlobalSec:AddSlider({
     Name = "Animation Speed",
     Min = 1, Max = 50, Default = 10,
     Callback = function(v) cfg.AnimSpeed = v/10 end
@@ -2330,7 +2339,7 @@ local ResetSec = ConfigTab:AddSection({
 
 ResetSec:AddParagraph("Description","Periodically return to the specified house for a moment to reset the stay time.")
 
-ResetSec:AddToggle({
+UIElements.PlotReturnToggle = ResetSec:AddToggle({
     Name = "Enable Auto-Reset",
     Default = cfg.PlotReturn.Enabled,
     Callback = function(v)
@@ -2338,7 +2347,7 @@ ResetSec:AddToggle({
     end
 })
 
-ResetSec:AddSlider({
+UIElements.PlotReturnInterval = ResetSec:AddSlider({
     Name = "Interval (seconds)",
     Min = 10, Max = 85, 
     -- Safe way to write
@@ -2353,7 +2362,7 @@ ResetSec:AddSlider({
 -- "Select House to Return to", "Sub Tab", and "Piano" below this
 -- will finally be loaded.
 
-ResetSec:AddDropdown({
+UIElements.PlotReturnHouse = ResetSec:AddDropdown({
     Name = "Select House to Return to",
     Default = "None",
     Options = {"Cherry Blossom House", "Light Blue House", "Purple House", "Green House", "Pink House"},
@@ -2482,6 +2491,43 @@ SaveSec:AddButton({
                         GLOBAL_ANGLE = s.GlobalAngle or -90
                         autoWidth = s.AutoWidth or true
                         if s.Esp then espCfg = s.Esp end
+                        
+                        -- ★Update UI appearance (Use Set method)
+                        if UIElements.WalkSpeedSlider then UIElements.WalkSpeedSlider:Set(walkSpeed) end
+                        if UIElements.WalkSpeedToggle then UIElements.WalkSpeedToggle:Set(useWalkSpeed) end
+                        if UIElements.JumpPowerSlider then UIElements.JumpPowerSlider:Set(jumpPower) end
+                        if UIElements.JumpPowerToggle then UIElements.JumpPowerToggle:Set(useJumpPower) end
+                        if UIElements.NoclipToggle then UIElements.NoclipToggle:Set(noclip) end
+                        if UIElements.InfiniteJumpToggle then UIElements.InfiniteJumpToggle:Set(infiniteJump) end
+                        if UIElements.AntiExplosionToggle then UIElements.AntiExplosionToggle:Set(antiExplosion) end
+                        if UIElements.AntiFireToggle then UIElements.AntiFireToggle:Set(antiFire) end
+                        if UIElements.AntiGrabToggle then UIElements.AntiGrabToggle:Set(antiGrab) end
+                        if UIElements.AntiGucciToggle then UIElements.AntiGucciToggle:Set(false) end -- Off for safety
+                        if UIElements.EffectToggle then UIElements.EffectToggle:Set(isEnabled) end
+                        if UIElements.ModeDropdown then UIElements.ModeDropdown:Set(currentMode) end
+                        if UIElements.CombinedToggle then UIElements.CombinedToggle:Set(combinedActive) end
+                        if UIElements.FollowToggle then UIElements.FollowToggle:Set(followPlayer) end
+                        if UIElements.OrientationSlider then UIElements.OrientationSlider:Set(GLOBAL_ANGLE) end
+                        if UIElements.MaxToysSlider then UIElements.MaxToysSlider:Set(cfg.Global.MaxToys) end
+                        if UIElements.AutoWidthToggle then UIElements.AutoWidthToggle:Set(autoWidth) end
+                        if UIElements.AnimSpeedSlider then UIElements.AnimSpeedSlider:Set(cfg.AnimSpeed * 10) end
+                        if UIElements.PlotReturnToggle then UIElements.PlotReturnToggle:Set(cfg.PlotReturn.Enabled) end
+                        if UIElements.PlotReturnInterval then UIElements.PlotReturnInterval:Set(cfg.PlotReturn.Interval) end
+                        
+                        -- ESP Settings
+                        if UIElements.EspEnabled then UIElements.EspEnabled:Set(espCfg.Enabled) end
+                        if UIElements.EspTargetOnly then UIElements.EspTargetOnly:Set(espCfg.TargetOnly) end
+                        if UIElements.EspNames then UIElements.EspNames:Set(espCfg.Names) end
+                        if UIElements.EspTracers then UIElements.EspTracers:Set(espCfg.Tracers) end
+                        if UIElements.EspHitbox then UIElements.EspHitbox:Set(espCfg.Hitbox) end
+                        if UIElements.EspHitboxSize then UIElements.EspHitboxSize:Set(espCfg.HitboxSize) end
+                        if UIElements.EspColor then UIElements.EspColor:Set(espCfg.ESPColor) end
+                        
+                        -- Combined Settings
+                        if UIElements.CombineMode1 then UIElements.CombineMode1:Set(cfg.Combined.Mode1) end
+                        if UIElements.CombineMode1Count then UIElements.CombineMode1Count:Set(cfg.Combined.Mode1Count) end
+                        if UIElements.CombineMode2 then UIElements.CombineMode2:Set(cfg.Combined.Mode2) end
+                        if UIElements.CombineMode2Count then UIElements.CombineMode2Count:Set(cfg.Combined.Mode2Count) end
                     end
 
                     -- ★Update UI appearance (color, transparency, image) in real-time here
@@ -2598,7 +2644,7 @@ local SubTargetSec = SubTab:AddSection({
 -- 1. Create dropdown
 local targetSubName = "" 
 
-pDropSub = SubTargetSec:AddDropdown({
+UIElements.SubTargetDropdown = SubTargetSec:AddDropdown({
     Name = "Select Target",
     Default = LocalPlayer.DisplayName .. " (@" .. LocalPlayer.Name .. ")",
     Options = getPList(),
@@ -2611,6 +2657,7 @@ pDropSub = SubTargetSec:AddDropdown({
         targetSub = Players:FindFirstChild(targetSubName) or LocalPlayer
     end    
 })
+pDropSub = UIElements.SubTargetDropdown
 
 Players.PlayerAdded:Connect(function()
     task.wait(0.5)
@@ -2659,37 +2706,37 @@ local EspSec = SubTab:AddSection({
     Name = "ESP Settings"
 })
 
-EspSec:AddToggle({
+UIElements.EspEnabled = EspSec:AddToggle({
     Name = "Enable ESP",
     Default = false,
     Callback = function(v) espCfg.Enabled = v end 
 })
 
-EspSec:AddToggle({
+UIElements.EspTargetOnly = EspSec:AddToggle({
     Name = "Target Only",
     Default = false,
     Callback = function(v) espCfg.TargetOnly = v end 
 })
 
-EspSec:AddToggle({
+UIElements.EspNames = EspSec:AddToggle({
     Name = "Show Names",
     Default = true,
     Callback = function(v) espCfg.Names = v end 
 })
 
-EspSec:AddToggle({
+UIElements.EspTracers = EspSec:AddToggle({
     Name = "Show Tracers",
     Default = false,
     Callback = function(v) espCfg.Tracers = v end 
 })
 
-EspSec:AddToggle({
+UIElements.EspHitbox = EspSec:AddToggle({
     Name = "Hitbox",
     Default = false,
     Callback = function(v) espCfg.Hitbox = v end 
 })
 
-EspSec:AddSlider({
+UIElements.EspHitboxSize = EspSec:AddSlider({
     Name = "Hitbox Size",
     Min = 2,
     Max = 20,
@@ -2697,7 +2744,7 @@ EspSec:AddSlider({
     Callback = function(v) espCfg.HitboxSize = v end 
 })
 
-EspSec:AddColorpicker({
+UIElements.EspColor = EspSec:AddColorpicker({
     Name = "ESP Color",
     Default = Color3.new(1,0,0),
     Callback = function(v)
@@ -2710,7 +2757,7 @@ local BarrierSec = SubTab:AddSection({
 })
 
 local destroyBarrier = false
-BarrierSec:AddToggle({
+UIElements.BarrierBreak = BarrierSec:AddToggle({
     Name = "Break House Barrier (WIP)",
     Default = false,
     Callback = function(v)
@@ -2765,7 +2812,7 @@ ActionSec:AddButton({
 })
 
 local levitateRunning = false
-ActionSec:AddToggle({
+UIElements.BlobmanKick = ActionSec:AddToggle({
     Name = "Blobman Kick (Spam it)",
     Default = false,
     Callback = function(v)
@@ -2878,7 +2925,7 @@ local PianoControlSec = PianoTab:AddSection({
 	Name = "Piano Control"
 })
 
-PianoControlSec:AddToggle({
+UIElements.PianoEnabled = PianoControlSec:AddToggle({
 	Name = "Enable Piano",
 	Default = false,
 	Callback = function(v)
@@ -2911,7 +2958,7 @@ PianoControlSec:AddToggle({
 	end    
 })
 
-PianoControlSec:AddToggle({
+UIElements.PianoFollow = PianoControlSec:AddToggle({
     Name = "Follow Player",
     Default = true,
     Callback = function(v)
