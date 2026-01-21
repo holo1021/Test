@@ -8,7 +8,7 @@ pcall(function()
 end)
 
 local Window = OrionLib:MakeWindow({
-    Name = "Grab Hub v3.4 - Full Copy", 
+    Name = "Grab Hub v3.4 - Original Copy", 
     HidePremium = false, 
     SaveConfig = true, 
     ConfigFolder = "RobloxGrabHub",
@@ -17,77 +17,145 @@ local Window = OrionLib:MakeWindow({
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
+local Workspace = game:GetService("Workspace")
 local localPlayer = Players.LocalPlayer
 
--- --- 画像から抽出した実行関数 ---
-local function executeBarrierBreak()
-    local success, err = pcall(function()
-        local character = localPlayer.Character
-        local hrp = character and character:FindFirstChild("HumanoidRootPart")
-        local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-        
-        if not hrp or not humanoid then error("Character not found") end
+-- フラグ管理
+local autoBarrierNoTPRunning = false
+local autoBarrierNoTPToggle = nil
 
-        -- 1. 動作を安定させるために足を止める (画像1467行目付近)
+-- --- 画像から完全にコピーした実行ロジック ---
+local function executeOriginalBarrierBreak()
+    local success, err = pcall(function()
+        -- プレイヤーチェック
+        if not localPlayer.Character or not localPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            error("Character not found")
+        end
+        
+        local humanoid = localPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if not humanoid then error("Humanoid not found") end
+
+        -- 速度を0にする (画像1467行目付近)
         humanoid.WalkSpeed = 0
         
-        -- 2. リモート関数でアイテムを生成 (画像内の座標をそのまま使用)
-        local spawnToyRF = ReplicatedStorage:WaitForChild("MenuToys"):WaitForChild("SpawnToyRemoteFunction")
-        
-        -- 画像に記載されていた正確なCFrame数値
-        local targetCFrame = CFrame.new(
-            184.148834, -5.54824972, 498.136749, 
-            0.829037189, -0.214714944, 0.516328275, 
-            0, 0.923344612, 0.383972496, 
-            -0.559193552, -0.318327487, 0.765486956
-        )
-        
-        local spawnResult = spawnToyRF:InvokeServer(
+        local replicatedStorage = game:GetService("ReplicatedStorage")
+        if not replicatedStorage:FindFirstChild("MenuToys") then
+            humanoid.WalkSpeed = 16
+            error("MenuToys not found")
+        end
+
+        -- 【重要】画像に記載されていた正確なCFrameとVector3
+        -- オカリナの生成 (画像1467行目)
+        local spawnResult = replicatedStorage.MenuToys.SpawnToyRemoteFunction:InvokeServer(
             "InstrumentWoodwindOcarina", 
-            targetCFrame, 
+            CFrame.new(
+                184.148834, -5.54824972, 498.136749, 
+                0.829037189, -0.214714944, 0.516328275, 
+                0, 0.923344612, 0.383972496, 
+                -0.559193552, -0.318327487, 0.765486956
+            ),
             Vector3.new(0, 34, 0)
         )
 
-        -- 3. テレポート実行 (画像1455行目のロジック)
-        if spawnResult then
-            hrp.CFrame = targetCFrame
-            task.wait(0.5)
-            humanoid.WalkSpeed = 16
-            return true
-        else
-            humanoid.WalkSpeed = 16
-            return false
+        if not spawnResult then 
+            humanoid.WalkSpeed = 16 
+            return false 
         end
+
+        -- キャンプファイヤーの生成 (画像3枚目/unnamed (3).jpg の上部参照)
+        -- 画像から読み取れる座標数値を反映
+        local campfireSpawnResult = replicatedStorage.MenuToys.SpawnToyRemoteFunction:InvokeServer(
+            "Campfire",
+            CFrame.new(
+                -0.930908992, -0.171067372, 0.257899135, 0,
+                0.533338678, 0.552762806, -0.309477001,
+                0.525626004, -0.79242748
+            ),
+            Vector3.new(0, 161.9720001220703, 0)
+        )
+
+        if not campfireSpawnResult then
+            humanoid.WalkSpeed = 16
+            error("Campfire spawn failed")
+        end
+
+        task.wait(1)
+
+        -- 最終チェック
+        local playerName = localPlayer.Name
+        if not Workspace:FindFirstChild(playerName .. "SpawnedInToys") then
+            humanoid.WalkSpeed = 16
+            error("Toy folder disappeared")
+        end
+
+        humanoid.WalkSpeed = 16
+        return true
     end)
     return success, err
 end
 
--- --- UI設定 ---
+-- --- UIタブ設定 ---
 local Tab = Window:MakeTab({
-    Name = "Barrier Break",
+    Name = "Original Barrier",
     Icon = "rbxassetid://4483345998"
 })
 
-Tab:AddButton({
-    Name = "バリア破壊(TP) 実行",
-    Callback = function()
-        local result, err = executeBarrierBreak()
-        if result then
+autoBarrierNoTPToggle = Tab:AddToggle({
+    Name = "オートバリア破壊NoTP",
+    Default = false,
+    Callback = function(Value)
+        autoBarrierNoTPRunning = Value
+        if Value then
             OrionLib:MakeNotification({
-                Name = "Success",
-                Content = "バリアを突破しました",
-                Time = 3
+                Name = "スタート",
+                Content = "成功するまで自動実行",
+                Time = 2
             })
-        else
-            OrionLib:MakeNotification({
-                Name = "Failed",
-                Content = "失敗しました: " .. tostring(err),
-                Time = 3
-            })
+            
+            task.spawn(function()
+                while autoBarrierNoTPRunning do
+                    -- 家の中にいるかどうかの判定 (画像1466行目)
+                    local plotItems = Workspace:FindFirstChild("PlotItems")
+                    local playersInPlots = plotItems and plotItems:FindFirstChild("PlayersInPlots")
+                    
+                    if playersInPlots and playersInPlots:FindFirstChild(localPlayer.Name) then
+                        OrionLib:MakeNotification({
+                            Name = "Error",
+                            Content = "Don't be in the house",
+                            Time = 3
+                        })
+                        autoBarrierNoTPRunning = false
+                        autoBarrierNoTPToggle:Set(false)
+                        break
+                    end
+
+                    local success, err = executeOriginalBarrierBreak()
+                    if success then
+                        OrionLib:MakeNotification({
+                            Name = "成功",
+                            Content = "バリア破壊成功",
+                            Time = 3
+                        })
+                        autoBarrierNoTPRunning = false
+                        autoBarrierNoTPToggle:Set(false)
+                        break
+                    end
+                    task.wait(1.5)
+                end
+            end)
         end
     end
 })
 
-Tab:AddLabel("※画像内の座標データをそのまま使用しています")
+Tab:AddButton({
+    Name = "バリア破壊(TPあり) 実行",
+    Callback = function()
+        -- 画像1464行目付近のTPロジック
+        local hrp = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            hrp.CFrame = CFrame.new(184.148834, -5.54824972, 498.136749)
+        end
+    end
+})
 
 OrionLib:Init()
