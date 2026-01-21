@@ -1530,103 +1530,39 @@ if not cfg.UI then
     cfg.UI = {
         Transparency = 0.1,
         BackgroundColor = Color3.fromRGB(25, 25, 25),
-        AccentColor = Color3.fromRGB(128, 128, 128),
+        AccentColor = Color3.fromRGB(88, 101, 242),
         BackgroundImage = ""
     }
 end
 
 -- UI外観をリアルタイムに反映させるエンジン
 local function applyCustomStyle()
-    -- 安全策: cfg.UIが存在しない場合の初期化（ロード直後対策）
-    if not cfg.UI then
-        cfg.UI = {
-            Transparency = 0.1,
-            BackgroundColor = Color3.fromRGB(25, 25, 25),
-            AccentColor = Color3.fromRGB(128, 128, 128),
-            BackgroundImage = ""
-        }
-    end
-
-    local gui = game:GetService("CoreGui"):FindFirstChild("OrionUI") or game:GetService("CoreGui"):FindFirstChild("Orion")
-    if not gui then
-        gui = LocalPlayer:FindFirstChild("PlayerGui") and (LocalPlayer.PlayerGui:FindFirstChild("OrionUI") or LocalPlayer.PlayerGui:FindFirstChild("Orion"))
-    end
-
-    if gui then
-        local main = gui:FindFirstChild("Main")
-        if not main then
-            for _, child in ipairs(gui:GetChildren()) do
-                if child:IsA("Frame") and child:FindFirstChild("TopBar") then
-                    main = child
-                    break
-                end
-            end
-        end
+    local gui = game.CoreGui:FindFirstChild("Orion")
+    if gui and gui:FindFirstChild("Main") then
+        local main = gui.Main
         
-        if main then
-            local bgColor = cfg.UI.BackgroundColor or Color3.fromRGB(25, 25, 25)
-            local trans = cfg.UI.Transparency or 0.1
-            local accent = cfg.UI.AccentColor or Color3.fromRGB(128, 128, 128)
-    
-            main.BackgroundColor3 = bgColor
-            main.BackgroundTransparency = trans
-            
-            -- 子要素を再帰的に探索してスタイル適用
-            for _, desc in ipairs(main:GetDescendants()) do
-                -- 1. 枠線 (UIStroke)
-                if desc:IsA("UIStroke") then
-                    desc.Color = accent
-                end
-                -- 2. 区切り線 (Lineという名前のFrame)
-                if desc:IsA("Frame") and desc.Name == "Line" then
-                    desc.BackgroundColor3 = accent
-                end
-                -- 3. サイドバーとトップバー
-                if desc:IsA("Frame") and (desc.Name == "SideBar" or desc.Name == "TopBar") then
-                    desc.BackgroundColor3 = bgColor
-                    desc.BackgroundTransparency = trans
-                    -- ヘッダーの角を丸くする
-                    if desc.Name == "TopBar" then
-                        local corner = desc:FindFirstChild("UICorner") or Instance.new("UICorner", desc)
-                        corner.CornerRadius = UDim.new(0, 9)
-                    end
-                end
-                -- 4. ボタンとタブ (TextButton)
-                -- 透明でないものだけ適用（見えないヒットボックスが表示されるのを防ぐ）
-                if desc:IsA("TextButton") and desc.BackgroundTransparency < 1 then
-                    desc.BackgroundColor3 = bgColor
-                    desc.BackgroundTransparency = trans
-                end
-            end
-            
-            -- メインフレーム自体の角も確実に丸くする
-            local mainCorner = main:FindFirstChild("UICorner") or Instance.new("UICorner", main)
-            mainCorner.CornerRadius = UDim.new(0, 9)
+        -- 背景と透明度を即座に反映
+        main.BackgroundColor3 = cfg.UI.BackgroundColor or Color3.fromRGB(25, 25, 25)
+        main.BackgroundTransparency = cfg.UI.Transparency or 0.1
+        
+        if main:FindFirstChild("SideBar") then
+            main.SideBar.BackgroundColor3 = cfg.UI.BackgroundColor or Color3.fromRGB(25, 25, 25)
+        end
         
         -- 背景画像のリアルタイム処理
         local bgImage = main:FindFirstChild("CustomBG")
         if cfg.UI.BackgroundImage and cfg.UI.BackgroundImage ~= "" then
             if not bgImage then
-                bgImage = Instance.new("ImageLabel")
+                bgImage = Instance.new("ImageLabel", main)
                 bgImage.Name = "CustomBG"
-                bgImage.Parent = main
                 bgImage.Size = UDim2.new(1, 0, 1, 0)
-                bgImage.Position = UDim2.new(0, 0, 0, 0)
                 bgImage.ZIndex = 0
                 bgImage.BackgroundTransparency = 1
             end
-            
-            local imgId = tostring(cfg.UI.BackgroundImage)
-            if not imgId:match("^rbxassetid://") then
-                imgId = "rbxassetid://" .. imgId
-            end
-            
-            bgImage.Image = imgId
-            bgImage.ImageTransparency = trans
-            bgImage.Visible = true
-        else
-            if bgImage then bgImage.Visible = false end
-        end
+            bgImage.Image = "rbxassetid://" .. cfg.UI.BackgroundImage
+            bgImage.ImageTransparency = cfg.UI.Transparency or 0.1
+        elseif bgImage then
+            bgImage:Destroy()
         end
     end
 end
@@ -1653,7 +1589,7 @@ local function StartHolonHUB()
     local Window = OrionLib:MakeWindow({
         Name = "Holon HUB v1.3.5",
         HidePremium = false,
-        SaveConfig = false, -- 初期化時の干渉を防ぐため無効化
+        SaveConfig = true,
         ConfigFolder = "HolonHUB",
         IntroEnabled = true,
         IntroText = "Holon HUB Load!"
@@ -1669,9 +1605,6 @@ local function getPList()
     return plist
 end
 
--- UI要素を管理するテーブル
-local UIElements = {}
-
 -- --- TAB: MAIN ---
 local MainTab = Window:MakeTab({
 	Name = "メイン",
@@ -1686,28 +1619,24 @@ local PlayerTab = Window:MakeTab({
 
 local MoveSec = PlayerTab:AddSection({ Name = "移動設定" })
 
--- 現在のステータスを初期値にする
-local currentWS = (LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid")) and LocalPlayer.Character.Humanoid.WalkSpeed or 16
-walkSpeed = currentWS
-
-UIElements.WalkSpeedSlider = MoveSec:AddSlider({
-    Name = "歩行スピード", Min = 16, Max = 300, Default = currentWS, Increment = 1,
+MoveSec:AddSlider({
+    Name = "歩行スピード", Min = 16, Max = 300, Default = 16, Increment = 1,
     Callback = function(v) walkSpeed = v end
 })
 
-UIElements.WalkSpeedToggle = MoveSec:AddToggle({
+MoveSec:AddToggle({
     Name = "歩行スピード有効化", Default = false,
     Callback = function(v) 
         useWalkSpeed = v 
     end
 })
 
-UIElements.JumpPowerSlider = MoveSec:AddSlider({
+MoveSec:AddSlider({
     Name = "ジャンプ力", Min = 16, Max = 300, Default = 25, Increment = 1,
     Callback = function(v) jumpPower = v end
 })
 
-UIElements.JumpPowerToggle = MoveSec:AddToggle({
+MoveSec:AddToggle({
     Name = "ジャンプ力有効化", Default = false,
     Callback = function(v) 
         useJumpPower = v 
@@ -1717,7 +1646,7 @@ UIElements.JumpPowerToggle = MoveSec:AddToggle({
     end
 })
 
-UIElements.NoclipToggle = MoveSec:AddToggle({
+MoveSec:AddToggle({
     Name = "Noclip", Default = false,
     Callback = function(v) 
         noclip = v 
@@ -1733,7 +1662,7 @@ UIElements.NoclipToggle = MoveSec:AddToggle({
     end
 })
 
-UIElements.InfiniteJumpToggle = MoveSec:AddToggle({
+MoveSec:AddToggle({
     Name = "無限ジャンプ", Default = false,
     Callback = function(v) infiniteJump = v end
 })
@@ -1741,7 +1670,7 @@ UIElements.InfiniteJumpToggle = MoveSec:AddToggle({
 local vflyEnabled = false
 local vflySpeed = 1
 
-UIElements.VFlyToggle = MoveSec:AddToggle({
+MoveSec:AddToggle({
     Name = "VFly",
     Default = false,
     Callback = function(v)
@@ -1815,7 +1744,7 @@ UIElements.VFlyToggle = MoveSec:AddToggle({
     end
 })
 
-UIElements.VFlySpeedSlider = MoveSec:AddSlider({
+MoveSec:AddSlider({
     Name = "VFly速度",
     Min = 1, Max = 10, Default = 1,
     Callback = function(v) vflySpeed = v end
@@ -1823,12 +1752,12 @@ UIElements.VFlySpeedSlider = MoveSec:AddSlider({
 
 local ProtectSec = PlayerTab:AddSection({ Name = "保護機能" })
 
-UIElements.AntiExplosionToggle = ProtectSec:AddToggle({ Name = "アンチ爆発", Default = false, Callback = function(v) antiExplosion = v end })
-UIElements.AntiFireToggle = ProtectSec:AddToggle({ Name = "アンチ炎", Default = false, Callback = function(v) antiFire = v end })
-UIElements.AntiGrabToggle = ProtectSec:AddToggle({ Name = "アンチ掴み", Default = false, Callback = function(v) antiGrab = v end })
+ProtectSec:AddToggle({ Name = "アンチ爆発", Default = false, Callback = function(v) antiExplosion = v end })
+ProtectSec:AddToggle({ Name = "アンチ炎", Default = false, Callback = function(v) antiFire = v end })
+ProtectSec:AddToggle({ Name = "アンチ掴み", Default = false, Callback = function(v) antiGrab = v end })
 
 local gucciConn = nil
-UIElements.AntiGucciToggle = ProtectSec:AddToggle({ 
+ProtectSec:AddToggle({ 
     Name = "アンチグッチ", 
     Default = false, 
     Callback = function(v) 
@@ -1869,7 +1798,7 @@ UIElements.AntiGucciToggle = ProtectSec:AddToggle({
 
 local PlayerViewSec = PlayerTab:AddSection({ Name = "視点・カメラ" })
 
-UIElements.ThirdPersonToggle = PlayerViewSec:AddToggle({
+PlayerViewSec:AddToggle({
     Name = "三人称視点",
     Default = false,
     Callback = function(v) 
@@ -1885,12 +1814,12 @@ UIElements.ThirdPersonToggle = PlayerViewSec:AddToggle({
     end 
 })
 
-local currentFOV = Camera.FieldOfView
-UIElements.FOVSlider = PlayerViewSec:AddSlider({
+PlayerViewSec:AddSlider({
     Name = "FOV調整",
     Min = 30,
     Max = 120,
-    Default = currentFOV,
+    Default = 70,
+    Color = Color3.fromRGB(255,255,255),
     Increment = 1,
     Callback = function(v)
         Camera.FieldOfView = v
@@ -1908,7 +1837,7 @@ local targetMainName = "" -- 名前を保存する変数を新しく用意
 local tpDropdown = nil
 
 local pDropMain
-UIElements.MainTargetDropdown = MainSec:AddDropdown({
+pDropMain = MainSec:AddDropdown({
     Name = "メイン対象",
     Default = LocalPlayer.DisplayName .. " (@" .. LocalPlayer.Name .. ")",
     Options = getPList(),
@@ -1919,7 +1848,6 @@ UIElements.MainTargetDropdown = MainSec:AddDropdown({
         targetMain = Players:FindFirstChild(targetMainName) or LocalPlayer
     end    
 })
-pDropMain = UIElements.MainTargetDropdown
 
 Players.PlayerAdded:Connect(function()
     task.wait(0.5)
@@ -1934,7 +1862,7 @@ Players.PlayerRemoving:Connect(function()
 end)
 
 -- エフェクト有効化トグル
-UIElements.EffectToggle = MainSec:AddToggle({
+MainSec:AddToggle({
 	Name = "エフェクト有効化",
 	Default = false,
 	Callback = function(v)
@@ -1943,7 +1871,7 @@ UIElements.EffectToggle = MainSec:AddToggle({
 })
 
 -- モード選択ドロップダウン
-UIElements.ModeDropdown = MainSec:AddDropdown({
+MainSec:AddDropdown({
 	Name = "モード選択",
 	Default = "Wing",
 	Options = {"Wing","Heart","Star","Vortex","Sphere","Rotate","Pet","Text","MagicCircle","MagicCircle2","MagicCircle3","FloatStone","Merkaba","Cube","MirrorPlayer","Beam","BackGuard"},
@@ -1956,7 +1884,7 @@ UIElements.ModeDropdown = MainSec:AddDropdown({
 -- 制御対象ドロップダウン
 local itemDropdown
 
-UIElements.ItemDropdown = MainSec:AddDropdown({
+itemDropdown = MainSec:AddDropdown({
     Name = "制御対象の選択",
     Default = "なし",
     Options = {"なし"},
@@ -1964,7 +1892,6 @@ UIElements.ItemDropdown = MainSec:AddDropdown({
         selectedItemName = v
     end    
 })
-itemDropdown = UIElements.ItemDropdown
 
 -- おもちゃリストをスキャンしてドロップダウンを更新する共通関数
 local function refreshToyList()
@@ -2046,7 +1973,7 @@ MainSec:AddButton({
 task.spawn(refreshToyList)
 
 -- 合体モードトグル
-UIElements.CombinedToggle = MainSec:AddToggle({
+MainSec:AddToggle({
 	Name = "合体モード使用",
 	Default = false,
 	Callback = function(v)
@@ -2132,35 +2059,37 @@ local CombineSec = ModeSetTab:AddSection({
     Name = "合体設定"
 })
 
-UIElements.CombineMode1 = CombineSec:AddDropdown({
+CombineSec:AddDropdown({
     Name = "合体: モード1",
     Default = "Wing",
     Options = {"Wing","Heart","Star","Vortex","Sphere","Rotate","Pet","Text","MagicCircle","MagicCircle2","MagicCircle3","FloatStone","Merkaba","Cube","MirrorPlayer","Beam","BackGuard"},
     Callback = function(v) cfg.Combined.Mode1 = v end
 })
 
-UIElements.CombineMode1Count = CombineSec:AddSlider({
+CombineSec:AddSlider({
     Name = "モード1の使用数",
     Min = 1,
     Max = 200,
     Default = 20,
+    Color = Color3.fromRGB(255,255,255),
     Increment = 1,
     ValueName = "個",
     Callback = function(v) cfg.Combined.Mode1Count = v end    
 })
 
-UIElements.CombineMode2 = CombineSec:AddDropdown({
+CombineSec:AddDropdown({
     Name = "合体: モード2",
     Default = "Rotate",
     Options = {"Wing","Heart","Star","Vortex","Sphere","Rotate","Pet","Text","MagicCircle","MagicCircle2","MagicCircle3","FloatStone","Merkaba","Cube","MirrorPlayer","Beam","BackGuard"},
     Callback = function(v) cfg.Combined.Mode2 = v end
 })
 
-UIElements.CombineMode2Count = CombineSec:AddSlider({
+CombineSec:AddSlider({
     Name = "モード2の使用数",
     Min = 1,
     Max = 200,
     Default = 10,
+    Color = Color3.fromRGB(255,255,255),
     Increment = 1,
     ValueName = "個",
     Callback = function(v) cfg.Combined.Mode2Count = v end    
@@ -2266,7 +2195,7 @@ local GlobalSec = ConfigTab:AddSection({
 })
 
 -- 1. 追従切り替え
-UIElements.FollowToggle = GlobalSec:AddToggle({
+GlobalSec:AddToggle({
     Name = "プレイヤー追従",
     Default = true,
     Callback = function(v)
@@ -2299,26 +2228,26 @@ GlobalSec:AddButton({
     end
 })
 
-UIElements.OrientationSlider = GlobalSec:AddSlider({
+GlobalSec:AddSlider({
     Name = "おもちゃ自体の向き",
     Min = -180, Max = 180, Default = -90,
     Callback = function(v) GLOBAL_ANGLE = v end
 })
 
-UIElements.MaxToysSlider = GlobalSec:AddSlider({
+GlobalSec:AddSlider({
     Name = "使用するおもちゃの最大数",
     Min = 1, Max = 200, Default = cfg.Global.MaxToys or 100,
     Callback = function(v) cfg.Global.MaxToys = v end
 })
 
-UIElements.AutoWidthToggle = GlobalSec:AddToggle({
+GlobalSec:AddToggle({
     Name = "幅自動調整",
     Default = true,
     Callback = function(v) autoWidth = v end
 })
 
 -- アニメ速度倍率 (小数のため10倍で処理)
-UIElements.AnimSpeedSlider = GlobalSec:AddSlider({
+GlobalSec:AddSlider({
     Name = "アニメ速度倍率",
     Min = 1, Max = 50, Default = 10,
     Callback = function(v) cfg.AnimSpeed = v/10 end
@@ -2331,7 +2260,7 @@ local ResetSec = ConfigTab:AddSection({
 
 ResetSec:AddParagraph("説明","指定した家へ定期的に一瞬だけ帰還し、滞在時間をリセットします。")
 
-UIElements.PlotReturnToggle = ResetSec:AddToggle({
+ResetSec:AddToggle({
     Name = "自動リセット有効化",
     Default = cfg.PlotReturn.Enabled,
     Callback = function(v)
@@ -2339,7 +2268,7 @@ UIElements.PlotReturnToggle = ResetSec:AddToggle({
     end
 })
 
-UIElements.PlotReturnInterval = ResetSec:AddSlider({
+ResetSec:AddSlider({
     Name = "実行間隔 (秒)",
     Min = 10, Max = 85, 
     -- 安全な書き方に変更
@@ -2354,7 +2283,7 @@ UIElements.PlotReturnInterval = ResetSec:AddSlider({
 -- この下の「帰還する家を選択」や「サブタブ」「ピアノ」が
 -- これでようやく読み込まれるようになります。
 
-UIElements.PlotReturnHouse = ResetSec:AddDropdown({
+ResetSec:AddDropdown({
     Name = "帰還する家を選択",
     Default = "なし",
     Options = {"桜の家", "水色の家", "紫の家", "緑の家", "ピンクの家"},
@@ -2464,109 +2393,6 @@ SaveSec:AddButton({
                 
                 if success then
                     cfg = data
-                    
-                    -- 保存された設定をローカル変数に反映
-                    if cfg.LocalSettings then
-                        local s = cfg.LocalSettings
-                        walkSpeed = s.WalkSpeed or 16
-                        jumpPower = s.JumpPower or 25
-                        useWalkSpeed = s.UseWalkSpeed or false
-                        useJumpPower = s.UseJumpPower or false
-                        infiniteJump = s.InfiniteJump or false
-                        noclip = s.Noclip or false
-                        antiExplosion = s.AntiExplosion or false
-                        antiFire = s.AntiFire or false
-                        antiGrab = s.AntiGrab or false
-                        currentMode = s.CurrentMode or "Wing"
-                        combinedActive = s.CombinedActive or false
-                        followPlayer = s.FollowPlayer or true
-                        GLOBAL_ANGLE = s.GlobalAngle or -90
-                        autoWidth = s.AutoWidth or true
-                        if s.Esp then espCfg = s.Esp end
-                        
-                        -- ★UI要素の見た目を更新 (Setメソッドを使用)
-                        if UIElements.WalkSpeedSlider then UIElements.WalkSpeedSlider:Set(walkSpeed) end
-                        if UIElements.WalkSpeedToggle then UIElements.WalkSpeedToggle:Set(useWalkSpeed) end
-                        if UIElements.JumpPowerSlider then UIElements.JumpPowerSlider:Set(jumpPower) end
-                        if UIElements.JumpPowerToggle then UIElements.JumpPowerToggle:Set(useJumpPower) end
-                        if UIElements.NoclipToggle then UIElements.NoclipToggle:Set(noclip) end
-                        if UIElements.InfiniteJumpToggle then UIElements.InfiniteJumpToggle:Set(infiniteJump) end
-                        if UIElements.AntiExplosionToggle then UIElements.AntiExplosionToggle:Set(antiExplosion) end
-                        if UIElements.AntiFireToggle then UIElements.AntiFireToggle:Set(antiFire) end
-                        if UIElements.AntiGrabToggle then UIElements.AntiGrabToggle:Set(antiGrab) end
-                        if UIElements.AntiGucciToggle then UIElements.AntiGucciToggle:Set(false) end -- 安全のためOFF
-                        if UIElements.EffectToggle then UIElements.EffectToggle:Set(isEnabled) end
-                        if UIElements.ModeDropdown then UIElements.ModeDropdown:Set(currentMode) end
-                        if UIElements.CombinedToggle then UIElements.CombinedToggle:Set(combinedActive) end
-                        if UIElements.FollowToggle then UIElements.FollowToggle:Set(followPlayer) end
-                        if UIElements.OrientationSlider then UIElements.OrientationSlider:Set(GLOBAL_ANGLE) end
-                        if UIElements.MaxToysSlider then UIElements.MaxToysSlider:Set(cfg.Global.MaxToys) end
-                        if UIElements.AutoWidthToggle then UIElements.AutoWidthToggle:Set(autoWidth) end
-                        if UIElements.AnimSpeedSlider then UIElements.AnimSpeedSlider:Set(cfg.AnimSpeed * 10) end
-                        if UIElements.PlotReturnToggle then UIElements.PlotReturnToggle:Set(cfg.PlotReturn.Enabled) end
-                        if UIElements.PlotReturnInterval then UIElements.PlotReturnInterval:Set(cfg.PlotReturn.Interval) end
-                        
-                        -- ESP設定の反映
-                        if UIElements.EspEnabled then UIElements.EspEnabled:Set(espCfg.Enabled) end
-                        if UIElements.EspTargetOnly then UIElements.EspTargetOnly:Set(espCfg.TargetOnly) end
-                        if UIElements.EspNames then UIElements.EspNames:Set(espCfg.Names) end
-                        if UIElements.EspTracers then UIElements.EspTracers:Set(espCfg.Tracers) end
-                        if UIElements.EspHitbox then UIElements.EspHitbox:Set(espCfg.Hitbox) end
-                        if UIElements.EspHitboxSize then UIElements.EspHitboxSize:Set(espCfg.HitboxSize) end
-                        if UIElements.EspColor then UIElements.EspColor:Set(espCfg.ESPColor) end
-                        
-                        -- 合体設定の反映
-                        if UIElements.CombineMode1 then UIElements.CombineMode1:Set(cfg.Combined.Mode1) end
-                        if UIElements.CombineMode1Count then UIElements.CombineMode1Count:Set(cfg.Combined.Mode1Count) end
-                        if UIElements.CombineMode2 then UIElements.CombineMode2:Set(cfg.Combined.Mode2) end
-                        if UIElements.CombineMode2Count then UIElements.CombineMode2Count:Set(cfg.Combined.Mode2Count) end
-                        
-                        -- 追加項目の反映
-                        vflyEnabled = s.VFlyEnabled or false
-                        vflySpeed = s.VFlySpeed or 1
-                        local isThirdPerson = s.ThirdPerson or false
-                        local savedFOV = s.FOV or 70
-                        targetMainName = s.TargetMainName or ""
-                        targetSubName = s.TargetSubName or ""
-                        selectedItemName = s.SelectedItemName or "全てのおもちゃ"
-                        pianoEnabled = s.PianoEnabled or false
-                        pianoFollowEnabled = s.PianoFollowEnabled or true
-
-                        if UIElements.VFlyToggle then UIElements.VFlyToggle:Set(vflyEnabled) end
-                        if UIElements.VFlySpeedSlider then UIElements.VFlySpeedSlider:Set(vflySpeed) end
-                        if UIElements.ThirdPersonToggle then UIElements.ThirdPersonToggle:Set(isThirdPerson) end
-                        if UIElements.FOVSlider then UIElements.FOVSlider:Set(savedFOV) end
-                        if UIElements.ItemDropdown then UIElements.ItemDropdown:Set(selectedItemName) end
-                        if UIElements.PianoEnabled then UIElements.PianoEnabled:Set(pianoEnabled) end
-                        if UIElements.PianoFollow then UIElements.PianoFollow:Set(pianoFollowEnabled) end
-
-                        -- ターゲットドロップダウンの復元（リストから検索）
-                        local function restoreDropdown(dd, name)
-                            if dd and name ~= "" then
-                                for _, opt in ipairs(getPList()) do
-                                    if opt:match("@" .. name .. "%)") then dd:Set(opt) break end
-                                end
-                            end
-                        end
-                        restoreDropdown(UIElements.MainTargetDropdown, targetMainName)
-                        restoreDropdown(UIElements.SubTargetDropdown, targetSubName)
-                        
-                        -- ★UI設定の復元
-                        if not cfg.UI then
-                            cfg.UI = {
-                                Transparency = 0.1,
-                                BackgroundColor = Color3.fromRGB(25, 25, 25),
-                                AccentColor = Color3.fromRGB(128, 128, 128),
-                                BackgroundImage = ""
-                            }
-                        end
-                        
-                        if UIElements.UITransparency then UIElements.UITransparency:Set((cfg.UI.Transparency or 0.1) * 100) end
-                        if UIElements.UIBackgroundColor then UIElements.UIBackgroundColor:Set(cfg.UI.BackgroundColor or Color3.fromRGB(25, 25, 25)) end
-                        if UIElements.UIAccentColor then UIElements.UIAccentColor:Set(cfg.UI.AccentColor or Color3.fromRGB(128, 128, 128)) end
-                        if UIElements.UIBackgroundImage then UIElements.UIBackgroundImage:Set(cfg.UI.BackgroundImage or "") end
-                    end
-
                     -- ★ここでリアルタイムにUIの見た目（カラー・透明度・画像）を更新
                     applyCustomStyle() 
                     OrionLib:MakeNotification({Name = "成功", Content = selectedFile .. " を適用しました", Time = 3})
@@ -2593,35 +2419,6 @@ SaveSec:AddButton({
             if not isfolder("holon_config") then makefolder("holon_config") end
             local path = "holon_config/" .. saveName .. ".json"
             
-            -- ローカル変数の状態をcfgに同期させてから保存
-            cfg.LocalSettings = {
-                WalkSpeed = walkSpeed,
-                JumpPower = jumpPower,
-                UseWalkSpeed = useWalkSpeed,
-                UseJumpPower = useJumpPower,
-                InfiniteJump = infiniteJump,
-                Noclip = noclip,
-                AntiExplosion = antiExplosion,
-                AntiFire = antiFire,
-                AntiGrab = antiGrab,
-                CurrentMode = currentMode,
-                CombinedActive = combinedActive,
-                FollowPlayer = followPlayer,
-                GlobalAngle = GLOBAL_ANGLE,
-                AutoWidth = autoWidth,
-                Esp = espCfg, -- ESP設定(テーブル)も保存
-                -- 追加保存項目
-                VFlyEnabled = vflyEnabled,
-                VFlySpeed = vflySpeed,
-                ThirdPerson = (LocalPlayer.CameraMode == Enum.CameraMode.Classic),
-                FOV = Camera.FieldOfView,
-                TargetMainName = targetMainName,
-                TargetSubName = targetSubName,
-                SelectedItemName = selectedItemName,
-                PianoEnabled = pianoEnabled,
-                PianoFollowEnabled = pianoFollowEnabled
-            }
-
             writefile(path, HttpService:JSONEncode(cfg))
             
             -- ★ここがポイント：保存した直後にドロップダウンのリストを最新にする
@@ -2639,9 +2436,9 @@ SaveSec:AddButton({
 -- --- UI外観設定 ---
 local UISec = ConfigTab:AddSection({Name = "UI外観・カラー設定"})
 
-UIElements.UITransparency = UISec:AddSlider({
+UISec:AddSlider({
     Name = "UI透明度",
-    Min = 0, Max = 100, Default = 0,
+    Min = 0, Max = 100, Default = 10,
     Callback = function(v)
         cfg.UI.Transparency = v / 100
         applyCustomStyle()
@@ -2649,7 +2446,7 @@ UIElements.UITransparency = UISec:AddSlider({
 })
 
 -- 以降、cfg.UI が存在するので消えずに表示されます
-UIElements.UIBackgroundColor = UISec:AddColorpicker({
+UISec:AddColorpicker({
     Name = "背景カラー",
     Default = cfg.UI.BackgroundColor,
     Callback = function(v)
@@ -2658,7 +2455,7 @@ UIElements.UIBackgroundColor = UISec:AddColorpicker({
     end
 })
 
-UIElements.UIAccentColor = UISec:AddColorpicker({
+UISec:AddColorpicker({
     Name = "枠カラー (アクセント)",
     Default = cfg.UI.AccentColor,
     Callback = function(v)
@@ -2667,21 +2464,12 @@ UIElements.UIAccentColor = UISec:AddColorpicker({
     end
 })
 
-UIElements.UIBackgroundImage = UISec:AddTextbox({
+UISec:AddTextbox({
     Name = "背景画像ID (数字のみ)",
     Default = cfg.UI.BackgroundImage,
     TextDisappear = false,
     Callback = function(v)
-        -- 数字以外の文字を除去して、数値のみ取り出す
-        local id = v:match("%d+") 
-        if id then
-            -- Decal IDをImage IDとして読み込ませるためのURL形式
-            -- ※Robloxの内部処理で自動変換を促す書き方です
-            cfg.UI.BackgroundImage = "rbxassetid://" .. id
-        else
-            cfg.UI.BackgroundImage = ""
-        end
-        
+        cfg.UI.BackgroundImage = v
         applyCustomStyle()
     end
 })
@@ -2700,7 +2488,7 @@ local SubTargetSec = SubTab:AddSection({
 -- 1. ドロップダウンの作成
 local targetSubName = "" 
 
-UIElements.SubTargetDropdown = SubTargetSec:AddDropdown({
+pDropSub = SubTargetSec:AddDropdown({
     Name = "対象選択",
     Default = LocalPlayer.DisplayName .. " (@" .. LocalPlayer.Name .. ")",
     Options = getPList(),
@@ -2713,7 +2501,6 @@ UIElements.SubTargetDropdown = SubTargetSec:AddDropdown({
         targetSub = Players:FindFirstChild(targetSubName) or LocalPlayer
     end    
 })
-pDropSub = UIElements.SubTargetDropdown
 
 Players.PlayerAdded:Connect(function()
     task.wait(0.5)
@@ -2762,37 +2549,37 @@ local EspSec = SubTab:AddSection({
     Name = "ESP設定"
 })
 
-UIElements.EspEnabled = EspSec:AddToggle({
+EspSec:AddToggle({
     Name = "ESP有効",
     Default = false,
     Callback = function(v) espCfg.Enabled = v end 
 })
 
-UIElements.EspTargetOnly = EspSec:AddToggle({
+EspSec:AddToggle({
     Name = "ターゲットのみ表示",
     Default = false,
     Callback = function(v) espCfg.TargetOnly = v end 
 })
 
-UIElements.EspNames = EspSec:AddToggle({
+EspSec:AddToggle({
     Name = "名前表示",
     Default = true,
     Callback = function(v) espCfg.Names = v end 
 })
 
-UIElements.EspTracers = EspSec:AddToggle({
+EspSec:AddToggle({
     Name = "トレーサー表示",
     Default = false,
     Callback = function(v) espCfg.Tracers = v end 
 })
 
-UIElements.EspHitbox = EspSec:AddToggle({
+EspSec:AddToggle({
     Name = "ヒットボックス",
     Default = false,
     Callback = function(v) espCfg.Hitbox = v end 
 })
 
-UIElements.EspHitboxSize = EspSec:AddSlider({
+EspSec:AddSlider({
     Name = "ヒットボックスサイズ",
     Min = 2,
     Max = 20,
@@ -2800,7 +2587,7 @@ UIElements.EspHitboxSize = EspSec:AddSlider({
     Callback = function(v) espCfg.HitboxSize = v end 
 })
 
-UIElements.EspColor = EspSec:AddColorpicker({
+EspSec:AddColorpicker({
     Name = "ESPカラー",
     Default = Color3.new(1,0,0),
     Callback = function(v)
@@ -2813,7 +2600,7 @@ local BarrierSec = SubTab:AddSection({
 })
 
 local destroyBarrier = false
-UIElements.BarrierBreak = BarrierSec:AddToggle({
+BarrierSec:AddToggle({
     Name = "家のバリア破壊 (作成中)",
     Default = false,
     Callback = function(v)
@@ -2868,7 +2655,7 @@ ActionSec:AddButton({
 })
 
 local levitateRunning = false
-UIElements.BlobmanKick = ActionSec:AddToggle({
+ActionSec:AddToggle({
     Name = "Blobman Kick(投げまくってください)",
     Default = false,
     Callback = function(v)
@@ -2981,7 +2768,7 @@ local PianoControlSec = PianoTab:AddSection({
 	Name = "ピアノ制御"
 })
 
-UIElements.PianoEnabled = PianoControlSec:AddToggle({
+PianoControlSec:AddToggle({
 	Name = "ピアノ機能を有効化",
 	Default = false,
 	Callback = function(v)
@@ -3014,7 +2801,7 @@ UIElements.PianoEnabled = PianoControlSec:AddToggle({
 	end    
 })
 
-UIElements.PianoFollow = PianoControlSec:AddToggle({
+PianoControlSec:AddToggle({
     Name = "プレイヤー追従",
     Default = true,
     Callback = function(v)
@@ -3210,9 +2997,6 @@ OrionLib:MakeNotification({
 	Content = "v1.3.5 が読み込まれました！",
 	Time = 5
 })
-    -- 起動時にUIスタイルを適用
-    applyCustomStyle()
-
     -- メイン画面側の初期化
     OrionLib:Init()
 end
