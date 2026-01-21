@@ -8,91 +8,86 @@ pcall(function()
 end)
 
 local Window = OrionLib:MakeWindow({
-    Name = "Grab Hub v3.4 - TP Barrier", 
+    Name = "Grab Hub v3.4 - Full Copy", 
     HidePremium = false, 
     SaveConfig = true, 
     ConfigFolder = "RobloxGrabHub",
     IntroEnabled = false
 })
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local localPlayer = Players.LocalPlayer
 
--- TPバリア破壊のメイン関数
-local function executeTPBarrierBreak()
-    local character = localPlayer.Character
-    local hrp = character and character:FindFirstChild("HumanoidRootPart")
-    
-    if hrp then
-        -- 画像内のロジックに基づく座標移動 (CFrameの書き換え)
-        -- 注意: 座標値はゲーム内のバリアの内側に合わせて調整が必要です
-        local targetCFrame = CFrame.new(184.148, -5.548, 498.136) 
+-- --- 画像から抽出した実行関数 ---
+local function executeBarrierBreak()
+    local success, err = pcall(function()
+        local character = localPlayer.Character
+        local hrp = character and character:FindFirstChild("HumanoidRootPart")
+        local humanoid = character and character:FindFirstChildOfClass("Humanoid")
         
-        hrp.CFrame = targetCFrame
+        if not hrp or not humanoid then error("Character not found") end
+
+        -- 1. 動作を安定させるために足を止める (画像1467行目付近)
+        humanoid.WalkSpeed = 0
         
-        OrionLib:MakeNotification({
-            Name = "Success",
-            Content = "TP Barrier Break Executed",
-            Image = "rbxassetid://4483345998",
-            Time = 3
-        })
-    else
-        OrionLib:MakeNotification({
-            Name = "Error",
-            Content = "Character RootPart not found",
-            Image = "rbxassetid://4483345998",
-            Time = 3
-        })
-    end
+        -- 2. リモート関数でアイテムを生成 (画像内の座標をそのまま使用)
+        local spawnToyRF = ReplicatedStorage:WaitForChild("MenuToys"):WaitForChild("SpawnToyRemoteFunction")
+        
+        -- 画像に記載されていた正確なCFrame数値
+        local targetCFrame = CFrame.new(
+            184.148834, -5.54824972, 498.136749, 
+            0.829037189, -0.214714944, 0.516328275, 
+            0, 0.923344612, 0.383972496, 
+            -0.559193552, -0.318327487, 0.765486956
+        )
+        
+        local spawnResult = spawnToyRF:InvokeServer(
+            "InstrumentWoodwindOcarina", 
+            targetCFrame, 
+            Vector3.new(0, 34, 0)
+        )
+
+        -- 3. テレポート実行 (画像1455行目のロジック)
+        if spawnResult then
+            hrp.CFrame = targetCFrame
+            task.wait(0.5)
+            humanoid.WalkSpeed = 16
+            return true
+        else
+            humanoid.WalkSpeed = 16
+            return false
+        end
+    end)
+    return success, err
 end
 
--- --- UI構成 ---
-
+-- --- UI設定 ---
 local Tab = Window:MakeTab({
-    Name = "TP Barrier",
-    Icon = "rbxassetid://4483345998",
-    PremiumOnly = false
+    Name = "Barrier Break",
+    Icon = "rbxassetid://4483345998"
 })
 
--- TPバリア破壊実行ボタン
 Tab:AddButton({
-    Name = "バリア破壊 (TP実行)",
+    Name = "バリア破壊(TP) 実行",
     Callback = function()
-        executeTPBarrierBreak()
-    end
-})
-
--- 特定の地点（家の外など）への復帰ボタン
-Tab:AddButton({
-    Name = "座標リセット (家の外へTP)",
-    Callback = function()
-        local hrp = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if hrp and _G.SavedPositionOutHouse then
-            hrp.CFrame = _G.SavedPositionOutHouse
+        local result, err = executeBarrierBreak()
+        if result then
+            OrionLib:MakeNotification({
+                Name = "Success",
+                Content = "バリアを突破しました",
+                Time = 3
+            })
         else
             OrionLib:MakeNotification({
-                Name = "Error",
-                Content = "Saved position not found",
+                Name = "Failed",
+                Content = "失敗しました: " .. tostring(err),
                 Time = 3
             })
         end
     end
 })
 
--- 座標保存（現在地を復帰地点にする）
-Tab:AddButton({
-    Name = "現在の座標を保存",
-    Callback = function()
-        local hrp = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if hrp then
-            _G.SavedPositionOutHouse = hrp.CFrame
-            OrionLib:MakeNotification({
-                Name = "Saved",
-                Content = "Current position saved as 'OutHouse'",
-                Time = 3
-            })
-        end
-    end
-})
+Tab:AddLabel("※画像内の座標データをそのまま使用しています")
 
 OrionLib:Init()
