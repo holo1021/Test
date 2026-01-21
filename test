@@ -8,141 +8,90 @@ pcall(function()
 end)
 
 local Window = OrionLib:MakeWindow({
-    Name = "Grab Hub v3.4 - Barrier Edition", 
+    Name = "Grab Hub v3.4 - TP Barrier", 
     HidePremium = false, 
     SaveConfig = true, 
     ConfigFolder = "RobloxGrabHub",
     IntroEnabled = false
 })
 
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
-local Workspace = game:GetService("Workspace")
 local localPlayer = Players.LocalPlayer
 
--- バリア破壊用変数
-local autoBarrierNoTPRunning = false
-local autoBarrierNoTPToggle = nil
-
--- バリア破壊のメインロジック (画像内のロジックを再現)
-local function executeBarrierBreakNoTP()
-    local success, err = pcall(function()
-        local character = localPlayer.Character
-        if not character or not character:FindFirstChild("HumanoidRootPart") then
-            error("Character not found")
-        end
-
-        local humanoid = character:FindFirstChildOfClass("Humanoid")
-        if not humanoid then error("Humanoid not found") end
-
-        -- 動作を安定させるため一時的に停止
-        humanoid.WalkSpeed = 0
+-- TPバリア破壊のメイン関数
+local function executeTPBarrierBreak()
+    local character = localPlayer.Character
+    local hrp = character and character:FindFirstChild("HumanoidRootPart")
+    
+    if hrp then
+        -- 画像内のロジックに基づく座標移動 (CFrameの書き換え)
+        -- 注意: 座標値はゲーム内のバリアの内側に合わせて調整が必要です
+        local targetCFrame = CFrame.new(184.148, -5.548, 498.136) 
         
-        local menuToys = ReplicatedStorage:FindFirstChild("MenuToys")
-        local spawnToyRF = menuToys and menuToys:FindFirstChild("SpawnToyRemoteFunction")
+        hrp.CFrame = targetCFrame
         
-        if not spawnToyRF then
-            humanoid.WalkSpeed = 16
-            error("MenuToys not found")
-        end
-
-        -- 画像に基づいた座標とアイテム(Ocarina)の生成
-        -- ※座標は画像から読み取った代表値を設定しています
-        local spawnResult = spawnToyRF:InvokeServer(
-            "InstrumentWoodwindOcarina", 
-            CFrame.new(184.148, -5.548, 498.136, 0.829, -0.214, 0.516, 0, 0.923, 0.383, -0.559, -0.318, 0.765),
-            Vector3.new(0, 34, 0)
-        )
-
-        if not spawnResult then
-            humanoid.WalkSpeed = 16
-            error("Spawn failed")
-        end
-
-        task.wait(1) -- 生成待ち
-
-        -- 判定の上書き（Campfire等の追加生成ロジックが必要な場合）
-        -- ここに画像後半のCampfireセクションを追加可能
-
-        humanoid.WalkSpeed = 16
-        return true
-    end)
-
-    return success, err
+        OrionLib:MakeNotification({
+            Name = "Success",
+            Content = "TP Barrier Break Executed",
+            Image = "rbxassetid://4483345998",
+            Time = 3
+        })
+    else
+        OrionLib:MakeNotification({
+            Name = "Error",
+            Content = "Character RootPart not found",
+            Image = "rbxassetid://4483345998",
+            Time = 3
+        })
+    end
 end
 
 -- --- UI構成 ---
 
 local Tab = Window:MakeTab({
-    Name = "Barrier Break",
-    Icon = "rbxassetid://4483345998"
+    Name = "TP Barrier",
+    Icon = "rbxassetid://4483345998",
+    PremiumOnly = false
 })
 
--- オートバリア破壊 (No TP)
-autoBarrierNoTPToggle = Tab:AddToggle({
-    Name = "オートバリア破壊 NoTP",
-    Default = false,
-    Callback = function(Value)
-        autoBarrierNoTPRunning = Value
-        if Value then
-            OrionLib:MakeNotification({
-                Name = "スタート",
-                Content = "成功するまで自動実行します",
-                Image = "rbxassetid://4483345998",
-                Time = 2
-            })
-            
-            task.spawn(function()
-                while autoBarrierNoTPRunning do
-                    -- 家の中にいないかチェックするロジック (画像参照)
-                    local plotItems = Workspace:FindFirstChild("PlotItems")
-                    local playersInPlots = plotItems and plotItems:FindFirstChild("PlayersInPlots")
-                    
-                    if playersInPlots and playersInPlots:FindFirstChild(localPlayer.Name) then
-                        OrionLib:MakeNotification({
-                            Name = "Error",
-                            Content = "Don't be in the house",
-                            Time = 3
-                        })
-                        autoBarrierNoTPRunning = false
-                        autoBarrierNoTPToggle:Set(false)
-                        break
-                    end
+-- TPバリア破壊実行ボタン
+Tab:AddButton({
+    Name = "バリア破壊 (TP実行)",
+    Callback = function()
+        executeTPBarrierBreak()
+    end
+})
 
-                    local success, err = executeBarrierBreakNoTP()
-                    if success then
-                        OrionLib:MakeNotification({
-                            Name = "成功",
-                            Content = "バリア破壊成功",
-                            Time = 3
-                        })
-                        autoBarrierNoTPRunning = false
-                        autoBarrierNoTPToggle:Set(false)
-                        break
-                    else
-                        OrionLib:MakeNotification({
-                            Name = "失敗",
-                            Content = "再試行中...",
-                            Time = 2
-                        })
-                    end
-                    task.wait(1.5)
-                end
-            end)
+-- 特定の地点（家の外など）への復帰ボタン
+Tab:AddButton({
+    Name = "座標リセット (家の外へTP)",
+    Callback = function()
+        local hrp = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if hrp and _G.SavedPositionOutHouse then
+            hrp.CFrame = _G.SavedPositionOutHouse
         else
             OrionLib:MakeNotification({
-                Name = "ストップ",
-                Content = "自動実行を停止しました",
-                Time = 2
+                Name = "Error",
+                Content = "Saved position not found",
+                Time = 3
             })
         end
     end
 })
 
+-- 座標保存（現在地を復帰地点にする）
 Tab:AddButton({
-    Name = "手動バリア破壊 (一度だけ実行)",
+    Name = "現在の座標を保存",
     Callback = function()
-        executeBarrierBreakNoTP()
+        local hrp = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            _G.SavedPositionOutHouse = hrp.CFrame
+            OrionLib:MakeNotification({
+                Name = "Saved",
+                Content = "Current position saved as 'OutHouse'",
+                Time = 3
+            })
+        end
     end
 })
 
