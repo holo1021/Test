@@ -8,7 +8,7 @@ pcall(function()
 end)
 
 local Window = OrionLib:MakeWindow({
-    Name = "Anti-Kick System", 
+    Name = "Anti-Kick System v2", 
     HidePremium = false, 
     SaveConfig = true, 
     ConfigFolder = "AntiKickHub",
@@ -28,13 +28,16 @@ local function spawnKunaiAtBody()
     local hrp = character and character:FindFirstChild("HumanoidRootPart")
     
     if hrp then
+        -- 画像で見られたSpawnToyの仕組みを流用
         local spawnToyRF = ReplicatedStorage:WaitForChild("MenuToys"):WaitForChild("SpawnToyRemoteFunction")
         
-        -- 画像の仕組みを流用: NinjaKunaiを現在の体(HRP)と同じ座標に生成
+        -- 現在の体(HRP)の位置から、正面に0.5スタッドだけずらして重なるように設定
+        local spawnCFrame = hrp.CFrame * CFrame.new(0, 0, -0.5) 
+        
         spawnToyRF:InvokeServer(
             "NinjaKunai", 
-            hrp.CFrame, 
-            Vector3.new(0, 0, 0) -- 向きのオフセットなし
+            spawnCFrame, 
+            Vector3.new(0, 0, 0)
         )
     end
 end
@@ -54,31 +57,17 @@ Tab:AddToggle({
         if Value then
             OrionLib:MakeNotification({
                 Name = "System",
-                Content = "アンチキック有効化: クナイの生成を開始します",
+                Content = "体と重なる位置でクナイの生成を開始しました",
                 Time = 3
             })
             
-            -- ループ処理
             task.spawn(function()
                 while _G.AntiKickEnabled do
                     pcall(spawnKunaiAtBody)
-                    task.wait(5) -- 5秒ごとに実行（負荷軽減とキック防止のバランス）
+                    task.wait(5) -- サーバーへの負荷と検知を考慮して5秒間隔
                 end
             end)
-        else
-            OrionLib:MakeNotification({
-                Name = "System",
-                Content = "アンチキックを停止しました",
-                Time = 3
-            })
         end
-    end
-})
-
-Tab:AddButton({
-    Name = "手動でクナイを1回生成",
-    Callback = function()
-        spawnKunaiAtBody()
     end
 })
 
