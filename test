@@ -1,3 +1,31 @@
+--[[
+    Modified Script: Verbal Hub with test.lua UI style
+    - Removed test.lua (Barrier Break) content
+    - Integrated Verbal Hub features
+    - Added Global Anti-Kick logic
+--]]
+
+-- --- [1. アンチキック機能のコアロジック] ---
+-- 実行時に自動で有効化されます
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+_G.AntiKickEnabled = true
+
+local mt = getrawmetatable(game)
+local oldNamecall = mt.__namecall
+setreadonly(mt, false)
+
+mt.__namecall = newcclosure(function(self, ...)
+    local method = getnamecallmethod()
+    if (method == "Kick" or method == "kick") and self == LocalPlayer and _G.AntiKickEnabled then
+        warn("Anti-Kick: サーバーからのキックをブロックしました！")
+        return nil
+    end
+    return oldNamecall(self, ...)
+end)
+setreadonly(mt, true)
+
+-- --- [2. UI 初期化 (test.lua の構成を使用)] ---
 local OrionLib = loadstring(game:HttpGet(('https://raw.githubusercontent.com/hololove1021/HolonHUB/refs/heads/main/source.txt')))()
 
 -- 二重起動防止
@@ -8,154 +36,78 @@ pcall(function()
 end)
 
 local Window = OrionLib:MakeWindow({
-    Name = "Grab Hub v3.4 - Original Copy", 
+    Name = "Verbal Hub (test UI Edition)", 
     HidePremium = false, 
     SaveConfig = true, 
-    ConfigFolder = "RobloxGrabHub",
-    IntroEnabled = false
+    ConfigFolder = "VerbalHubConfig",
+    IntroEnabled = false -- test.lua の設定に従い Intro を無効化
 })
 
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Players = game:GetService("Players")
-local Workspace = game:GetService("Workspace")
-local localPlayer = Players.LocalPlayer
-
--- フラグ管理
-local autoBarrierNoTPRunning = false
-local autoBarrierNoTPToggle = nil
-
--- --- 画像から完全にコピーした実行ロジック ---
-local function executeOriginalBarrierBreak()
-    local success, err = pcall(function()
-        -- プレイヤーチェック
-        if not localPlayer.Character or not localPlayer.Character:FindFirstChild("HumanoidRootPart") then
-            error("Character not found")
-        end
-        
-        local humanoid = localPlayer.Character:FindFirstChildOfClass("Humanoid")
-        if not humanoid then error("Humanoid not found") end
-
-        -- 速度を0にする (画像1467行目付近)
-        humanoid.WalkSpeed = 0
-        
-        local replicatedStorage = game:GetService("ReplicatedStorage")
-        if not replicatedStorage:FindFirstChild("MenuToys") then
-            humanoid.WalkSpeed = 16
-            error("MenuToys not found")
-        end
-
-        -- 【重要】画像に記載されていた正確なCFrameとVector3
-        -- オカリナの生成 (画像1467行目)
-        local spawnResult = replicatedStorage.MenuToys.SpawnToyRemoteFunction:InvokeServer(
-            "InstrumentWoodwindOcarina", 
-            CFrame.new(
-                184.148834, -5.54824972, 498.136749, 
-                0.829037189, -0.214714944, 0.516328275, 
-                0, 0.923344612, 0.383972496, 
-                -0.559193552, -0.318327487, 0.765486956
-            ),
-            Vector3.new(0, 34, 0)
-        )
-
-        if not spawnResult then 
-            humanoid.WalkSpeed = 16 
-            return false 
-        end
-
-        -- キャンプファイヤーの生成 (画像3枚目/unnamed (3).jpg の上部参照)
-        -- 画像から読み取れる座標数値を反映
-        local campfireSpawnResult = replicatedStorage.MenuToys.SpawnToyRemoteFunction:InvokeServer(
-            "Campfire",
-            CFrame.new(
-                -0.930908992, -0.171067372, 0.257899135, 0,
-                0.533338678, 0.552762806, -0.309477001,
-                0.525626004, -0.79242748
-            ),
-            Vector3.new(0, 161.9720001220703, 0)
-        )
-
-        if not campfireSpawnResult then
-            humanoid.WalkSpeed = 16
-            error("Campfire spawn failed")
-        end
-
-        task.wait(1)
-
-        -- 最終チェック
-        local playerName = localPlayer.Name
-        if not Workspace:FindFirstChild(playerName .. "SpawnedInToys") then
-            humanoid.WalkSpeed = 16
-            error("Toy folder disappeared")
-        end
-
-        humanoid.WalkSpeed = 16
-        return true
-    end)
-    return success, err
-end
-
--- --- UIタブ設定 ---
+-- --- [3. 機能タブの作成 (VerbalHub から移植)] ---
 local Tab = Window:MakeTab({
-    Name = "Original Barrier",
-    Icon = "rbxassetid://4483345998"
+    Name = "Main / Anti-Kick",
+    Icon = "rbxassetid://4483345998",
+    PremiumOnly = false
 })
 
-autoBarrierNoTPToggle = Tab:AddToggle({
-    Name = "オートバリア破壊NoTP",
+-- アンチキックのトグル
+Tab:AddToggle({
+    Name = "Anti-Kick (アンチキック)",
+    Default = true,
+    Callback = function(Value)
+        _G.AntiKickEnabled = Value
+        print("Anti-Kick: " .. tostring(Value))
+    end
+})
+
+-- Verbal Hub の主要機能 (Sigma Player タブの内容)
+Section = Tab:AddSection({
+    Name = "Player Settings"
+})
+
+Tab:AddSlider({
+    Name = "WalkSpeed",
+    Min = 16,
+    Max = 1000,
+    Default = 16,
+    Callback = function(p25)
+        local character = LocalPlayer.Character
+        if character and character:FindFirstChild("Humanoid") then
+            character.Humanoid.WalkSpeed = p25
+        end
+    end
+})
+
+Tab:AddSlider({
+    Name = "JumpPower",
+    Min = 20,
+    Max = 1000,
+    Default = 50,
+    Callback = function(p27)
+        local character = LocalPlayer.Character
+        if character and character:FindFirstChild("Humanoid") then
+            character.Humanoid.JumpPower = p27
+        end
+    end
+})
+
+-- 無限ジャンプ (Verbal Hub)
+InfiniteJumpEnabled = false
+game:GetService("UserInputService").JumpRequest:Connect(function()
+    if InfiniteJumpEnabled and LocalPlayer.Character then
+        LocalPlayer.Character:FindFirstChildOfClass("Humanoid"):ChangeState("Jumping")
+    end
+end)
+
+Tab:AddToggle({
+    Name = "Infinite Jump",
     Default = false,
     Callback = function(Value)
-        autoBarrierNoTPRunning = Value
-        if Value then
-            OrionLib:MakeNotification({
-                Name = "スタート",
-                Content = "成功するまで自動実行",
-                Time = 2
-            })
-            
-            task.spawn(function()
-                while autoBarrierNoTPRunning do
-                    -- 家の中にいるかどうかの判定 (画像1466行目)
-                    local plotItems = Workspace:FindFirstChild("PlotItems")
-                    local playersInPlots = plotItems and plotItems:FindFirstChild("PlayersInPlots")
-                    
-                    if playersInPlots and playersInPlots:FindFirstChild(localPlayer.Name) then
-                        OrionLib:MakeNotification({
-                            Name = "Error",
-                            Content = "Don't be in the house",
-                            Time = 3
-                        })
-                        autoBarrierNoTPRunning = false
-                        autoBarrierNoTPToggle:Set(false)
-                        break
-                    end
-
-                    local success, err = executeOriginalBarrierBreak()
-                    if success then
-                        OrionLib:MakeNotification({
-                            Name = "成功",
-                            Content = "バリア破壊成功",
-                            Time = 3
-                        })
-                        autoBarrierNoTPRunning = false
-                        autoBarrierNoTPToggle:Set(false)
-                        break
-                    end
-                    task.wait(1.5)
-                end
-            end)
-        end
+        InfiniteJumpEnabled = Value
     end
 })
 
-Tab:AddButton({
-    Name = "バリア破壊(TPあり) 実行",
-    Callback = function()
-        -- 画像1464行目付近のTPロジック
-        local hrp = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if hrp then
-            hrp.CFrame = CFrame.new(184.148834, -5.54824972, 498.136749)
-        end
-    end
-})
+-- その他の Verbal Hub 機能（テレポート、爆発、UIリストなど）を必要に応じてここに追加可能です。
+-- test.lua にあった Barrier Break 関連のコードは削除されています。
 
 OrionLib:Init()
