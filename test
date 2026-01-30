@@ -8,7 +8,7 @@ pcall(function()
 end)
 
 local Window = OrionLib:MakeWindow({
-    Name = "Anti-Kick System v2", 
+    Name = "Anti-Kick System v2.1", 
     HidePremium = false, 
     SaveConfig = true, 
     ConfigFolder = "AntiKickHub",
@@ -28,11 +28,12 @@ local function spawnKunaiAtBody()
     local hrp = character and character:FindFirstChild("HumanoidRootPart")
     
     if hrp then
-        -- 画像で見られたSpawnToyの仕組みを流用
+        -- 画像に基づいたリモート関数の取得
         local spawnToyRF = ReplicatedStorage:WaitForChild("MenuToys"):WaitForChild("SpawnToyRemoteFunction")
         
-        -- 現在の体(HRP)の位置から、正面に0.5スタッドだけずらして重なるように設定
-        local spawnCFrame = hrp.CFrame * CFrame.new(0, 0, -0.5) 
+        -- 横（X）と高さ（Y）は維持し、前後（Z）を0.2（少し後ろ）に調整
+        -- 前回の -0.5 より 0.7スタッド後ろに下がります
+        local spawnCFrame = hrp.CFrame * CFrame.new(0, 0, 0.2) 
         
         spawnToyRF:InvokeServer(
             "NinjaKunai", 
@@ -57,18 +58,20 @@ Tab:AddToggle({
         if Value then
             OrionLib:MakeNotification({
                 Name = "System",
-                Content = "体と重なる位置でクナイの生成を開始しました",
+                Content = "位置を微調整してクナイ生成を開始しました",
                 Time = 3
             })
             
             task.spawn(function()
                 while _G.AntiKickEnabled do
                     pcall(spawnKunaiAtBody)
-                    task.wait(5) -- サーバーへの負荷と検知を考慮して5秒間隔
+                    task.wait(5) -- サーバー負荷を抑えるための待機時間
                 end
             end)
         end
     end
 })
+
+Tab:AddLabel("※CFrame.new(0, 0, 0.2) で前後位置を調整済み")
 
 OrionLib:Init()
