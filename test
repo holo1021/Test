@@ -1,31 +1,3 @@
---[[
-    Modified Script: Verbal Hub with test.lua UI style
-    - Removed test.lua (Barrier Break) content
-    - Integrated Verbal Hub features
-    - Added Global Anti-Kick logic
---]]
-
--- --- [1. アンチキック機能のコアロジック] ---
--- 実行時に自動で有効化されます
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-_G.AntiKickEnabled = true
-
-local mt = getrawmetatable(game)
-local oldNamecall = mt.__namecall
-setreadonly(mt, false)
-
-mt.__namecall = newcclosure(function(self, ...)
-    local method = getnamecallmethod()
-    if (method == "Kick" or method == "kick") and self == LocalPlayer and _G.AntiKickEnabled then
-        warn("Anti-Kick: サーバーからのキックをブロックしました！")
-        return nil
-    end
-    return oldNamecall(self, ...)
-end)
-setreadonly(mt, true)
-
--- --- [2. UI 初期化 (test.lua の構成を使用)] ---
 local OrionLib = loadstring(game:HttpGet(('https://raw.githubusercontent.com/hololove1021/HolonHUB/refs/heads/main/source.txt')))()
 
 -- 二重起動防止
@@ -36,78 +8,78 @@ pcall(function()
 end)
 
 local Window = OrionLib:MakeWindow({
-    Name = "Verbal Hub (test UI Edition)", 
+    Name = "Anti-Kick System", 
     HidePremium = false, 
     SaveConfig = true, 
-    ConfigFolder = "VerbalHubConfig",
-    IntroEnabled = false -- test.lua の設定に従い Intro を無効化
+    ConfigFolder = "AntiKickHub",
+    IntroEnabled = false
 })
 
--- --- [3. 機能タブの作成 (VerbalHub から移植)] ---
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local localPlayer = Players.LocalPlayer
+
+-- 変数管理
+_G.AntiKickEnabled = false
+
+-- --- NinjaKunai生成メインロジック ---
+local function spawnKunaiAtBody()
+    local character = localPlayer.Character
+    local hrp = character and character:FindFirstChild("HumanoidRootPart")
+    
+    if hrp then
+        local spawnToyRF = ReplicatedStorage:WaitForChild("MenuToys"):WaitForChild("SpawnToyRemoteFunction")
+        
+        -- 画像の仕組みを流用: NinjaKunaiを現在の体(HRP)と同じ座標に生成
+        spawnToyRF:InvokeServer(
+            "NinjaKunai", 
+            hrp.CFrame, 
+            Vector3.new(0, 0, 0) -- 向きのオフセットなし
+        )
+    end
+end
+
+-- --- UI構成 ---
 local Tab = Window:MakeTab({
-    Name = "Main / Anti-Kick",
-    Icon = "rbxassetid://4483345998",
-    PremiumOnly = false
+    Name = "Main",
+    Icon = "rbxassetid://4483345998"
 })
-
--- アンチキックのトグル
-Tab:AddToggle({
-    Name = "Anti-Kick (アンチキック)",
-    Default = true,
-    Callback = function(Value)
-        _G.AntiKickEnabled = Value
-        print("Anti-Kick: " .. tostring(Value))
-    end
-})
-
--- Verbal Hub の主要機能 (Sigma Player タブの内容)
-Section = Tab:AddSection({
-    Name = "Player Settings"
-})
-
-Tab:AddSlider({
-    Name = "WalkSpeed",
-    Min = 16,
-    Max = 1000,
-    Default = 16,
-    Callback = function(p25)
-        local character = LocalPlayer.Character
-        if character and character:FindFirstChild("Humanoid") then
-            character.Humanoid.WalkSpeed = p25
-        end
-    end
-})
-
-Tab:AddSlider({
-    Name = "JumpPower",
-    Min = 20,
-    Max = 1000,
-    Default = 50,
-    Callback = function(p27)
-        local character = LocalPlayer.Character
-        if character and character:FindFirstChild("Humanoid") then
-            character.Humanoid.JumpPower = p27
-        end
-    end
-})
-
--- 無限ジャンプ (Verbal Hub)
-InfiniteJumpEnabled = false
-game:GetService("UserInputService").JumpRequest:Connect(function()
-    if InfiniteJumpEnabled and LocalPlayer.Character then
-        LocalPlayer.Character:FindFirstChildOfClass("Humanoid"):ChangeState("Jumping")
-    end
-end)
 
 Tab:AddToggle({
-    Name = "Infinite Jump",
+    Name = "アンチキック (NinjaKunai Loop)",
     Default = false,
     Callback = function(Value)
-        InfiniteJumpEnabled = Value
+        _G.AntiKickEnabled = Value
+        
+        if Value then
+            OrionLib:MakeNotification({
+                Name = "System",
+                Content = "アンチキック有効化: クナイの生成を開始します",
+                Time = 3
+            })
+            
+            -- ループ処理
+            task.spawn(function()
+                while _G.AntiKickEnabled do
+                    pcall(spawnKunaiAtBody)
+                    task.wait(5) -- 5秒ごとに実行（負荷軽減とキック防止のバランス）
+                end
+            end)
+        else
+            OrionLib:MakeNotification({
+                Name = "System",
+                Content = "アンチキックを停止しました",
+                Time = 3
+            })
+        end
     end
 })
 
--- その他の Verbal Hub 機能（テレポート、爆発、UIリストなど）を必要に応じてここに追加可能です。
--- test.lua にあった Barrier Break 関連のコードは削除されています。
+Tab:AddButton({
+    Name = "手動でクナイを1回生成",
+    Callback = function()
+        spawnKunaiAtBody()
+    end
+})
 
 OrionLib:Init()
