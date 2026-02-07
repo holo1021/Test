@@ -8,108 +8,71 @@ pcall(function()
 end)
 
 local Window = OrionLib:MakeWindow({
-    Name = "Anti-Kick & Sync Hub", 
+    Name = "Anti-Kick Only", 
     HidePremium = false, 
     SaveConfig = true, 
-    ConfigFolder = "AntiKickHub",
+    ConfigFolder = "AntiKickSimple",
     IntroEnabled = false
 })
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local Workspace = game:GetService("Workspace")
 local localPlayer = Players.LocalPlayer
 
 -- 変数管理
 _G.AntiKickEnabled = false
-_G.GlobalSyncEnabled = false
-local syncConnection = nil
 
--- --- 同期メインロジック (クナイとデコイの両方を体にくっつける) ---
-local function startGlobalSync()
-    if syncConnection then syncConnection:Disconnect() end
-
-    syncConnection = RunService.RenderStepped:Connect(function()
-        if not _G.GlobalSyncEnabled then 
-            if syncConnection then syncConnection:Disconnect() end
-            return 
-        end
-
-        local char = localPlayer.Character
-        local hrp = char and char:FindFirstChild("HumanoidRootPart")
-        local toysFolder = Workspace:FindFirstChild(localPlayer.Name .. "SpawnedInToys")
+-- --- NinjaKunai生成ロジック (お腹の位置) ---
+local function spawnKunaiAtStomach()
+    local character = localPlayer.Character
+    local hrp = character and character:FindFirstChild("HumanoidRootPart")
+    
+    if hrp then
+        local spawnToyRF = ReplicatedStorage:WaitForChild("MenuToys"):WaitForChild("SpawnToyRemoteFunction")
         
-        if hrp and toysFolder then
-            -- 前回の微調整に基づき、少し後ろ(0.2)の位置を計算
-            local targetCFrame = hrp.CFrame * CFrame.new(0, 0, 0.2)
-            
-            for _, toy in pairs(toysFolder:GetChildren()) do
-                -- NinjaKunai または YouDecoy を対象にする
-                if toy.Name == "NinjaKunai" or toy.Name == "YouDecoy" or toy:FindFirstChild("Humanoid") then
-                    if toy:IsA("Model") then
-                        toy:SetPrimaryPartCFrame(targetCFrame)
-                    elseif toy:IsA("BasePart") then
-                        toy.CFrame = targetCFrame
-                    end
-                end
-            end
-        end
-    end)
+        -- お腹あたりの位置を計算
+        -- HRP(腰)から少し上(0.3)に上げ、少し前(-0.5)に出すことでお腹に重なります
+        local stomachCFrame = hrp.CFrame * CFrame.new(0, 0.3, -0.5)
+        
+        spawnToyRF:InvokeServer(
+            "NinjaKunai", 
+            stomachCFrame, 
+            Vector3.new(0, 0, 0)
+        )
+    end
 end
 
 -- --- UI構成 ---
 local Tab = Window:MakeTab({
-    Name = "Main Control",
+    Name = "Anti-Kick",
     Icon = "rbxassetid://4483345998"
 })
 
--- 1. 同期トグル（これを入れるとクナイもデコイも体に固定されます）
 Tab:AddToggle({
-    Name = "アイテムを体に同期 (Kunai/Decoy)",
-    Default = false,
-    Callback = function(Value)
-        _G.GlobalSyncEnabled = Value
-        if Value then
-            OrionLib:MakeNotification({Name = "Sync", Content = "同期開始: アイテムが体に固定されます", Time = 3})
-            startGlobalSync()
-        else
-            if syncConnection then syncConnection:Disconnect() end
-        end
-    end
-})
-
--- 2. アンチキック（クナイを出す）
-Tab:AddToggle({
-    Name = "アンチキック (NinjaKunai生成)",
+    Name = "アンチキック開始 (NinjaKunai)",
     Default = false,
     Callback = function(Value)
         _G.AntiKickEnabled = Value
+        
         if Value then
+            OrionLib:MakeNotification({
+                Name = "System",
+                Content = "お腹の位置でクナイの生成を開始しました",
+                Time = 3
+            })
+            
             task.spawn(function()
                 while _G.AntiKickEnabled do
-                    local hrp = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
-                    if hrp then
-                        local spawnToyRF = ReplicatedStorage:WaitForChild("MenuToys"):WaitForChild("SpawnToyRemoteFunction")
-                        -- 生成（同期がONなら、生成直後に体に吸い付きます）
-                        spawnToyRF:InvokeServer("NinjaKunai", hrp.CFrame * CFrame.new(0, 0, 0.2), Vector3.new(0, 0, 0))
-                    end
-                    task.wait(10) -- 生成の間隔（同期しているので長めでOK）
+                    pcall(spawnKunaiAtStomach)
+                    -- アンチキックとして機能させるため、一定間隔で生成
+                    task.wait(8) 
                 end
             end)
         end
     end
 })
 
-Tab:AddButton({
-    Name = "YouDecoyを配置",
-    Callback = function()
-        local hrp = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if hrp then
-            local spawnToyRF = ReplicatedStorage:WaitForChild("MenuToys"):WaitForChild("SpawnToyRemoteFunction")
-            spawnToyRF:InvokeServer("YouDecoy", hrp.CFrame, Vector3.new(0, 0, 0))
-        end
-    end
-})
+Tab:AddLabel("※同期機能(Sync)は削除済みです。")
+Tab:AddLabel("※クナイはお腹の位置に生成され、その場に残ります。")
 
 OrionLib:Init()
