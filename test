@@ -1,658 +1,479 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
-local Teams = game:GetService("Teams")
-local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+-- イベント定義
+local GrabEvents = ReplicatedStorage:WaitForChild("GrabEvents")
+local SetNetworkOwner = GrabEvents:WaitForChild("SetNetworkOwner")
 
 local LocalPlayer = Players.LocalPlayer
-local Camera = Workspace.CurrentCamera
-local OrionLib
 
--- 作者情報の定義
-local AuthorName = "holon_calm"
-local RobloxID = "najayou777"
-local DetailIcon = "rbxassetid://7733964719"
+-- ピアノ機能用の変数
+local pianoEnabled = false
+local pianoFollowEnabled = true
+local selectedSongFile = nil
+local selectedSongData = nil
+local pianoKeyboard = nil
+local isPlayingSong = false
+local pianoUpdateConnection = nil
+local pianoOriginalCollisions = {}
 
--- 重複実行時の接続解除処理
-if getgenv().HolonConnections then
-    for _, c in pairs(getgenv().HolonConnections) do
-        if c then c:Disconnect() end
+-- ピアノのキーマッピング
+local pianoKeyMap = {
+    -- 白鍵
+    ["1"] = "Key1C", ["2"] = "Key1D", ["3"] = "Key1E", ["4"] = "Key1F", 
+    ["5"] = "Key1G", ["6"] = "Key1A", ["7"] = "Key1B", ["8"] = "Key2C",
+    ["9"] = "Key2D", ["0"] = "Key2E", ["q"] = "Key2F", ["w"] = "Key2G",
+    ["e"] = "Key2A", ["r"] = "Key2B", ["t"] = "Key3C",
+    
+    -- 黒鍵
+    ["f"] = "Key1Csharp", ["g"] = "Key1Dsharp", ["h"] = "Key1Fsharp",
+    ["j"] = "Key1Gsharp", ["k"] = "Key1Asharp", ["l"] = "Key2Csharp",
+    ["z"] = "Key2Dsharp", ["x"] = "Key2Fsharp", ["c"] = "Key2Gsharp",
+    ["v"] = "Key2Asharp"
+}
+
+-- getMusicKeyboard 関数の定義
+local function getMusicKeyboard()
+    local myName = LocalPlayer.Name
+    
+    -- 1. SpawnedInToys から探す
+    local spawnedToys = Workspace:FindFirstChild(myName .. "SpawnedInToys")
+    if spawnedToys then
+        local kb = spawnedToys:FindFirstChild("MusicKeyboard")
+        if kb then return kb end
     end
-end
-getgenv().HolonConnections = {}
-pcall(function() RunService:UnbindFromRenderStep("HolonAimbot") end)
--- GUIクリーンアップ
-local function cleanupGui(name)
-    if game:GetService("CoreGui"):FindFirstChild(name) then game:GetService("CoreGui")[name]:Destroy() end
-    if gethui and gethui():FindFirstChild(name) then gethui()[name]:Destroy() end
-    if LocalPlayer:FindFirstChild("PlayerGui") and LocalPlayer.PlayerGui:FindFirstChild(name) then LocalPlayer.PlayerGui[name]:Destroy() end
-end
-cleanupGui("HolonFOV")
-cleanupGui("HolonMiniUI")
 
--- リンク集を表示する共通関数（認証画面とメイン画面で使い回せます）
-local function AddDetailContent(Tab)
-    Tab:AddLabel("作者: " .. AuthorName)
-    Tab:AddLabel("Roblox ID: " .. RobloxID)
-    Tab:AddButton({
-        Name = "Discord",
-        Callback = function()
-            setclipboard("https://discord.gg/EHBXqgZZYN")
-            OrionLib:MakeNotification({Name = "リンク", Content = "Discordの招待リンクをコピーしました", Time = 3})
-        end
-    })
-    Tab:AddButton({
-        Name = "Copy & Load EN Version",
-        Callback = function()
-            setclipboard("loadstring(game:HttpGet(\"https://raw.githubusercontent.com/hololove1021/holon-mvs2/refs/heads/main/hub-en.lua\"))()")
-            task.spawn(function()
-                loadstring(game:HttpGet("https://raw.githubusercontent.com/hololove1021/holon-mvs2/refs/heads/main/hub-en.lua"))()
-            end)
-        end
-    })
-end
+    -- 2. Plots から探す
+    local plots = Workspace:FindFirstChild("Plots")
+    local plotItems = Workspace:FindFirstChild("PlotItems")
 
-local aimCfg = { 
-    Enabled = false, 
-    FOV = 150, 
-    ShowFOV = true, 
-    ThroughWalls = false,
-    TargetPart = "HumanoidRootPart",
-    TargetTeam = "敵チーム",
-    ExcludeFriends = false,
-    ExcludeGroup = false,
-    GroupId = 0,
-    Whitelist = {},
-    Blacklist = {}
-}
-
-local currentLockedTarget = nil
-
-local bodyPartMap = {
-    ["頭"] = "Head",
-    ["胴体"] = "HumanoidRootPart",
-    ["上半身"] = "UpperTorso",
-    ["下半身"] = "LowerTorso"
-}
-local bodyPartMapReverse = {
-    ["Head"] = "頭",
-    ["HumanoidRootPart"] = "胴体",
-    ["UpperTorso"] = "上半身",
-    ["LowerTorso"] = "下半身"
-}
-
--- キャッシュ用テーブル
-local FriendCache = {}
-local GroupCache = {}
-
--- キャッシュ更新ループ
-task.spawn(function()
-    while true do
-        if aimCfg.ExcludeFriends or aimCfg.ExcludeGroup then
-            for _, p in ipairs(Players:GetPlayers()) do
-                if p ~= LocalPlayer then
-                    if aimCfg.ExcludeFriends then pcall(function() FriendCache[p.Name] = LocalPlayer:IsFriendsWith(p.UserId) end) end
-                    if aimCfg.ExcludeGroup and aimCfg.GroupId > 0 then pcall(function() GroupCache[p.Name] = p:IsInGroup(aimCfg.GroupId) end) end
+    if plots and plotItems then
+        for _, plot in ipairs(plots:GetChildren()) do
+            local sign = plot:FindFirstChild("PlotSign")
+            local ownerObj = sign and (sign:FindFirstChild("ThisPlotsOwners") or sign:FindFirstChild("Owner"))
+            if ownerObj then
+                local val = ownerObj:FindFirstChild("Value") or ownerObj
+                local data = val:FindFirstChild("Data") or val
+                if (data:IsA("StringValue") and data.Value == myName) then
+                    -- PlotItemsフォルダ内を検索
+                    local myPlotItems = plotItems:FindFirstChild(plot.Name)
+                    if myPlotItems then
+                        local kb = myPlotItems:FindFirstChild("MusicKeyboard")
+                        if kb then return kb end
+                    end
+                    -- 念のためBuild内も検索
+                    local build = plot:FindFirstChild("Build")
+                    local kb = build and build:FindFirstChild("MusicKeyboard")
+                    if kb then return kb end
                 end
-                task.wait()
             end
         end
-        task.wait(5)
     end
-end)
 
--- UI要素を管理するテーブル (グローバルスコープに移動して連携可能にする)
-local UIElements = {}
+    -- 3. Workspace全体から所有権のある MusicKeyboard を探す
+    for _, item in ipairs(Workspace:GetChildren()) do
+        if item.Name == "MusicKeyboard" and item:IsA("Model") then
+            local ownerValue = item:FindFirstChild("Owner") or item:FindFirstChild("PartOwner")
+            if ownerValue and ownerValue:IsA("StringValue") and ownerValue.Value == myName then
+                return item
+            end
+        end
+    end
 
--- Auto Aim FOV Circle
-local fovCircleGui = Instance.new("ScreenGui")
-fovCircleGui.Name = "HolonFOV"
--- gethuiがあればそれを使用、なければCoreGui、それもなければPlayerGui
-fovCircleGui.IgnoreGuiInset = true -- ズレ修正
-local parent = (gethui and gethui()) or game:GetService("CoreGui") or LocalPlayer:WaitForChild("PlayerGui")
-fovCircleGui.Parent = parent
-fovCircleGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-
-local fovCircleFrame = Instance.new("Frame")
-fovCircleFrame.Name = "Circle"
-fovCircleFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-fovCircleFrame.BackgroundColor3 = Color3.new(1, 1, 1)
-fovCircleFrame.BackgroundTransparency = 1
-fovCircleFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-fovCircleFrame.Size = UDim2.new(0, 300, 0, 300)
-fovCircleFrame.Parent = fovCircleGui
-
-local fovCorner = Instance.new("UICorner")
-fovCorner.CornerRadius = UDim.new(1, 0)
-fovCorner.Parent = fovCircleFrame
-
-local fovStroke = Instance.new("UIStroke")
-fovStroke.Color = Color3.new(1, 1, 1)
-fovStroke.Thickness = 1
-fovStroke.Parent = fovCircleFrame
-
--- ミニUIの作成
-local miniUiGui = Instance.new("ScreenGui")
-miniUiGui.Name = "HolonMiniUI"
-miniUiGui.Parent = parent
-miniUiGui.Enabled = false
-miniUiGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-
-local miniFrame = Instance.new("Frame")
-miniFrame.Size = UDim2.new(0, 120, 0, 190) -- スリム化
-miniFrame.Position = UDim2.new(1, -10, 0.4, 0) -- デフォルト右
-miniFrame.AnchorPoint = Vector2.new(1, 0.5)
-miniFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-miniFrame.BorderSizePixel = 0
-miniFrame.Parent = miniUiGui
-
-local miniCorner = Instance.new("UICorner")
-miniCorner.CornerRadius = UDim.new(0, 8)
-miniCorner.Parent = miniFrame
-
-local miniStroke = Instance.new("UIStroke")
-miniStroke.Color = Color3.fromRGB(100, 100, 100)
-miniStroke.Thickness = 1
-miniStroke.Parent = miniFrame
-
-local miniLayout = Instance.new("UIListLayout")
-miniLayout.Parent = miniFrame
-miniLayout.SortOrder = Enum.SortOrder.LayoutOrder
-miniLayout.Padding = UDim.new(0, 5)
-miniLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-
-local miniPadding = Instance.new("UIPadding")
-miniPadding.Parent = miniFrame
-miniPadding.PaddingTop = UDim.new(0, 5)
-miniPadding.PaddingBottom = UDim.new(0, 5)
-miniPadding.PaddingLeft = UDim.new(0, 5)
-miniPadding.PaddingRight = UDim.new(0, 5)
-
--- 1. Aim Toggle Button
-local miniAimBtn = Instance.new("TextButton")
-miniAimBtn.Size = UDim2.new(0, 110, 0, 25)
-miniAimBtn.BackgroundColor3 = Color3.fromRGB(170, 0, 0)
-miniAimBtn.Text = "Aim: OFF"
-miniAimBtn.TextColor3 = Color3.new(1,1,1)
-miniAimBtn.Font = Enum.Font.SourceSansBold
-miniAimBtn.TextSize = 12
-miniAimBtn.Parent = miniFrame
-Instance.new("UICorner", miniAimBtn).CornerRadius = UDim.new(0, 6)
-
--- 2. Team Cycle Button
-local miniTeamBtn = Instance.new("TextButton")
-miniTeamBtn.Size = UDim2.new(0, 110, 0, 25)
-miniTeamBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-miniTeamBtn.Text = "Team: 敵チーム"
-miniTeamBtn.TextColor3 = Color3.new(1,1,1)
-miniTeamBtn.Font = Enum.Font.SourceSans
-miniTeamBtn.TextSize = 12
-miniTeamBtn.Parent = miniFrame
-Instance.new("UICorner", miniTeamBtn).CornerRadius = UDim.new(0, 6)
-
--- 3. Part Cycle Button (New)
-local miniPartBtn = Instance.new("TextButton")
-miniPartBtn.Size = UDim2.new(0, 110, 0, 25)
-miniPartBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-miniPartBtn.Text = "Part: 胴体"
-miniPartBtn.TextColor3 = Color3.new(1,1,1)
-miniPartBtn.Font = Enum.Font.SourceSans
-miniPartBtn.TextSize = 12
-miniPartBtn.Parent = miniFrame
-Instance.new("UICorner", miniPartBtn).CornerRadius = UDim.new(0, 6)
-
--- 4. FOV Slider Frame
-local miniSliderFrame = Instance.new("Frame")
-miniSliderFrame.Size = UDim2.new(0, 110, 0, 25)
-miniSliderFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-miniSliderFrame.Parent = miniFrame
-Instance.new("UICorner", miniSliderFrame).CornerRadius = UDim.new(0, 6)
-
-local miniSliderFill = Instance.new("Frame")
-miniSliderFill.Size = UDim2.new(aimCfg.FOV/800, 0, 1, 0) -- 初期値
-miniSliderFill.BackgroundColor3 = Color3.fromRGB(0, 120, 255)
-miniSliderFill.Parent = miniSliderFrame
-Instance.new("UICorner", miniSliderFill).CornerRadius = UDim.new(0, 6)
-
-local miniSliderText = Instance.new("TextLabel")
-miniSliderText.Size = UDim2.new(1, 0, 1, 0)
-miniSliderText.BackgroundTransparency = 1
-miniSliderText.Text = "FOV: " .. math.floor(aimCfg.FOV)
-miniSliderText.TextColor3 = Color3.new(1,1,1)
-miniSliderText.Font = Enum.Font.SourceSansBold
-miniSliderText.TextSize = 12
-miniSliderText.Parent = miniSliderFrame
-
--- 5. Unlock Target Button
-local miniUnlockBtn = Instance.new("TextButton")
-miniUnlockBtn.Size = UDim2.new(0, 110, 0, 25)
-miniUnlockBtn.BackgroundColor3 = Color3.fromRGB(200, 100, 0)
-miniUnlockBtn.Text = "Unlock"
-miniUnlockBtn.TextColor3 = Color3.new(1,1,1)
-miniUnlockBtn.Font = Enum.Font.SourceSansBold
-miniUnlockBtn.TextSize = 12
-miniUnlockBtn.Parent = miniFrame
-Instance.new("UICorner", miniUnlockBtn).CornerRadius = UDim.new(0, 6)
-
--- ミニUIのロジック
-local function updateMiniUI()
-    miniAimBtn.Text = "Aim: " .. (aimCfg.Enabled and "ON" or "OFF")
-    miniAimBtn.BackgroundColor3 = aimCfg.Enabled and Color3.fromRGB(0, 170, 0) or Color3.fromRGB(170, 0, 0)
-    miniTeamBtn.Text = "Team: " .. aimCfg.TargetTeam
-    miniPartBtn.Text = "Part: " .. (bodyPartMapReverse[aimCfg.TargetPart] or aimCfg.TargetPart)
-    miniSliderText.Text = "FOV: " .. math.floor(aimCfg.FOV)
-    miniSliderFill.Size = UDim2.new(aimCfg.FOV/800, 0, 1, 0)
+    return nil
 end
 
-miniAimBtn.MouseButton1Click:Connect(function()
-    aimCfg.Enabled = not aimCfg.Enabled
-    if UIElements.AimEnabled then UIElements.AimEnabled:Set(aimCfg.Enabled) end
-    updateMiniUI()
-end)
+-- ピアノを停止・解放する関数
+local function stopPiano()
+    if pianoUpdateConnection then
+        pianoUpdateConnection:Disconnect()
+        pianoUpdateConnection = nil
+    end
+    if pianoKeyboard and pianoKeyboard.Parent then
+        local pp = pianoKeyboard:FindFirstChild("Main", true) or pianoKeyboard.PrimaryPart
+        if not pp then return end
+        -- AlignPosition/Orientation を削除
+        for _, child in ipairs(pp:GetChildren()) do
+            if child:IsA("Attachment") or child:IsA("AlignPosition") or child:IsA("AlignOrientation") then
+                child:Destroy()
+            end
+        end
+    end
+    
+    -- 当たり判定を元に戻す
+    for part, canCollide in pairs(pianoOriginalCollisions) do
+        if part and part.Parent then
+            part.CanCollide = canCollide
+        end
+    end
+    pianoOriginalCollisions = {} 
 
-miniTeamBtn.MouseButton1Click:Connect(function()
-    local teams = {"敵チーム", "全てのチーム", "個別プレイヤー"}
-    for _, t in ipairs(Teams:GetTeams()) do table.insert(teams, t.Name) end
-    local idx = table.find(teams, aimCfg.TargetTeam) or 0
-    aimCfg.TargetTeam = teams[(idx % #teams) + 1] or "敵チーム"
-    if UIElements.AimTargetTeam then UIElements.AimTargetTeam:Set(aimCfg.TargetTeam) end
-    updateMiniUI()
-end)
+    print("Holon HUB: ピアノの追従を停止しました")
+end
 
-miniPartBtn.MouseButton1Click:Connect(function()
-    local parts = {"Head", "HumanoidRootPart", "UpperTorso", "LowerTorso"}
-    local idx = table.find(parts, aimCfg.TargetPart) or 0
-    aimCfg.TargetPart = parts[(idx % #parts) + 1] or "HumanoidRootPart"
-    if UIElements.AimTargetPart then UIElements.AimTargetPart:Set(bodyPartMapReverse[aimCfg.TargetPart]) end
-    updateMiniUI()
-end)
+-- ピアノを腰の前に追従させる関数
+local function setupPianoFollow()
+    if not pianoKeyboard then pianoKeyboard = getMusicKeyboard() end
+    if not pianoKeyboard then return end
+    
+    if pianoUpdateConnection then return end
 
-miniUnlockBtn.MouseButton1Click:Connect(function()
-    currentLockedTarget = nil
-end)
+    local mainPart = pianoKeyboard:FindFirstChild("Main", true) or pianoKeyboard.PrimaryPart
+    if not mainPart then 
+        warn("Holon HUB: ピアノのMainパーツが見つかりません")
+        return 
+    end
+    print("Holon HUB: ピアノのセットアップを開始:", pianoKeyboard.Name)
+    
+    for _, part in ipairs(pianoKeyboard:GetDescendants()) do
+        if part:IsA("BasePart") then
+            if pianoOriginalCollisions[part] == nil then
+                pianoOriginalCollisions[part] = part.CanCollide
+            end
+            part.CanCollide = false
+            part.CanTouch = false
+            part.CanQuery = false
+            part.Anchored = false
+            part.Massless = true
+            part.AssemblyLinearVelocity = Vector3.zero
+            part.AssemblyAngularVelocity = Vector3.zero
+            pcall(function() part:SetNetworkOwner(LocalPlayer) end)
+        end
+    end
+    
+    local pp = mainPart
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if root then
+        local offset = CFrame.new(0, -1.5, -2) * CFrame.Angles(0, math.rad(180), 0)
+        pp.CFrame = root.CFrame * offset
+    end
+    
+    local a0 = Instance.new("Attachment", pp)
+    local ap = Instance.new("AlignPosition", pp)
+    ap.Attachment0 = a0
+    ap.Mode = Enum.PositionAlignmentMode.OneAttachment
+    ap.MaxForce = 1e9
+    ap.Responsiveness = 200
+    local ao = Instance.new("AlignOrientation", pp)
+    ao.Attachment0 = a0
+    ao.Mode = Enum.OrientationAlignmentMode.OneAttachment
+    ao.MaxTorque = 1e9
+    ao.Responsiveness = 200
+    
+    pianoUpdateConnection = RunService.RenderStepped:Connect(function()
+        local char = LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if not root then return end
+        if not pianoKeyboard or not pianoKeyboard.Parent then 
+            stopPiano()
+            return 
+        end
 
-local miniUiPos = "Right"
-local function updateMiniUiLayout()
-    if miniUiPos == "Right" then
-        miniFrame.AnchorPoint = Vector2.new(1, 0.5)
-        miniFrame.Position = UDim2.new(1, -10, 0.4, 0)
-        miniLayout.FillDirection = Enum.FillDirection.Vertical
-        miniFrame.Size = UDim2.new(0, 120, 0, 190)
-        
-        miniAimBtn.Size = UDim2.new(0, 110, 0, 25)
-        miniTeamBtn.Size = UDim2.new(0, 110, 0, 25)
-        miniPartBtn.Size = UDim2.new(0, 110, 0, 25)
-        miniSliderFrame.Size = UDim2.new(0, 110, 0, 25)
-        miniUnlockBtn.Size = UDim2.new(0, 110, 0, 25)
-    else -- Top
-        miniFrame.AnchorPoint = Vector2.new(0.5, 0)
-        miniFrame.Position = UDim2.new(0.5, 0, 0, 10)
-        miniLayout.FillDirection = Enum.FillDirection.Horizontal
-        miniFrame.Size = UDim2.new(0, 600, 0, 40)
-        
-        miniAimBtn.Size = UDim2.new(0, 110, 0, 25)
-        miniTeamBtn.Size = UDim2.new(0, 110, 0, 25)
-        miniPartBtn.Size = UDim2.new(0, 110, 0, 25)
-        miniSliderFrame.Size = UDim2.new(0, 110, 0, 25)
-        miniUnlockBtn.Size = UDim2.new(0, 110, 0, 25)
+        if math.random() < 0.05 then
+             pcall(function() pp:SetNetworkOwner(LocalPlayer) end)
+        end
+
+        local baseCF = root.CFrame
+        local offset = CFrame.new(0, -1.5, -2) * CFrame.Angles(0, math.rad(180), 0)
+        local targetCF = baseCF * offset
+        ap.Position = targetCF.Position
+        ao.CFrame = targetCF
+    end)
+    print("Holon HUB: ピアノの追従を開始しました")
+end
+
+-- 鍵盤を叩く関数
+local function pressPianoKey(keyName)
+    local targetKeyboard = getMusicKeyboard()
+    if not targetKeyboard then return end
+
+    local key = targetKeyboard:FindFirstChild(keyName, true)
+    if key and key:IsA("BasePart") then
+        SetNetworkOwner:FireServer(key, key.CFrame)
+        task.wait(0.15)
     end
 end
 
-local draggingSlider = false
-miniSliderFrame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        draggingSlider = true
-    end
-end)
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        draggingSlider = false
-    end
-end)
-UserInputService.InputChanged:Connect(function(input)
-    if draggingSlider and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-        local mousePos = UserInputService:GetMouseLocation()
-        local relX = math.clamp(mousePos.X - miniSliderFrame.AbsolutePosition.X, 0, miniSliderFrame.AbsoluteSize.X)
-        local ratio = relX / miniSliderFrame.AbsoluteSize.X
-        local newFov = math.floor(ratio * 790 + 10)
-        aimCfg.FOV = newFov
-        if UIElements.AimFOV then UIElements.AimFOV:Set(newFov) end
-        updateMiniUI()
-    end
-end)
-
--- オートエイムループ
-RunService:BindToRenderStep("HolonAimbot", Enum.RenderPriority.Camera.Value + 1, function()
-    -- FOV円の更新
-    fovCircleFrame.Size = UDim2.new(0, aimCfg.FOV * 2, 0, aimCfg.FOV * 2)
-    fovCircleGui.Enabled = aimCfg.Enabled and aimCfg.ShowFOV
+-- JSON再生関数
+local function playSongFromJSON(jsonData)
+    if isPlayingSong then return end
     
-    local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-    
-    -- 手動操作によるターゲット解除 (マウスの動きを検知)
-    local mouseDelta = UserInputService:GetMouseDelta()
-    if mouseDelta.Magnitude > 3 then -- 閾値
-        currentLockedTarget = nil
-    end
-
-    if aimCfg.Enabled then
-        local target = nil
-        
-        -- ロック中のターゲットが有効かチェック
-        if currentLockedTarget and currentLockedTarget.Parent and currentLockedTarget.Parent:FindFirstChild("Humanoid") and currentLockedTarget.Parent.Humanoid.Health > 0 then
-             local p = Players:GetPlayerFromCharacter(currentLockedTarget.Parent)
-             if p then
-                 -- チーム判定
-                 local isTargetTeam = false
-                 if aimCfg.TargetTeam == "全てのチーム" then
-                     isTargetTeam = true
-                 elseif aimCfg.TargetTeam == "敵チーム" then
-                     isTargetTeam = true
-                     if p.Team and LocalPlayer.Team and p.Team == LocalPlayer.Team then
-                         isTargetTeam = false
-                     end
-                 elseif p.Team and p.Team.Name == aimCfg.TargetTeam then
-                     isTargetTeam = true
-                 end
-                 
-                 if isTargetTeam then
-                     -- FOVと壁抜きチェック
-                     local screenPos, onScreen = Camera:WorldToViewportPoint(currentLockedTarget.Position)
-                     local dist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
-                     
-                     if onScreen and dist <= aimCfg.FOV then
-                         local visible = true
-                         if not aimCfg.ThroughWalls then
-                             local params = RaycastParams.new()
-                             params.FilterDescendantsInstances = {LocalPlayer.Character, workspace.CurrentCamera} -- ターゲット自体は除外しない（ヒットしたら見えている証拠）
-                             params.FilterType = Enum.RaycastFilterType.Exclude
-                             local dir = (currentLockedTarget.Position - Camera.CFrame.Position)
-                             local result = workspace:Raycast(Camera.CFrame.Position, dir.Unit * dir.Magnitude, params)
-                             -- ヒットしたものがターゲットのキャラクターの一部でなければ「壁」とみなす
-                             if result and not result.Instance:IsDescendantOf(currentLockedTarget.Parent) then 
-                                 visible = false 
-                             end
-                         end
-                         
-                         if visible then
-                             target = currentLockedTarget
-                         else
-                             currentLockedTarget = nil
-                         end
-                     else
-                         currentLockedTarget = nil
-                     end
-                 else
-                     currentLockedTarget = nil
-                 end
-             else
-                 currentLockedTarget = nil
-             end
+    local songData
+    local success, err = pcall(function()
+        if type(jsonData) == "string" then
+            return HttpService:JSONDecode(jsonData)
         else
-            currentLockedTarget = nil
+            return jsonData
         end
+    end)
+    
+    if not success or type(err) ~= "table" then
+        warn("JSONデータの読み込みに失敗しました")
+        return
+    end
+    songData = err
 
-        -- 新しいターゲットを探す
-        if not target then
-            local closest = nil
-            local minDist = aimCfg.FOV
+    isPlayingSong = true
+    print("演奏を開始します: " .. #songData .. " 音符")
+    
+    task.spawn(function()
+        if not pianoKeyboard then pianoKeyboard = getMusicKeyboard() end
+        
+        for i, note in ipairs(songData) do
+            if not isPlayingSong then break end
             
-            for _, p in ipairs(Players:GetPlayers()) do
-                if p ~= LocalPlayer then
-                    -- フィルターチェック
-                    if aimCfg.ExcludeFriends and FriendCache[p.Name] then continue end
-                    if aimCfg.ExcludeGroup and GroupCache[p.Name] then continue end
-                    if table.find(aimCfg.Whitelist, p.Name) then continue end -- ホワイトリストは除外
-
-                    -- チーム判定
-                    local isTargetTeam = false
-                    if table.find(aimCfg.Blacklist, p.Name) then
-                        isTargetTeam = true -- ブラックリストは強制対象
-                    elseif aimCfg.TargetTeam == "個別プレイヤー" then
-                        isTargetTeam = false -- 個別プレイヤーモードなら、リスト以外は対象外
-                    elseif aimCfg.TargetTeam == "全てのチーム" then
-                        isTargetTeam = true
-                    elseif aimCfg.TargetTeam == "敵チーム" then
-                        isTargetTeam = true
-                        if p.Team and LocalPlayer.Team and p.Team == LocalPlayer.Team then
-                            isTargetTeam = false
-                        end
-                    elseif p.Team and p.Team.Name == aimCfg.TargetTeam then
-                        isTargetTeam = true
-                    end
-
-                    if isTargetTeam and p.Character and p.Character:FindFirstChild(aimCfg.TargetPart) and p.Character:FindFirstChild("Humanoid") and p.Character.Humanoid.Health > 0 then
-                        local targetPart = p.Character[aimCfg.TargetPart]
-                        local screenPos, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
-                        
-                        if onScreen then
-                            local dist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
-                            if dist < minDist then
-                                -- 壁抜きチェック
-                                local isVisible = true
-                                if not aimCfg.ThroughWalls then
-                                    local params = RaycastParams.new()
-                                    params.FilterDescendantsInstances = {LocalPlayer.Character, workspace.CurrentCamera}
-                                    params.FilterType = Enum.RaycastFilterType.Exclude
-                                    local dir = (targetPart.Position - Camera.CFrame.Position)
-                                    local result = workspace:Raycast(Camera.CFrame.Position, dir.Unit * dir.Magnitude, params)
-                                    if result and not result.Instance:IsDescendantOf(p.Character) then 
-                                        isVisible = false
-                                    end
-                                end
-                                
-                                if isVisible then
-                                    minDist = dist
-                                    closest = targetPart
-                                end
-                            end
-                        end
-                    end
-                end
+            local rawKey = tostring(note.key)
+            local keyName = rawKey
+            if not string.match(rawKey, "^Key") then
+                keyName = pianoKeyMap[rawKey] or rawKey
             end
-            target = closest
-            if target then
-                currentLockedTarget = target
-            end
+            
+            local delayTime = note.delay or 0.1
+            
+            task.spawn(function()
+                pressPianoKey(keyName)
+            end)
+            
+            task.wait(delayTime)
         end
         
-        if target then
-            -- CFrame.lookAtを使用してカメラの回転を安定させる
-            Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, target.Position)
-        end
-    else
-        currentLockedTarget = nil
-    end
-end)
+        isPlayingSong = false
+        print("演奏が終了しました")
+    end)
+end
 
---------------------------------------------------------------------------------
--- [UI 構築] orion lib
---------------------------------------------------------------------------------
-local OrionUrl = "https://raw.githubusercontent.com/hololove1021/HolonHUB/refs/heads/main/source.txt"
+-- 曲の再生を停止
+local function stopSong()
+    isPlayingSong = false
+end
 
--- [[ 1. メイン画面の関数 ]]
-local function StartHolonHUB()
-    -- スマホ対策：OrionLibを関数内で読み込み直す
-    OrionLib = loadstring(game:HttpGet(OrionUrl))()
+-- JSONファイル一覧を取得
+local function getSongFiles()
+    local files = {}
+    local targetFolder = "FTAP_Notes"
     
-    -- 既存のUIを強制削除（二重表示防止）
+    local folderExists = false
     pcall(function()
-        if game:GetService("CoreGui"):FindFirstChild("Orion") then 
-            game:GetService("CoreGui").Orion:Destroy() 
+        if isfolder and isfolder(targetFolder) then
+            folderExists = true
         end
     end)
 
-    local Window = OrionLib:MakeWindow({
-        Name = "Holon HUB v1.4.2",
-        HidePremium = false,
-        SaveConfig = false, -- 初期化時の干渉を防ぐため無効化
-        ConfigFolder = "HolonHUB",
-        IntroEnabled = true,
-        IntroText = "Holon HUB v1.4.2 Loaded!"
-    })
-
--- プレイヤーリスト取得関数
-local function getPList()
-    local plist = {}
-    for _, p in ipairs(Players:GetPlayers()) do
-        -- 「表示名 (@ユーザー名)」の形式でテーブルに入れる
-        table.insert(plist, p.DisplayName .. " (@" .. p.Name .. ")")
+    if not folderExists then
+        return {"フォルダが見つかりません"}
     end
-    return plist
+    
+    local success, allFiles = pcall(function()
+        return listfiles(targetFolder)
+    end)
+    
+    if not success or not allFiles then
+        return {"アクセスエラー"}
+    end
+    
+    for _, filePath in ipairs(allFiles) do
+        if filePath:lower():match("%.json$") then
+            local fileName = filePath:match("([^/%\]+)$") or filePath
+            table.insert(files, fileName)
+        end
+    end
+    
+    if #files == 0 then
+        return {"JSONファイルなし"}
+    end
+    
+    return files
 end
 
--- --- TAB: AUTO AIM ---
-local AimTab = Window:MakeTab({
-    Name = "オートエイム",
-    Icon = "rbxassetid://7733960981" -- ターゲットアイコン
+-- UI構築
+local OrionLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/hololove1021/HolonHUB/refs/heads/main/source.txt"))()
+local Window = OrionLib:MakeWindow({
+    Name = "Holon Piano Standalone",
+    HidePremium = false,
+    SaveConfig = false,
+    ConfigFolder = "HolonPiano",
+    IntroEnabled = true,
+    IntroText = "Piano Script Loaded!"
 })
 
-local AimSec = AimTab:AddSection({ Name = "エイムボット設定" })
+local PianoTab = Window:MakeTab({
+    Name = "ピアノ",
+    Icon = "rbxassetid://7734020554"
+})
 
-UIElements.AimEnabled = AimSec:AddToggle({
-    Name = "オートエイム有効化",
+local PianoControlSec = PianoTab:AddSection({
+    Name = "ピアノ制御"
+})
+
+PianoControlSec:AddToggle({
+    Name = "ピアノ機能を有効化",
     Default = false,
-    Callback = function(v) 
-        aimCfg.Enabled = v 
-        updateMiniUI()
-    end
-})
-
-UIElements.AimShowFOV = AimSec:AddToggle({
-    Name = "FOV円を表示",
-    Default = true,
-    Callback = function(v) 
-        aimCfg.ShowFOV = v 
-        updateMiniUI()
-    end
-})
-
-UIElements.AimFOV = AimSec:AddSlider({
-    Name = "FOVサイズ (円の大きさ)",
-    Min = 10, Max = 800, Default = 190,
-    Callback = function(v) 
-        aimCfg.FOV = v 
-        updateMiniUI()
-    end
-})
-
-UIElements.AimThroughWalls = AimSec:AddToggle({
-    Name = "壁抜き (壁を無視)",
-    Default = false,
-    Callback = function(v) aimCfg.ThroughWalls = v end
-})
-
-AimSec:AddToggle({
-    Name = "ミニUIを表示",
-    Default = false,
-    Callback = function(v) miniUiGui.Enabled = v end
-})
-
-AimSec:AddDropdown({
-    Name = "ミニUI位置",
-    Default = "上",
-    Options = {"右", "上"},
     Callback = function(v)
-        miniUiPos = (v == "右") and "Right" or "Top"
-        updateMiniUiLayout()
-    end
-})
+        pianoEnabled = v
+        if v then
+            pianoKeyboard = getMusicKeyboard()
+            
+            if pianoKeyboard then
+                if pianoFollowEnabled then setupPianoFollow() end
 
-UIElements.AimTargetTeam = AimSec:AddDropdown({
-    Name = "対象チーム",
-    Default = "敵チーム",
-    Options = (function() 
-        local list = {"敵チーム", "全てのチーム", "個別プレイヤー"}
-        for _, t in ipairs(Teams:GetTeams()) do table.insert(list, t.Name) end
-        return list
-    end)(),
-    Callback = function(v) 
-        aimCfg.TargetTeam = v 
-        updateMiniUI()
-    end
-})
-
-AimSec:AddButton({
-    Name = "現在のターゲットを解除",
-    Callback = function() currentLockedTarget = nil end
-})
-
-UIElements.AimTargetPart = AimSec:AddDropdown({
-    Name = "狙う部位",
-    Default = "胴体",
-    Options = {"頭", "胴体", "上半身", "下半身"},
-    Callback = function(v) 
-        aimCfg.TargetPart = bodyPartMap[v] or "HumanoidRootPart"
-        updateMiniUI()
-    end
-})
-
-local FilterSec = AimTab:AddSection({ Name = "ターゲットフィルター" })
-
-FilterSec:AddToggle({
-    Name = "フレンドを除外",
-    Default = false,
-    Callback = function(v) aimCfg.ExcludeFriends = v end
-})
-
-FilterSec:AddToggle({
-    Name = "グループメンバーを除外",
-    Default = false,
-    Callback = function(v) aimCfg.ExcludeGroup = v end
-})
-
-FilterSec:AddTextbox({
-    Name = "除外するグループID",
-    Default = "0",
-    TextDisappear = false,
-    Callback = function(v) aimCfg.GroupId = tonumber(v) or 0 end
-})
-
-local ListSec = AimTab:AddSection({ Name = "プレイヤー個別設定" })
-
-local selectedPlayer = nil
-local playerDropdown = ListSec:AddDropdown({
-    Name = "プレイヤー選択",
-    Default = "",
-    Options = (function()
-        local list = {}
-        for _, p in ipairs(Players:GetPlayers()) do
-            if p ~= LocalPlayer then table.insert(list, p.Name) end
+                OrionLib:MakeNotification({
+                    Name = "ピアノ機能",
+                    Content = "MusicKeyboardを検出しました",
+                    Time = 5
+                })
+            else
+                pianoEnabled = false
+                OrionLib:MakeNotification({
+                    Name = "エラー",
+                    Content = "MusicKeyboardが見つかりません",
+                    Time = 5
+                })
+            end
+        else
+            stopSong()
+            stopPiano()
         end
-        return list
-    end)(),
-    Callback = function(v) selectedPlayer = v end
+    end    
 })
 
-ListSec:AddButton({
-    Name = "リスト更新",
+PianoControlSec:AddToggle({
+    Name = "プレイヤー追従",
+    Default = true,
+    Callback = function(v)
+        pianoFollowEnabled = v
+        if pianoEnabled and pianoKeyboard and pianoKeyboard.Parent then
+            if v then
+                setupPianoFollow()
+            else
+                stopPiano()
+            end
+        elseif pianoEnabled and v then
+            pianoKeyboard = getMusicKeyboard()
+            if pianoKeyboard then
+                setupPianoFollow()
+            end
+        end
+    end
+})
+
+local PianoSongSec = PianoTab:AddSection({
+    Name = "曲の再生"
+})
+
+local songDropdown = PianoSongSec:AddDropdown({
+    Name = "曲を選択",
+    Default = "なし",
+    Options = getSongFiles(),
+    Callback = function(v)
+        if v == "なし" or v == "フォルダが見つかりません" or v == "JSONファイルなし" then
+            selectedSongFile = nil
+            selectedSongData = nil
+            return
+        end
+        
+        local filePath = "FTAP_Notes/" .. v
+        selectedSongFile = filePath
+        
+        local success, fileContent = pcall(function()
+            return readfile(filePath)
+        end)
+        
+        if success then
+            local decodeSuccess, jsonData = pcall(function()
+                return HttpService:JSONDecode(fileContent)
+            end)
+            
+            if decodeSuccess then
+                selectedSongData = jsonData
+                OrionLib:MakeNotification({
+                    Name = "読み込み完了",
+                    Content = "音符数: " .. #jsonData,
+                    Time = 5
+                })
+            else
+                selectedSongData = nil
+            end
+        end
+    end    
+})
+
+PianoSongSec:AddButton({
+    Name = "曲リストを更新",
     Callback = function()
-        local list = {}
-        for _, p in ipairs(Players:GetPlayers()) do
-            if p ~= LocalPlayer then table.insert(list, p.Name) end
-        end
-        playerDropdown:Refresh(list, true)
+        songDropdown:Refresh(getSongFiles(), true)
+        OrionLib:MakeNotification({
+            Name = "更新完了",
+            Content = "JSONファイルリストを更新しました",
+            Time = 5
+        })
     end
 })
 
-ListSec:AddButton({ Name = "ホワイトリストに追加 (除外)", Callback = function() if selectedPlayer and not table.find(aimCfg.Whitelist, selectedPlayer) then table.insert(aimCfg.Whitelist, selectedPlayer) OrionLib:MakeNotification({Name="追加",Content=selectedPlayer.." を除外リストに追加しました",Time=2}) end end })
-ListSec:AddButton({ Name = "ホワイトリストから削除", Callback = function() if selectedPlayer then local idx = table.find(aimCfg.Whitelist, selectedPlayer) if idx then table.remove(aimCfg.Whitelist, idx) OrionLib:MakeNotification({Name="削除",Content=selectedPlayer.." を除外リストから削除しました",Time=2}) end end end })
-ListSec:AddButton({ Name = "ブラックリストに追加 (対象)", Callback = function() if selectedPlayer and not table.find(aimCfg.Blacklist, selectedPlayer) then table.insert(aimCfg.Blacklist, selectedPlayer) OrionLib:MakeNotification({Name="追加",Content=selectedPlayer.." を対象リストに追加しました",Time=2}) end end })
-ListSec:AddButton({ Name = "ブラックリストから削除", Callback = function() if selectedPlayer then local idx = table.find(aimCfg.Blacklist, selectedPlayer) if idx then table.remove(aimCfg.Blacklist, idx) OrionLib:MakeNotification({Name="削除",Content=selectedPlayer.." を対象リストから削除しました",Time=2}) end end end })
-ListSec:AddButton({ Name = "リストをクリア", Callback = function() aimCfg.Whitelist = {} aimCfg.Blacklist = {} OrionLib:MakeNotification({Name="クリア",Content="リストをリセットしました",Time=2}) end })
-
-local DetailTab = Window:MakeTab({Name = "詳細", Icon = DetailIcon})
-AddDetailContent(DetailTab)
-
--- 通知（起動時）
-OrionLib:MakeNotification({
-	Name = "Holon HUB",
-	Content = "v1.4.2 が読み込まれました！",
-	Time = 5
+PianoSongSec:AddButton({
+    Name = "選択した曲を再生",
+    Callback = function()
+        if not pianoKeyboard then
+            pianoKeyboard = getMusicKeyboard()
+        end
+        
+        if not pianoKeyboard then
+            OrionLib:MakeNotification({Name = "エラー", Content = "MusicKeyboardが見つかりません", Time = 5})
+            return
+        end
+        
+        if not selectedSongData then
+            OrionLib:MakeNotification({Name = "エラー", Content = "曲を選択してください", Time = 5})
+            return
+        end
+        
+        playSongFromJSON(selectedSongData)
+        
+        OrionLib:MakeNotification({
+            Name = "自動演奏",
+            Content = "再生を開始しました",
+            Time = 3
+        })
+    end
 })
 
-    -- メイン画面側の初期化
-    OrionLib:Init()
-end
-StartHolonHUB()
+PianoSongSec:AddButton({
+    Name = "再生を停止",
+    Callback = function()
+        stopSong()
+        OrionLib:MakeNotification({
+            Name = "停止",
+            Content = "曲の再生を停止しました",
+            Time = 5
+        })
+    end
+})
+
+local PianoManualSec = PianoTab:AddSection({
+    Name = "マニュアル操作・テスト"
+})
+
+PianoManualSec:AddButton({
+    Name = "テスト: Cキーを押す",
+    Callback = function()
+        if pianoKeyboard then
+            local testKey = pianoKeyboard:FindFirstChild("Key1C", true)
+            if testKey then
+                SetNetworkOwner:FireServer(testKey, testKey.CFrame)
+                task.wait(0.1)
+                OrionLib:MakeNotification({
+                    Name = "テスト", 
+                    Content = "Key1Cを鳴らしました！", 
+                    Time = 2
+                })
+            else
+                warn("Key1Cが見つかりません")
+            end
+        end
+    end
+})
+
+OrionLib:Init()
