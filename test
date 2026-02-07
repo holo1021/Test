@@ -17,6 +17,8 @@ local Window = OrionLib:MakeWindow({
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
 local localPlayer = Players.LocalPlayer
 
 -- 変数管理
@@ -42,6 +44,51 @@ local function spawnKunaiAtStomach()
     end
 end
 
+-- --- クナイ同期ロジック ---
+local syncConnection = nil
+
+local function startSync()
+    if syncConnection then syncConnection:Disconnect() end
+
+    syncConnection = RunService.RenderStepped:Connect(function()
+        if not _G.AntiKickEnabled then 
+            if syncConnection then syncConnection:Disconnect() end
+            return 
+        end
+
+        local char = localPlayer.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        local toysFolder = Workspace:FindFirstChild(localPlayer.Name .. "SpawnedInToys")
+        
+        if hrp and toysFolder then
+            for _, toy in pairs(toysFolder:GetChildren()) do
+                if toy.Name == "NinjaKunai" then
+                    local targetCFrame = hrp.CFrame * CFrame.new(0, 0.3, -0.5)
+                    if toy:IsA("Model") then
+                        if toy.PrimaryPart then
+                            toy:SetPrimaryPartCFrame(targetCFrame)
+                        elseif toy:FindFirstChild("Handle") then
+                            toy.Handle.CFrame = targetCFrame
+                        end
+                        -- 物理演算の影響を排除して固定を強化
+                        for _, part in pairs(toy:GetDescendants()) do
+                            if part:IsA("BasePart") then
+                                part.CanCollide = false
+                                part.AssemblyLinearVelocity = Vector3.zero
+                                part.AssemblyAngularVelocity = Vector3.zero
+                            end
+                        end
+                    elseif toy:IsA("BasePart") then
+                        toy.CFrame = targetCFrame
+                        toy.CanCollide = false
+                        toy.AssemblyLinearVelocity = Vector3.zero
+                    end
+                end
+            end
+        end
+    end)
+end
+
 -- --- UI構成 ---
 local Tab = Window:MakeTab({
     Name = "Anti-Kick",
@@ -57,7 +104,7 @@ Tab:AddToggle({
         if Value then
             OrionLib:MakeNotification({
                 Name = "System",
-                Content = "お腹の位置でクナイの生成を開始しました",
+                Content = "クナイの生成と追従を開始しました",
                 Time = 3
             })
             
@@ -68,11 +115,11 @@ Tab:AddToggle({
                     task.wait(8) 
                 end
             end)
+            startSync()
         end
     end
 })
 
-Tab:AddLabel("※同期機能(Sync)は削除済みです。")
-Tab:AddLabel("※クナイはお腹の位置に生成され、その場に残ります。")
+Tab:AddLabel("※クナイは常に自分のお腹の位置に追従します。")
 
 OrionLib:Init()
