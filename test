@@ -25,6 +25,8 @@ local localPlayer = Players.LocalPlayer
 _G.AntiKickEnabled = false
 _G.DollFollowEnabled = false
 local followConnection = nil
+_G.DecoySync = false
+local decoyConnection = nil
 
 -- --- NinjaKunai生成メインロジック ---
 local function spawnKunaiAtBody()
@@ -72,6 +74,36 @@ local function startFollowing()
                     toy:SetPrimaryPartCFrame(hrp.CFrame)
                 elseif toy:IsA("BasePart") then
                     toy.CFrame = hrp.CFrame
+                end
+            end
+        end
+    end)
+end
+
+-- --- YouDecoy同期ロジック ---
+local function startDecoySync()
+    if decoyConnection then decoyConnection:Disconnect() end
+
+    decoyConnection = RunService.RenderStepped:Connect(function()
+        if not _G.DecoySync then 
+            if decoyConnection then decoyConnection:Disconnect() end
+            return 
+        end
+
+        local char = localPlayer.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        local toysFolder = Workspace:FindFirstChild(localPlayer.Name .. "SpawnedInToys")
+        
+        if hrp and toysFolder then
+            -- フォルダ内から "YouDecoy" という名前のオブジェクトを探す
+            for _, toy in pairs(toysFolder:GetChildren()) do
+                if toy.Name == "YouDecoy" or toy:FindFirstChild("Humanoid") then
+                    -- 自分の位置に重ねる（少し後ろにしたい場合は CFrame.new(0, 0, 2) など調整）
+                    if toy:IsA("Model") then
+                        toy:SetPrimaryPartCFrame(hrp.CFrame)
+                    elseif toy:IsA("BasePart") then
+                        toy.CFrame = hrp.CFrame
+                    end
                 end
             end
         end
@@ -138,5 +170,39 @@ SyncTab:AddToggle({
 })
 
 SyncTab:AddLabel("※NinjaKunaiや他の人形もすべて重なります")
+
+local DecoyTab = Window:MakeTab({
+    Name = "Decoy Control",
+    Icon = "rbxassetid://4483345998"
+})
+
+DecoyTab:AddToggle({
+    Name = "YouDecoyを同期させる",
+    Default = false,
+    Callback = function(Value)
+        _G.DecoySync = Value
+        if Value then
+            OrionLib:MakeNotification({
+                Name = "System",
+                Content = "YouDecoyの同期を開始しました",
+                Time = 3
+            })
+            startDecoySync()
+        else
+            if decoyConnection then decoyConnection:Disconnect() end
+        end
+    end
+})
+
+DecoyTab:AddButton({
+    Name = "YouDecoyをその場に配置 (生成)",
+    Callback = function()
+        local hrp = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if hrp then
+            local spawnToyRF = ReplicatedStorage:WaitForChild("MenuToys"):WaitForChild("SpawnToyRemoteFunction")
+            spawnToyRF:InvokeServer("YouDecoy", hrp.CFrame, Vector3.new(0, 0, 0))
+        end
+    end
+})
 
 OrionLib:Init()
