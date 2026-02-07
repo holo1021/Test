@@ -1,16 +1,14 @@
--- ライブラリの読み込み
 local OrionLib = loadstring(game:HttpGet(('https://raw.githubusercontent.com/hololove1021/HolonHUB/refs/heads/main/source.txt')))()
 
--- 既存のUIを削除して衝突を防ぐ
+-- 二重起動防止
 pcall(function()
     if game:GetService("CoreGui"):FindFirstChild("Orion") then 
         game:GetService("CoreGui").Orion:Destroy() 
     end
 end)
 
--- ウィンドウ作成
 local Window = OrionLib:MakeWindow({
-    Name = "Anti-Kick Simple", 
+    Name = "Anti-Kick Only", 
     HidePremium = false, 
     SaveConfig = true, 
     ConfigFolder = "AntiKickSimple",
@@ -21,16 +19,37 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local localPlayer = Players.LocalPlayer
 
+-- 変数管理
 _G.AntiKickEnabled = false
+
+-- --- NinjaKunai生成ロジック (お腹の位置) ---
+local function spawnKunaiAtStomach()
+    local character = localPlayer.Character
+    local hrp = character and character:FindFirstChild("HumanoidRootPart")
+    
+    if hrp then
+        local spawnToyRF = ReplicatedStorage:WaitForChild("MenuToys"):WaitForChild("SpawnToyRemoteFunction")
+        
+        -- お腹あたりの位置を計算
+        -- HRP(腰)から少し上(0.3)に上げ、少し前(-0.5)に出すことでお腹に重なります
+        local stomachCFrame = hrp.CFrame * CFrame.new(0, 0.3, -0.5)
+        
+        spawnToyRF:InvokeServer(
+            "NinjaKunai", 
+            stomachCFrame, 
+            Vector3.new(0, 0, 0)
+        )
+    end
+end
 
 -- --- UI構成 ---
 local Tab = Window:MakeTab({
-    Name = "Main",
+    Name = "Anti-Kick",
     Icon = "rbxassetid://4483345998"
 })
 
 Tab:AddToggle({
-    Name = "アンチキック (NinjaKunai)",
+    Name = "アンチキック開始 (NinjaKunai)",
     Default = false,
     Callback = function(Value)
         _G.AntiKickEnabled = Value
@@ -38,31 +57,22 @@ Tab:AddToggle({
         if Value then
             OrionLib:MakeNotification({
                 Name = "System",
-                Content = "お腹の位置で生成を開始しました（非同期）",
+                Content = "お腹の位置でクナイの生成を開始しました",
                 Time = 3
             })
             
             task.spawn(function()
                 while _G.AntiKickEnabled do
-                    local char = localPlayer.Character
-                    local hrp = char and char:FindFirstChild("HumanoidRootPart")
-                    
-                    if hrp then
-                        local spawnToyRF = ReplicatedStorage:WaitForChild("MenuToys"):WaitForChild("SpawnToyRemoteFunction")
-                        
-                        -- お腹あたりの位置（腰から少し上、少し前）
-                        local stomachPos = hrp.CFrame * CFrame.new(0, 0.4, -0.2)
-                        
-                        pcall(function()
-                            spawnToyRF:InvokeServer("NinjaKunai", stomachPos, Vector3.new(0, 0, 0))
-                        end)
-                    end
-                    task.wait(8) -- 生成間隔
+                    pcall(spawnKunaiAtStomach)
+                    -- アンチキックとして機能させるため、一定間隔で生成
+                    task.wait(8) 
                 end
             end)
         end
     end
 })
 
--- 【重要】これを最後に書かないとUIが表示されません
+Tab:AddLabel("※同期機能(Sync)は削除済みです。")
+Tab:AddLabel("※クナイはお腹の位置に生成され、その場に残ります。")
+
 OrionLib:Init()
