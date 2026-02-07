@@ -1,479 +1,142 @@
+local OrionLib = loadstring(game:HttpGet(('https://raw.githubusercontent.com/hololove1021/HolonHUB/refs/heads/main/source.txt')))()
+
+-- 二重起動防止
+pcall(function()
+    if game:GetService("CoreGui"):FindFirstChild("Orion") then 
+        game:GetService("CoreGui").Orion:Destroy() 
+    end
+end)
+
+local Window = OrionLib:MakeWindow({
+    Name = "Anti-Kick System v2.1", 
+    HidePremium = false, 
+    SaveConfig = true, 
+    ConfigFolder = "AntiKickHub",
+    IntroEnabled = false
+})
+
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
-local HttpService = game:GetService("HttpService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local localPlayer = Players.LocalPlayer
 
--- イベント定義
-local GrabEvents = ReplicatedStorage:WaitForChild("GrabEvents")
-local SetNetworkOwner = GrabEvents:WaitForChild("SetNetworkOwner")
+-- 変数管理
+_G.AntiKickEnabled = false
+_G.DollFollowEnabled = false
+local followConnection = nil
 
-local LocalPlayer = Players.LocalPlayer
-
--- ピアノ機能用の変数
-local pianoEnabled = false
-local pianoFollowEnabled = true
-local selectedSongFile = nil
-local selectedSongData = nil
-local pianoKeyboard = nil
-local isPlayingSong = false
-local pianoUpdateConnection = nil
-local pianoOriginalCollisions = {}
-
--- ピアノのキーマッピング
-local pianoKeyMap = {
-    -- 白鍵
-    ["1"] = "Key1C", ["2"] = "Key1D", ["3"] = "Key1E", ["4"] = "Key1F", 
-    ["5"] = "Key1G", ["6"] = "Key1A", ["7"] = "Key1B", ["8"] = "Key2C",
-    ["9"] = "Key2D", ["0"] = "Key2E", ["q"] = "Key2F", ["w"] = "Key2G",
-    ["e"] = "Key2A", ["r"] = "Key2B", ["t"] = "Key3C",
+-- --- NinjaKunai生成メインロジック ---
+local function spawnKunaiAtBody()
+    local character = localPlayer.Character
+    local hrp = character and character:FindFirstChild("HumanoidRootPart")
     
-    -- 黒鍵
-    ["f"] = "Key1Csharp", ["g"] = "Key1Dsharp", ["h"] = "Key1Fsharp",
-    ["j"] = "Key1Gsharp", ["k"] = "Key1Asharp", ["l"] = "Key2Csharp",
-    ["z"] = "Key2Dsharp", ["x"] = "Key2Fsharp", ["c"] = "Key2Gsharp",
-    ["v"] = "Key2Asharp"
-}
-
--- getMusicKeyboard 関数の定義
-local function getMusicKeyboard()
-    local myName = LocalPlayer.Name
-    
-    -- 1. SpawnedInToys から探す
-    local spawnedToys = Workspace:FindFirstChild(myName .. "SpawnedInToys")
-    if spawnedToys then
-        local kb = spawnedToys:FindFirstChild("MusicKeyboard")
-        if kb then return kb end
+    if hrp then
+        -- 画像に基づいたリモート関数の取得
+        local spawnToyRF = ReplicatedStorage:WaitForChild("MenuToys"):WaitForChild("SpawnToyRemoteFunction")
+        
+        -- 横（X）と高さ（Y）は維持し、前後（Z）を0.2（少し後ろ）に調整
+        -- 前回の -0.5 より 0.7スタッド後ろに下がります
+        local spawnCFrame = hrp.CFrame * CFrame.new(0, 0, 0.2) 
+        
+        spawnToyRF:InvokeServer(
+            "NinjaKunai", 
+            spawnCFrame, 
+            Vector3.new(0, 0, 0)
+        )
     end
-
-    -- 2. Plots から探す
-    local plots = Workspace:FindFirstChild("Plots")
-    local plotItems = Workspace:FindFirstChild("PlotItems")
-
-    if plots and plotItems then
-        for _, plot in ipairs(plots:GetChildren()) do
-            local sign = plot:FindFirstChild("PlotSign")
-            local ownerObj = sign and (sign:FindFirstChild("ThisPlotsOwners") or sign:FindFirstChild("Owner"))
-            if ownerObj then
-                local val = ownerObj:FindFirstChild("Value") or ownerObj
-                local data = val:FindFirstChild("Data") or val
-                if (data:IsA("StringValue") and data.Value == myName) then
-                    -- PlotItemsフォルダ内を検索
-                    local myPlotItems = plotItems:FindFirstChild(plot.Name)
-                    if myPlotItems then
-                        local kb = myPlotItems:FindFirstChild("MusicKeyboard")
-                        if kb then return kb end
-                    end
-                    -- 念のためBuild内も検索
-                    local build = plot:FindFirstChild("Build")
-                    local kb = build and build:FindFirstChild("MusicKeyboard")
-                    if kb then return kb end
-                end
-            end
-        end
-    end
-
-    -- 3. Workspace全体から所有権のある MusicKeyboard を探す
-    for _, item in ipairs(Workspace:GetChildren()) do
-        if item.Name == "MusicKeyboard" and item:IsA("Model") then
-            local ownerValue = item:FindFirstChild("Owner") or item:FindFirstChild("PartOwner")
-            if ownerValue and ownerValue:IsA("StringValue") and ownerValue.Value == myName then
-                return item
-            end
-        end
-    end
-
-    return nil
 end
 
--- ピアノを停止・解放する関数
-local function stopPiano()
-    if pianoUpdateConnection then
-        pianoUpdateConnection:Disconnect()
-        pianoUpdateConnection = nil
-    end
-    if pianoKeyboard and pianoKeyboard.Parent then
-        local pp = pianoKeyboard:FindFirstChild("Main", true) or pianoKeyboard.PrimaryPart
-        if not pp then return end
-        -- AlignPosition/Orientation を削除
-        for _, child in ipairs(pp:GetChildren()) do
-            if child:IsA("Attachment") or child:IsA("AlignPosition") or child:IsA("AlignOrientation") then
-                child:Destroy()
-            end
-        end
-    end
-    
-    -- 当たり判定を元に戻す
-    for part, canCollide in pairs(pianoOriginalCollisions) do
-        if part and part.Parent then
-            part.CanCollide = canCollide
-        end
-    end
-    pianoOriginalCollisions = {} 
+-- --- 同期ロジック ---
+local function startFollowing()
+    -- 前回の接続があれば解除
+    if followConnection then followConnection:Disconnect() end
 
-    print("Holon HUB: ピアノの追従を停止しました")
-end
-
--- ピアノを腰の前に追従させる関数
-local function setupPianoFollow()
-    if not pianoKeyboard then pianoKeyboard = getMusicKeyboard() end
-    if not pianoKeyboard then return end
-    
-    if pianoUpdateConnection then return end
-
-    local mainPart = pianoKeyboard:FindFirstChild("Main", true) or pianoKeyboard.PrimaryPart
-    if not mainPart then 
-        warn("Holon HUB: ピアノのMainパーツが見つかりません")
-        return 
-    end
-    print("Holon HUB: ピアノのセットアップを開始:", pianoKeyboard.Name)
-    
-    for _, part in ipairs(pianoKeyboard:GetDescendants()) do
-        if part:IsA("BasePart") then
-            if pianoOriginalCollisions[part] == nil then
-                pianoOriginalCollisions[part] = part.CanCollide
-            end
-            part.CanCollide = false
-            part.CanTouch = false
-            part.CanQuery = false
-            part.Anchored = false
-            part.Massless = true
-            part.AssemblyLinearVelocity = Vector3.zero
-            part.AssemblyAngularVelocity = Vector3.zero
-            pcall(function() part:SetNetworkOwner(LocalPlayer) end)
-        end
-    end
-    
-    local pp = mainPart
-    local char = LocalPlayer.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    if root then
-        local offset = CFrame.new(0, -1.5, -2) * CFrame.Angles(0, math.rad(180), 0)
-        pp.CFrame = root.CFrame * offset
-    end
-    
-    local a0 = Instance.new("Attachment", pp)
-    local ap = Instance.new("AlignPosition", pp)
-    ap.Attachment0 = a0
-    ap.Mode = Enum.PositionAlignmentMode.OneAttachment
-    ap.MaxForce = 1e9
-    ap.Responsiveness = 200
-    local ao = Instance.new("AlignOrientation", pp)
-    ao.Attachment0 = a0
-    ao.Mode = Enum.OrientationAlignmentMode.OneAttachment
-    ao.MaxTorque = 1e9
-    ao.Responsiveness = 200
-    
-    pianoUpdateConnection = RunService.RenderStepped:Connect(function()
-        local char = LocalPlayer.Character
-        local root = char and char:FindFirstChild("HumanoidRootPart")
-        if not root then return end
-        if not pianoKeyboard or not pianoKeyboard.Parent then 
-            stopPiano()
+    followConnection = RunService.RenderStepped:Connect(function()
+        if not _G.DollFollowEnabled then 
+            if followConnection then followConnection:Disconnect() end
             return 
         end
 
-        if math.random() < 0.05 then
-             pcall(function() pp:SetNetworkOwner(LocalPlayer) end)
-        end
-
-        local baseCF = root.CFrame
-        local offset = CFrame.new(0, -1.5, -2) * CFrame.Angles(0, math.rad(180), 0)
-        local targetCF = baseCF * offset
-        ap.Position = targetCF.Position
-        ao.CFrame = targetCF
-    end)
-    print("Holon HUB: ピアノの追従を開始しました")
-end
-
--- 鍵盤を叩く関数
-local function pressPianoKey(keyName)
-    local targetKeyboard = getMusicKeyboard()
-    if not targetKeyboard then return end
-
-    local key = targetKeyboard:FindFirstChild(keyName, true)
-    if key and key:IsA("BasePart") then
-        SetNetworkOwner:FireServer(key, key.CFrame)
-        task.wait(0.15)
-    end
-end
-
--- JSON再生関数
-local function playSongFromJSON(jsonData)
-    if isPlayingSong then return end
-    
-    local songData
-    local success, err = pcall(function()
-        if type(jsonData) == "string" then
-            return HttpService:JSONDecode(jsonData)
-        else
-            return jsonData
-        end
-    end)
-    
-    if not success or type(err) ~= "table" then
-        warn("JSONデータの読み込みに失敗しました")
-        return
-    end
-    songData = err
-
-    isPlayingSong = true
-    print("演奏を開始します: " .. #songData .. " 音符")
-    
-    task.spawn(function()
-        if not pianoKeyboard then pianoKeyboard = getMusicKeyboard() end
+        local char = localPlayer.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
         
-        for i, note in ipairs(songData) do
-            if not isPlayingSong then break end
-            
-            local rawKey = tostring(note.key)
-            local keyName = rawKey
-            if not string.match(rawKey, "^Key") then
-                keyName = pianoKeyMap[rawKey] or rawKey
+        -- 自分の名前がついたおもちゃフォルダを探す
+        local toysFolder = Workspace:FindFirstChild(localPlayer.Name .. "SpawnedInToys")
+        
+        if hrp and toysFolder then
+            -- フォルダ内にある最新の人形（おもちゃ）をすべて同期
+            for _, toy in pairs(toysFolder:GetChildren()) do
+                if toy:IsA("Model") and toy.PrimaryPart then
+                    -- 自分のHRPと同じ位置・向きに固定
+                    toy:SetPrimaryPartCFrame(hrp.CFrame)
+                elseif toy:IsA("BasePart") then
+                    toy.CFrame = hrp.CFrame
+                end
             end
-            
-            local delayTime = note.delay or 0.1
+        end
+    end)
+end
+
+-- --- UI構成 ---
+local Tab = Window:MakeTab({
+    Name = "Main",
+    Icon = "rbxassetid://4483345998"
+})
+
+Tab:AddToggle({
+    Name = "アンチキック (NinjaKunai Loop)",
+    Default = false,
+    Callback = function(Value)
+        _G.AntiKickEnabled = Value
+        
+        if Value then
+            OrionLib:MakeNotification({
+                Name = "System",
+                Content = "位置を微調整してクナイ生成を開始しました",
+                Time = 3
+            })
             
             task.spawn(function()
-                pressPianoKey(keyName)
+                while _G.AntiKickEnabled do
+                    pcall(spawnKunaiAtBody)
+                    task.wait(5) -- サーバー負荷を抑えるための待機時間
+                end
             end)
-            
-            task.wait(delayTime)
-        end
-        
-        isPlayingSong = false
-        print("演奏が終了しました")
-    end)
-end
-
--- 曲の再生を停止
-local function stopSong()
-    isPlayingSong = false
-end
-
--- JSONファイル一覧を取得
-local function getSongFiles()
-    local files = {}
-    local targetFolder = "FTAP_Notes"
-    
-    local folderExists = false
-    pcall(function()
-        if isfolder and isfolder(targetFolder) then
-            folderExists = true
-        end
-    end)
-
-    if not folderExists then
-        return {"フォルダが見つかりません"}
-    end
-    
-    local success, allFiles = pcall(function()
-        return listfiles(targetFolder)
-    end)
-    
-    if not success or not allFiles then
-        return {"アクセスエラー"}
-    end
-    
-    for _, filePath in ipairs(allFiles) do
-        if filePath:lower():match("%.json$") then
-            local fileName = filePath:match("([^/%\]+)$") or filePath
-            table.insert(files, fileName)
         end
     end
-    
-    if #files == 0 then
-        return {"JSONファイルなし"}
-    end
-    
-    return files
-end
-
--- UI構築
-local OrionLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/hololove1021/HolonHUB/refs/heads/main/source.txt"))()
-local Window = OrionLib:MakeWindow({
-    Name = "Holon Piano Standalone",
-    HidePremium = false,
-    SaveConfig = false,
-    ConfigFolder = "HolonPiano",
-    IntroEnabled = true,
-    IntroText = "Piano Script Loaded!"
 })
 
-local PianoTab = Window:MakeTab({
-    Name = "ピアノ",
-    Icon = "rbxassetid://7734020554"
+Tab:AddLabel("※CFrame.new(0, 0, 0.2) で前後位置を調整済み")
+
+local SyncTab = Window:MakeTab({
+    Name = "Sync Control",
+    Icon = "rbxassetid://4483345998"
 })
 
-local PianoControlSec = PianoTab:AddSection({
-    Name = "ピアノ制御"
-})
-
-PianoControlSec:AddToggle({
-    Name = "ピアノ機能を有効化",
+SyncTab:AddToggle({
+    Name = "自分と同じ動きをさせる",
     Default = false,
-    Callback = function(v)
-        pianoEnabled = v
-        if v then
-            pianoKeyboard = getMusicKeyboard()
-            
-            if pianoKeyboard then
-                if pianoFollowEnabled then setupPianoFollow() end
-
-                OrionLib:MakeNotification({
-                    Name = "ピアノ機能",
-                    Content = "MusicKeyboardを検出しました",
-                    Time = 5
-                })
-            else
-                pianoEnabled = false
-                OrionLib:MakeNotification({
-                    Name = "エラー",
-                    Content = "MusicKeyboardが見つかりません",
-                    Time = 5
-                })
-            end
+    Callback = function(Value)
+        _G.DollFollowEnabled = Value
+        if Value then
+            OrionLib:MakeNotification({
+                Name = "System",
+                Content = "同期を開始しました。人形を出すと重なります。",
+                Time = 3
+            })
+            startFollowing()
         else
-            stopSong()
-            stopPiano()
-        end
-    end    
-})
-
-PianoControlSec:AddToggle({
-    Name = "プレイヤー追従",
-    Default = true,
-    Callback = function(v)
-        pianoFollowEnabled = v
-        if pianoEnabled and pianoKeyboard and pianoKeyboard.Parent then
-            if v then
-                setupPianoFollow()
-            else
-                stopPiano()
-            end
-        elseif pianoEnabled and v then
-            pianoKeyboard = getMusicKeyboard()
-            if pianoKeyboard then
-                setupPianoFollow()
-            end
+            if followConnection then followConnection:Disconnect() end
+            OrionLib:MakeNotification({
+                Name = "System",
+                Content = "同期を停止しました。",
+                Time = 3
+            })
         end
     end
 })
 
-local PianoSongSec = PianoTab:AddSection({
-    Name = "曲の再生"
-})
-
-local songDropdown = PianoSongSec:AddDropdown({
-    Name = "曲を選択",
-    Default = "なし",
-    Options = getSongFiles(),
-    Callback = function(v)
-        if v == "なし" or v == "フォルダが見つかりません" or v == "JSONファイルなし" then
-            selectedSongFile = nil
-            selectedSongData = nil
-            return
-        end
-        
-        local filePath = "FTAP_Notes/" .. v
-        selectedSongFile = filePath
-        
-        local success, fileContent = pcall(function()
-            return readfile(filePath)
-        end)
-        
-        if success then
-            local decodeSuccess, jsonData = pcall(function()
-                return HttpService:JSONDecode(fileContent)
-            end)
-            
-            if decodeSuccess then
-                selectedSongData = jsonData
-                OrionLib:MakeNotification({
-                    Name = "読み込み完了",
-                    Content = "音符数: " .. #jsonData,
-                    Time = 5
-                })
-            else
-                selectedSongData = nil
-            end
-        end
-    end    
-})
-
-PianoSongSec:AddButton({
-    Name = "曲リストを更新",
-    Callback = function()
-        songDropdown:Refresh(getSongFiles(), true)
-        OrionLib:MakeNotification({
-            Name = "更新完了",
-            Content = "JSONファイルリストを更新しました",
-            Time = 5
-        })
-    end
-})
-
-PianoSongSec:AddButton({
-    Name = "選択した曲を再生",
-    Callback = function()
-        if not pianoKeyboard then
-            pianoKeyboard = getMusicKeyboard()
-        end
-        
-        if not pianoKeyboard then
-            OrionLib:MakeNotification({Name = "エラー", Content = "MusicKeyboardが見つかりません", Time = 5})
-            return
-        end
-        
-        if not selectedSongData then
-            OrionLib:MakeNotification({Name = "エラー", Content = "曲を選択してください", Time = 5})
-            return
-        end
-        
-        playSongFromJSON(selectedSongData)
-        
-        OrionLib:MakeNotification({
-            Name = "自動演奏",
-            Content = "再生を開始しました",
-            Time = 3
-        })
-    end
-})
-
-PianoSongSec:AddButton({
-    Name = "再生を停止",
-    Callback = function()
-        stopSong()
-        OrionLib:MakeNotification({
-            Name = "停止",
-            Content = "曲の再生を停止しました",
-            Time = 5
-        })
-    end
-})
-
-local PianoManualSec = PianoTab:AddSection({
-    Name = "マニュアル操作・テスト"
-})
-
-PianoManualSec:AddButton({
-    Name = "テスト: Cキーを押す",
-    Callback = function()
-        if pianoKeyboard then
-            local testKey = pianoKeyboard:FindFirstChild("Key1C", true)
-            if testKey then
-                SetNetworkOwner:FireServer(testKey, testKey.CFrame)
-                task.wait(0.1)
-                OrionLib:MakeNotification({
-                    Name = "テスト", 
-                    Content = "Key1Cを鳴らしました！", 
-                    Time = 2
-                })
-            else
-                warn("Key1Cが見つかりません")
-            end
-        end
-    end
-})
+SyncTab:AddLabel("※NinjaKunaiや他の人形もすべて重なります")
 
 OrionLib:Init()
