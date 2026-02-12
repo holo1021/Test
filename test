@@ -479,7 +479,7 @@ local defaultConfig = {
     MirrorPlayer = { Size = 60, Speed = 10, Height = 0, Back = 0, Scale = 1, EdgeSpacing = 1 },
     Beam = { Size = 60, Speed = 50, Height = 0.5, Back = 0, Count = 8 },
     BackGuard = { Size = 10, Speed = 2, Height = 2, Back = 15 },
-    Tornado = { Size = 20, Speed = 5, Height = 0, Back = 0, Radius = 5, TopRadius = 20, Invert = false },
+    Tornado = { Size = 20, Speed = 5, Height = 0, Back = 0, Radius = 5, TopRadius = 20 },
     Combined = {Mode1 = "Wing", Mode2 = "Merkaba", Mode1Count = 15, Mode2Count = 15 },
     AnimSpeed = 1.0,
     PlotReturn = { Enabled = false, Interval = 30, PlotCFrame = nil},
@@ -977,7 +977,6 @@ elseif mode == "MagicCircle3" then
         local h = c.Size -- Sizeを高さとして使用
         
         local ratio = (i - 1) / (count > 1 and count - 1 or 1)
-        if c.Invert then ratio = 1 - ratio end
         
         local currentR = r1 + (r2 - r1) * ratio
         local currentH = h * ratio
@@ -1679,7 +1678,7 @@ local function StartHolonHUB()
     end)
 
     local Window = OrionLib:MakeWindow({
-        Name = "Holon HUB v1.3.6",
+        Name = "Holon HUB v1.3.7",
         HidePremium = false,
         SaveConfig = false, -- 初期化時の干渉を防ぐため無効化
         ConfigFolder = "HolonHUB",
@@ -2073,7 +2072,7 @@ MainSec:AddButton({
 })
 
 UIElements.OtherToysToggle = MainSec:AddToggle({
-    Name = "他人のトイも使用",
+    Name = "他人のおもちゃも使用",
     Default = false,
     Callback = function(v)
         useOtherToys = v
@@ -2286,9 +2285,8 @@ for _, m in ipairs(modes) do
             s:AddToggle({ Name = "カオス移動", Default = false, Callback = function(v) cfg.FloatStone.Chaos = v end })
 
         elseif m == "Tornado" then
-            s:AddSlider({ Name = "下部幅 (Radius)", Min = 0, Max = 50, Default = cfg.Tornado.Radius, Callback = function(v) cfg.Tornado.Radius = v end })
-            s:AddSlider({ Name = "上部幅 (TopRadius)", Min = 0, Max = 50, Default = cfg.Tornado.TopRadius, Callback = function(v) cfg.Tornado.TopRadius = v end })
-            s:AddToggle({ Name = "上下反転 (Invert)", Default = cfg.Tornado.Invert, Callback = function(v) cfg.Tornado.Invert = v end })
+            s:AddSlider({ Name = "下部幅", Min = 0, Max = 50, Default = cfg.Tornado.Radius, Callback = function(v) cfg.Tornado.Radius = v end })
+            s:AddSlider({ Name = "上部幅", Min = 0, Max = 50, Default = cfg.Tornado.TopRadius, Callback = function(v) cfg.Tornado.TopRadius = v end })
         end
     end
 end
