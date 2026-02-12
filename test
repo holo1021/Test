@@ -2995,37 +2995,31 @@ UIElements.BlobmanKick = ActionSec:AddToggle({
                 end
                 
                 if grabRemote and dropRemote and ((lDet and lWeld) or (rDet and rWeld)) then
-                    OrionLib:MakeNotification({ Name = "実行", Content = "Blobman Hold Loop", Time = 3 })
+                    OrionLib:MakeNotification({ Name = "実行", Content = "Blobman Kick Loop", Time = 3 })
 
                     task.spawn(function()
                         while levitateRunning and blobman and blobman.Parent do
                             if target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
                                 local tRoot = target.Character.HumanoidRootPart
                                 
-                                -- まだ固定されていない（捕獲前）なら捕まえに行く
-                                if blobman.PrimaryPart and not blobman.PrimaryPart.Anchored then
-                                    -- 1. Force TP to Target
+                                -- raw.txt風キック: TP→掴む→離す を繰り返してFlingさせる
+                                if blobman.PrimaryPart.Anchored then
                                     blobman.PrimaryPart.Anchored = false
-                                    blobman:SetPrimaryPartCFrame(tRoot.CFrame)
-                                    
-                                    -- 2. Grab with BOTH hands (両手で掴む)
-                                    if lDet and lWeld then grabRemote:FireServer(lDet, tRoot, lWeld) end
-                                    if rDet and rWeld then grabRemote:FireServer(rDet, tRoot, rWeld) end
-                                    
-                                    task.wait(0.1)
-                                    
-                                    -- 3. TP Up 100 studs & Stop (上空100で固定)
-                                    blobman:SetPrimaryPartCFrame(tRoot.CFrame + Vector3.new(0, 100, 0))
-                                    blobman.PrimaryPart.AssemblyLinearVelocity = Vector3.zero
-                                    blobman.PrimaryPart.AssemblyAngularVelocity = Vector3.zero
-                                    blobman.PrimaryPart.Anchored = true
-                                else
-                                    -- 既に固定されているなら掴み状態を維持（念のため再送信）
-                                    if lDet and lWeld then grabRemote:FireServer(lDet, tRoot, lWeld) end
-                                    if rDet and rWeld then grabRemote:FireServer(rDet, tRoot, rWeld) end
                                 end
+
+                                blobman:SetPrimaryPartCFrame(tRoot.CFrame)
+                                
+                                if lDet and lWeld then grabRemote:FireServer(lDet, tRoot, lWeld) end
+                                if rDet and rWeld then grabRemote:FireServer(rDet, tRoot, rWeld) end
+                                task.wait(0.1)
+                                
+                                dropRemote:FireServer()
+                                
+                                task.wait(0.1)
+                            else
+                                levitateRunning = false -- ターゲットを失ったら停止
+                                break
                             end
-                            task.wait(0.05)
                         end
                         
                         -- 終了時に固定解除
