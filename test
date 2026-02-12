@@ -3002,20 +3002,16 @@ UIElements.BlobmanKick = ActionSec:AddToggle({
                             if target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
                                 local tRoot = target.Character.HumanoidRootPart
                                 
-                                -- raw.txt風キック: TP→掴む→離す を繰り返してFlingさせる
-                                if blobman.PrimaryPart.Anchored then
-                                    blobman.PrimaryPart.Anchored = false
-                                end
-
+                                -- raw.txt風キック
+                                blobman.PrimaryPart.Anchored = false
                                 blobman:SetPrimaryPartCFrame(tRoot.CFrame)
                                 
                                 if lDet and lWeld then grabRemote:FireServer(lDet, tRoot, lWeld) end
                                 if rDet and rWeld then grabRemote:FireServer(rDet, tRoot, rWeld) end
-                                task.wait(0.1)
+                                task.wait()
                                 
                                 dropRemote:FireServer()
-                                
-                                task.wait(0.1)
+                                task.wait()
                             else
                                 levitateRunning = false -- ターゲットを失ったら停止
                                 break
