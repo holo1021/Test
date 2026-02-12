@@ -2932,7 +2932,7 @@ ActionSec:AddButton({
 
 local levitateRunning = false
 UIElements.BlobmanKick = ActionSec:AddToggle({
-    Name = "Blobman Kick(投げまくってください)",
+    Name = "Blobman Kick",
     Default = false,
     Callback = function(v)
         levitateRunning = v
@@ -3032,7 +3032,6 @@ UIElements.BlobmanKick = ActionSec:AddToggle({
                         end
                         
                         -- Phase 2: Lock
-                        local packetTimer = 0
                         while levitateRunning and blobman and blobman.Parent do
                             if not target or not target.Parent or not target.Character then break end
                             
@@ -3049,24 +3048,21 @@ UIElements.BlobmanKick = ActionSec:AddToggle({
                                 tRoot.AssemblyLinearVelocity = Vector3.zero
                                 tRoot.AssemblyAngularVelocity = Vector3.zero
                                 
-                                if tick() - packetTimer > 0.05 then
-                                    packetTimer = tick()
-                                    pcall(function()
-                                        tHum.PlatformStand = true
-                                        tHum.Sit = true
-                                        GE.SetNetworkOwner:FireServer(tRoot, lockPos)
-                                        
-                                        -- Check for existing weld to drop
-                                        local currentWeld = Det:FindFirstChild("RightWeld") or Det:FindFirstChild("LeftWeld") or Det:FindFirstChildWhichIsA("Weld") or Det:FindFirstChild("RigidConstraint")
-                                        if currentWeld then
-                                            dropRemote:FireServer(currentWeld)
-                                        end
-                                        
-                                        GE.DestroyGrabLine:FireServer(tRoot)
-                                        if Det then grabRemote:FireServer(Det, tRoot, Weld) end
-                                        GE.CreateGrabLine:FireServer(tRoot, Vector3.zero, tRoot.Position, false)
-                                    end)
-                                end
+                                pcall(function()
+                                    tHum.PlatformStand = true
+                                    tHum.Sit = true
+                                    GE.SetNetworkOwner:FireServer(tRoot, lockPos)
+                                    
+                                    -- Check for existing weld to drop
+                                    local currentWeld = Det:FindFirstChild("RightWeld") or Det:FindFirstChild("LeftWeld") or Det:FindFirstChildWhichIsA("Weld") or Det:FindFirstChild("RigidConstraint")
+                                    if currentWeld then
+                                        dropRemote:FireServer(currentWeld)
+                                    end
+                                    
+                                    GE.DestroyGrabLine:FireServer(tRoot)
+                                    if Det then grabRemote:FireServer(Det, tRoot, Weld) end
+                                    GE.CreateGrabLine:FireServer(tRoot, Vector3.zero, tRoot.Position, false)
+                                end)
                             else
                                 if blobRoot then
                                     blobRoot.CFrame = SavedPos
