@@ -476,10 +476,10 @@ local defaultConfig = {
     FloatStone = { Size = 10, Speed = 2, Height = 2, Back = 0, Chaos = false },
     Merkaba = { Size = 8, Speed = 2, Height = 7, Back = 0 },
     Cube = { Size = 5, Speed = 1, Height = 5, Back = 0 },
-    MirrorPlayer = { Size = 40, Speed = 10, Height = 0, Back = 0 },
+    MirrorPlayer = { Size = 60, Speed = 10, Height = 0, Back = 0, Scale = 1, EdgeSpacing = 1 },
     Beam = { Size = 60, Speed = 50, Height = 0.5, Back = 0, Count = 8 },
-    Tornado = { Size = 20, Speed = 5, Height = -10, Back = 0, TopWidth = 20, BottomWidth = 0, Invert = false },
     BackGuard = { Size = 10, Speed = 2, Height = 2, Back = 15 },
+    Tornado = { Size = 20, Speed = 5, Height = 0, Back = 0, Radius = 5, TopRadius = 20, Invert = false },
     Combined = {Mode1 = "Wing", Mode2 = "Merkaba", Mode1Count = 15, Mode2Count = 15 },
     AnimSpeed = 1.0,
     PlotReturn = { Enabled = false, Interval = 30, PlotCFrame = nil},
@@ -494,10 +494,10 @@ local function deepCopy(target)
 end
 
 local selectedItemName = "全てのおもちゃ" 
-local useOtherPlayersToys = false
 local detectedItems = {}
 
 local cfg = deepCopy(defaultConfig)
+local useOtherToys = false
 local isEnabled, currentMode, combinedActive = false, "Wing", false
 local followPlayer = true
 local lastBaseCF = nil
@@ -972,17 +972,18 @@ elseif mode == "MagicCircle3" then
         return Vector3.new(randomX, randomY + hover, -backDistance)
 
     elseif mode == "Tornado" then
-        local ratio = i / count
-        local h = ratio * c.Size * 1.5
-        if c.Invert then h = -h end
+        local r1 = c.Radius or 5
+        local r2 = c.TopRadius or 20
+        local h = c.Size -- Sizeを高さとして使用
         
-        local top = c.TopWidth or c.Size
-        local bot = c.BottomWidth or 0
-        local r = bot + (top - bot) * ratio
+        local ratio = (i - 1) / (count > 1 and count - 1 or 1)
+        if c.Invert then ratio = 1 - ratio end
         
-        local angle = (i * 0.2) + (time * c.Speed)
+        local currentR = r1 + (r2 - r1) * ratio
+        local currentH = h * ratio
+        local theta = time * c.Speed + ratio * math.pi * 4
         
-        return Vector3.new(math.cos(angle) * r, h + c.Height, math.sin(angle) * r + c.Back)
+        return Vector3.new(math.cos(theta) * currentR, currentH + c.Height, math.sin(theta) * currentR + c.Back)
     end
     
     return Vector3.zero
@@ -1041,65 +1042,41 @@ local function startEffect()
     local plotsFolder = Workspace:FindFirstChild("Plots")
     local plotItemsFolder = Workspace:FindFirstChild("PlotItems")
 
-    if useOtherPlayersToys then
-        -- 全てのSpawnedInToysフォルダをスキャン
-        for _, folder in ipairs(Workspace:GetChildren()) do
-            if folder.Name:match("SpawnedInToys") then
-                for _, item in ipairs(folder:GetChildren()) do
-                    table.insert(allMyItems, item)
-                end
-            end
+    -- 0. Get items from SpawnedInToys (Cosmic style)
+    local spawnedToys = Workspace:FindFirstChild(myName .. "SpawnedInToys")
+    if spawnedToys then
+        for _, item in ipairs(spawnedToys:GetChildren()) do
+            table.insert(allMyItems, item)
         end
-        -- 全てのPlotItemsをスキャン
-        if plotItemsFolder then
-            for _, folder in ipairs(plotItemsFolder:GetChildren()) do
-                for _, item in ipairs(folder:GetChildren()) do
-                    table.insert(allMyItems, item)
-                end
-            end
-        end
-        -- Workspace直下の所有権付きモデルをスキャン
-        for _, item in ipairs(Workspace:GetChildren()) do
-            local ownerValue = item:FindFirstChild("Owner") or item:FindFirstChild("PartOwner")
-            if item:IsA("Model") and ownerValue and ownerValue:IsA("StringValue") and not table.find(allMyItems, item) then
-                 table.insert(allMyItems, item)
-            end
-        end
-    else
-        -- 0. Get items from SpawnedInToys (Cosmic style)
-        local spawnedToys = Workspace:FindFirstChild(myName .. "SpawnedInToys")
-        if spawnedToys then
-            for _, item in ipairs(spawnedToys:GetChildren()) do
-                table.insert(allMyItems, item)
-            end
-        end
+    end
 
-        -- 1. Get items from my plot
-        if plotsFolder and plotItemsFolder then
-            for _, plot in ipairs(plotsFolder:GetChildren()) do
-                local sign = plot:FindFirstChild("PlotSign")
-                local ownerObj = sign and (sign:FindFirstChild("ThisPlotsOwners") or sign:FindFirstChild("Owner"))
-                if ownerObj then
-                    local val = ownerObj:FindFirstChild("Value") or ownerObj
-                    local data = val:FindFirstChild("Data") or val
-                    if (data:IsA("StringValue") and data.Value == myName) then
-                        local myPlotName = plot.Name
-                        local targetFolder = plotItemsFolder:FindFirstChild(myPlotName)
-                        if targetFolder then
-                            for _, item in ipairs(targetFolder:GetChildren()) do
-                                table.insert(allMyItems, item)
-                            end
+    -- 1. Get items from my plot
+    if plotsFolder and plotItemsFolder then
+        for _, plot in ipairs(plotsFolder:GetChildren()) do
+            local sign = plot:FindFirstChild("PlotSign")
+            local ownerObj = sign and (sign:FindFirstChild("ThisPlotsOwners") or sign:FindFirstChild("Owner"))
+            if ownerObj then
+                local val = ownerObj:FindFirstChild("Value") or ownerObj
+                local data = val:FindFirstChild("Data") or val
+                if (data:IsA("StringValue") and data.Value == myName) then
+                    local myPlotName = plot.Name
+                    local targetFolder = plotItemsFolder:FindFirstChild(myPlotName)
+                    if targetFolder then
+                        for _, item in ipairs(targetFolder:GetChildren()) do
+                            table.insert(allMyItems, item)
                         end
-                        break
                     end
+                    break
                 end
             end
         end
+    end
 
-        -- 2. Get items directly from Workspace that I own
-        for _, item in ipairs(Workspace:GetChildren()) do
-            local ownerValue = item:FindFirstChild("Owner") or item:FindFirstChild("PartOwner")
-            if item:IsA("Model") and ownerValue and ownerValue:IsA("StringValue") and ownerValue.Value == myName and not table.find(allMyItems, item) then
+    -- 2. Get items directly from Workspace that I own
+    for _, item in ipairs(Workspace:GetChildren()) do
+        local ownerValue = item:FindFirstChild("Owner") or item:FindFirstChild("PartOwner")
+        if item:IsA("Model") and ownerValue and ownerValue:IsA("StringValue") then
+            if (ownerValue.Value == myName or useOtherToys) and not table.find(allMyItems, item) then
                  table.insert(allMyItems, item)
             end
         end
@@ -1699,14 +1676,10 @@ local function StartHolonHUB()
         if game:GetService("CoreGui"):FindFirstChild("Orion") then 
             game:GetService("CoreGui").Orion:Destroy() 
         end
-        local pg = LocalPlayer:FindFirstChild("PlayerGui")
-        if pg and pg:FindFirstChild("Orion") then
-            pg.Orion:Destroy()
-        end
     end)
 
     local Window = OrionLib:MakeWindow({
-        Name = "Holon HUB v1.3.7",
+        Name = "Holon HUB v1.3.6",
         HidePremium = false,
         SaveConfig = false, -- 初期化時の干渉を防ぐため無効化
         ConfigFolder = "HolonHUB",
@@ -2021,15 +1994,6 @@ UIElements.ItemDropdown = MainSec:AddDropdown({
 })
 itemDropdown = UIElements.ItemDropdown
 
-UIElements.OtherToysToggle = MainSec:AddToggle({
-    Name = "他のプレイヤーのおもちゃを含める",
-    Default = false,
-    Callback = function(v)
-        useOtherPlayersToys = v
-        refreshToyList()
-    end
-})
-
 -- おもちゃリストをスキャンしてドロップダウンを更新する共通関数
 local function refreshToyList()
     detectedItems = {}
@@ -2038,71 +2002,47 @@ local function refreshToyList()
     local plotsFolder = Workspace:FindFirstChild("Plots")
     local plotItemsFolder = Workspace:FindFirstChild("PlotItems")
 
-    if useOtherPlayersToys then
-        -- 全てのSpawnedInToysフォルダをスキャン
-        for _, folder in ipairs(Workspace:GetChildren()) do
-            if folder.Name:match("SpawnedInToys") then
-                for _, item in ipairs(folder:GetChildren()) do
-                    table.insert(allMyItems, item)
-                end
-            end
+    -- 0. Get items from SpawnedInToys
+    local spawnedToys = Workspace:FindFirstChild(myName .. "SpawnedInToys")
+    if spawnedToys then
+        for _, item in ipairs(spawnedToys:GetChildren()) do
+            table.insert(allMyItems, item)
         end
-        -- 全てのPlotItemsをスキャン
-        if plotItemsFolder then
-            for _, folder in ipairs(plotItemsFolder:GetChildren()) do
-                for _, item in ipairs(folder:GetChildren()) do
-                    table.insert(allMyItems, item)
-                end
-            end
-        end
-        -- Workspace直下の所有権付きモデルをスキャン
-        for _, item in ipairs(Workspace:GetChildren()) do
-            local ownerValue = item:FindFirstChild("Owner") or item:FindFirstChild("PartOwner")
-            if item:IsA("Model") and ownerValue and ownerValue:IsA("StringValue") and not table.find(allMyItems, item) then
-                 table.insert(allMyItems, item)
-            end
-        end
-    else
-        -- 0. Get items from SpawnedInToys
-        local spawnedToys = Workspace:FindFirstChild(myName .. "SpawnedInToys")
-        if spawnedToys then
-            for _, item in ipairs(spawnedToys:GetChildren()) do
-                table.insert(allMyItems, item)
-            end
-        end
+    end
 
-        -- 1. Get items from my plot
-        if plotsFolder and plotItemsFolder then
-            for _, plot in ipairs(plotsFolder:GetChildren()) do
-                local sign = plot:FindFirstChild("PlotSign")
-                local ownerObj = sign and (sign:FindFirstChild("ThisPlotsOwners") or sign:FindFirstChild("Owner"))
-                if ownerObj then
-                    local val = ownerObj:FindFirstChild("Value") or ownerObj
-                    local data = val:FindFirstChild("Data") or val
-                    if (data:IsA("StringValue") and data.Value == myName) then
-                        local myPlotName = plot.Name
-                        local targetFolder = plotItemsFolder:FindFirstChild(myPlotName)
-                        if targetFolder then
-                            for _, item in ipairs(targetFolder:GetChildren()) do
-                                table.insert(allMyItems, item)
-                            end
-                            -- ★このフォルダの増減を監視開始 (初回のみ)
-                            if not _G.ToyWatcher then
-                                _G.ToyWatcher = true
-                                targetFolder.ChildAdded:Connect(function() task.wait(0.1) refreshToyList() end)
-                                targetFolder.ChildRemoved:Connect(function() task.wait(0.1) refreshToyList() end)
-                            end
+    -- 1. Get items from my plot
+    if plotsFolder and plotItemsFolder then
+        for _, plot in ipairs(plotsFolder:GetChildren()) do
+            local sign = plot:FindFirstChild("PlotSign")
+            local ownerObj = sign and (sign:FindFirstChild("ThisPlotsOwners") or sign:FindFirstChild("Owner"))
+            if ownerObj then
+                local val = ownerObj:FindFirstChild("Value") or ownerObj
+                local data = val:FindFirstChild("Data") or val
+                if (data:IsA("StringValue") and data.Value == myName) then
+                    local myPlotName = plot.Name
+                    local targetFolder = plotItemsFolder:FindFirstChild(myPlotName)
+                    if targetFolder then
+                        for _, item in ipairs(targetFolder:GetChildren()) do
+                            table.insert(allMyItems, item)
                         end
-                        break
+                        -- ★このフォルダの増減を監視開始 (初回のみ)
+                        if not _G.ToyWatcher then
+                            _G.ToyWatcher = true
+                            targetFolder.ChildAdded:Connect(function() task.wait(0.1) refreshToyList() end)
+                            targetFolder.ChildRemoved:Connect(function() task.wait(0.1) refreshToyList() end)
+                        end
                     end
+                    break
                 end
             end
         end
+    end
 
-        -- 2. Get items directly from Workspace that I own
-        for _, item in ipairs(Workspace:GetChildren()) do
-            local ownerValue = item:FindFirstChild("Owner") or item:FindFirstChild("PartOwner")
-            if item:IsA("Model") and ownerValue and ownerValue:IsA("StringValue") and ownerValue.Value == myName and not table.find(allMyItems, item) then
+    -- 2. Get items directly from Workspace that I own
+    for _, item in ipairs(Workspace:GetChildren()) do
+        local ownerValue = item:FindFirstChild("Owner") or item:FindFirstChild("PartOwner")
+        if item:IsA("Model") and ownerValue and ownerValue:IsA("StringValue") then
+            if (ownerValue.Value == myName or useOtherToys) and not table.find(allMyItems, item) then
                  table.insert(allMyItems, item)
             end
         end
@@ -2129,6 +2069,15 @@ MainSec:AddButton({
     Callback = function()
         refreshToyList()
         OrionLib:MakeNotification({ Name = "更新", Content = "おもちゃリストを再スキャンしました", Time = 3 })
+    end
+})
+
+UIElements.OtherToysToggle = MainSec:AddToggle({
+    Name = "他人のトイも使用",
+    Default = false,
+    Callback = function(v)
+        useOtherToys = v
+        refreshToyList()
     end
 })
 
@@ -2337,9 +2286,9 @@ for _, m in ipairs(modes) do
             s:AddToggle({ Name = "カオス移動", Default = false, Callback = function(v) cfg.FloatStone.Chaos = v end })
 
         elseif m == "Tornado" then
-            s:AddSlider({ Name = "上の幅", Min = 0, Max = 100, Default = 20, Callback = function(v) cfg.Tornado.TopWidth = v end })
-            s:AddSlider({ Name = "横の幅 (下部)", Min = 0, Max = 100, Default = 0, Callback = function(v) cfg.Tornado.BottomWidth = v end })
-            s:AddToggle({ Name = "上下逆さま", Default = false, Callback = function(v) cfg.Tornado.Invert = v end })
+            s:AddSlider({ Name = "下部幅 (Radius)", Min = 0, Max = 50, Default = cfg.Tornado.Radius, Callback = function(v) cfg.Tornado.Radius = v end })
+            s:AddSlider({ Name = "上部幅 (TopRadius)", Min = 0, Max = 50, Default = cfg.Tornado.TopRadius, Callback = function(v) cfg.Tornado.TopRadius = v end })
+            s:AddToggle({ Name = "上下反転 (Invert)", Default = cfg.Tornado.Invert, Callback = function(v) cfg.Tornado.Invert = v end })
         end
     end
 end
@@ -2570,6 +2519,7 @@ SaveSec:AddButton({
                         combinedActive = s.CombinedActive or false
                         followPlayer = s.FollowPlayer or true
                         GLOBAL_ANGLE = s.GlobalAngle or -90
+                        useOtherToys = s.UseOtherToys or false
                         autoWidth = s.AutoWidth or true
                         if s.Esp then espCfg = s.Esp end
                         
@@ -2592,6 +2542,7 @@ SaveSec:AddButton({
                         if UIElements.MaxToysSlider then UIElements.MaxToysSlider:Set(cfg.Global.MaxToys) end
                         if UIElements.AutoWidthToggle then UIElements.AutoWidthToggle:Set(autoWidth) end
                         if UIElements.AnimSpeedSlider then UIElements.AnimSpeedSlider:Set(cfg.AnimSpeed * 10) end
+                        if UIElements.OtherToysToggle then UIElements.OtherToysToggle:Set(useOtherToys) end
                         if UIElements.PlotReturnToggle then UIElements.PlotReturnToggle:Set(cfg.PlotReturn.Enabled) end
                         if UIElements.PlotReturnInterval then UIElements.PlotReturnInterval:Set(cfg.PlotReturn.Interval) end
                         
@@ -2697,6 +2648,7 @@ SaveSec:AddButton({
                 CombinedActive = combinedActive,
                 FollowPlayer = followPlayer,
                 GlobalAngle = GLOBAL_ANGLE,
+                UseOtherToys = useOtherToys,
                 AutoWidth = autoWidth,
                 Esp = espCfg, -- ESP設定(テーブル)も保存
                 -- 追加保存項目
@@ -3291,7 +3243,7 @@ OrionLib:MakeNotification({
 	Time = 5
 })
     -- 起動時にUIスタイルを適用
-    pcall(applyCustomStyle)
+    applyCustomStyle()
 
     -- メイン画面側の初期化
     OrionLib:Init()
@@ -3304,13 +3256,6 @@ else
     -- 未認証なら認証UIを作る
     local OrionLib = loadstring(game:HttpGet(OrionUrl))()
     
-    -- 既存のUIを削除 (認証画面用)
-    pcall(function()
-        if game:GetService("CoreGui"):FindFirstChild("Orion") then game:GetService("CoreGui").Orion:Destroy() end
-        local pg = LocalPlayer:FindFirstChild("PlayerGui")
-        if pg and pg:FindFirstChild("Orion") then pg.Orion:Destroy() end
-    end)
-
     local AuthWindow = OrionLib:MakeWindow({
         Name = "Holon HUB | Key System",
         HidePremium = true,
