@@ -1699,6 +1699,10 @@ local function StartHolonHUB()
         if game:GetService("CoreGui"):FindFirstChild("Orion") then 
             game:GetService("CoreGui").Orion:Destroy() 
         end
+        local pg = LocalPlayer:FindFirstChild("PlayerGui")
+        if pg and pg:FindFirstChild("Orion") then
+            pg.Orion:Destroy()
+        end
     end)
 
     local Window = OrionLib:MakeWindow({
@@ -3287,7 +3291,7 @@ OrionLib:MakeNotification({
 	Time = 5
 })
     -- 起動時にUIスタイルを適用
-    applyCustomStyle()
+    pcall(applyCustomStyle)
 
     -- メイン画面側の初期化
     OrionLib:Init()
@@ -3300,6 +3304,13 @@ else
     -- 未認証なら認証UIを作る
     local OrionLib = loadstring(game:HttpGet(OrionUrl))()
     
+    -- 既存のUIを削除 (認証画面用)
+    pcall(function()
+        if game:GetService("CoreGui"):FindFirstChild("Orion") then game:GetService("CoreGui").Orion:Destroy() end
+        local pg = LocalPlayer:FindFirstChild("PlayerGui")
+        if pg and pg:FindFirstChild("Orion") then pg.Orion:Destroy() end
+    end)
+
     local AuthWindow = OrionLib:MakeWindow({
         Name = "Holon HUB | Key System",
         HidePremium = true,
