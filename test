@@ -476,8 +476,9 @@ local defaultConfig = {
     FloatStone = { Size = 10, Speed = 2, Height = 2, Back = 0, Chaos = false },
     Merkaba = { Size = 8, Speed = 2, Height = 7, Back = 0 },
     Cube = { Size = 5, Speed = 1, Height = 5, Back = 0 },
-    MirrorPlayer = { Size = 30, Speed = 10, Height = 50, Back = 0, Scale = 1, EdgeSpacing = 1 },
+    MirrorPlayer = { Size = 40, Speed = 10, Height = 0, Back = 0 },
     Beam = { Size = 60, Speed = 50, Height = 0.5, Back = 0, Count = 8 },
+    Tornado = { Size = 20, Speed = 5, Height = -10, Back = 0 },
     BackGuard = { Size = 10, Speed = 2, Height = 2, Back = 15 },
     Combined = {Mode1 = "Wing", Mode2 = "Merkaba", Mode1Count = 15, Mode2Count = 15 },
     AnimSpeed = 1.0,
@@ -968,6 +969,14 @@ elseif mode == "MagicCircle3" then
         local hover = math.sin(time * c.Speed + i * 0.5) * 0.5
     
         return Vector3.new(randomX, randomY + hover, -backDistance)
+
+    elseif mode == "Tornado" then
+        local ratio = i / count
+        local h = ratio * c.Size * 1.5
+        local r = ratio * c.Size
+        local angle = (i * 0.2) + (time * c.Speed)
+        
+        return Vector3.new(math.cos(angle) * r, h + c.Height, math.sin(angle) * r + c.Back)
     end
     
     return Vector3.zero
@@ -1956,7 +1965,7 @@ UIElements.EffectToggle = MainSec:AddToggle({
 UIElements.ModeDropdown = MainSec:AddDropdown({
 	Name = "モード選択",
 	Default = "Wing",
-	Options = {"Wing","Heart","Star","Vortex","Sphere","Rotate","Pet","Text","MagicCircle","MagicCircle2","MagicCircle3","FloatStone","Merkaba","Cube","MirrorPlayer","Beam","BackGuard"},
+	Options = {"Wing","Heart","Star","Vortex","Sphere","Rotate","Pet","Text","MagicCircle","MagicCircle2","MagicCircle3","FloatStone","Merkaba","Cube","MirrorPlayer","Beam","BackGuard","Tornado"},
 	Callback = function(v)
 		currentMode = v
 		combinedActive = false
@@ -2145,7 +2154,7 @@ local CombineSec = ModeSetTab:AddSection({
 UIElements.CombineMode1 = CombineSec:AddDropdown({
     Name = "合体: モード1",
     Default = "Wing",
-    Options = {"Wing","Heart","Star","Vortex","Sphere","Rotate","Pet","Text","MagicCircle","MagicCircle2","MagicCircle3","FloatStone","Merkaba","Cube","MirrorPlayer","Beam","BackGuard"},
+    Options = {"Wing","Heart","Star","Vortex","Sphere","Rotate","Pet","Text","MagicCircle","MagicCircle2","MagicCircle3","FloatStone","Merkaba","Cube","MirrorPlayer","Beam","BackGuard","Tornado"},
     Callback = function(v) cfg.Combined.Mode1 = v end
 })
 
@@ -2162,7 +2171,7 @@ UIElements.CombineMode1Count = CombineSec:AddSlider({
 UIElements.CombineMode2 = CombineSec:AddDropdown({
     Name = "合体: モード2",
     Default = "Rotate",
-    Options = {"Wing","Heart","Star","Vortex","Sphere","Rotate","Pet","Text","MagicCircle","MagicCircle2","MagicCircle3","FloatStone","Merkaba","Cube","MirrorPlayer","Beam","BackGuard"},
+    Options = {"Wing","Heart","Star","Vortex","Sphere","Rotate","Pet","Text","MagicCircle","MagicCircle2","MagicCircle3","FloatStone","Merkaba","Cube","MirrorPlayer","Beam","BackGuard","Tornado"},
     Callback = function(v) cfg.Combined.Mode2 = v end
 })
 
@@ -2181,7 +2190,7 @@ local EditSec = ModeSetTab:AddSection({
     Name = "共通設定エディタ"
 })
 
-local modes = {"Wing","Heart","Star","Vortex","Sphere","Rotate","Pet","Text","MagicCircle", "MagicCircle2", "MagicCircle3", "FloatStone", "Merkaba", "Cube", "MirrorPlayer", "Beam", "BackGuard"}
+local modes = {"Wing","Heart","Star","Vortex","Sphere","Rotate","Pet","Text","MagicCircle", "MagicCircle2", "MagicCircle3", "FloatStone", "Merkaba", "Cube", "MirrorPlayer", "Beam", "BackGuard", "Tornado"}
 
 local currentEditMode = "Wing"
 local sl_Speed, sl_Size, sl_Height, sl_Back
@@ -2225,7 +2234,7 @@ local AdvTab = Window:MakeTab({
 
 for _, m in ipairs(modes) do
     -- 固有設定があるモードのみセクションを作成
-    if m == "Wing" or m == "Pet" or m == "Text" or m == "MagicCircle2" or m == "MagicCircle3" or m == "MirrorPlayer" or m == "Beam" or m == "FloatStone" then
+    if m == "Wing" or m == "Pet" or m == "Text" or m == "MagicCircle2" or m == "MagicCircle3" or m == "Beam" or m == "FloatStone" then
         local s = AdvTab:AddSection({ Name = m })
         
         if m == "Wing" then
@@ -2249,12 +2258,6 @@ for _, m in ipairs(modes) do
         
         elseif m == "MagicCircle3" then
             s:AddSlider({ Name = "複雑度", Min = 1, Max = 10, Default = 5, Callback = function(v) cfg.MagicCircle3.Complexity = v end })
-        
-        elseif m == "MirrorPlayer" then
-            -- Orionは小数が苦手なので10倍で表示
-            s:AddSlider({ Name = "スケール倍率 (x10)", Min = 1, Max = 100, Default = 10, Callback = function(v) cfg.MirrorPlayer.Scale = v/10 end })
-            s:AddSlider({ Name = "ボックスサイズ (x10)", Min = 5, Max = 100, Default = 20, Callback = function(v) cfg.MirrorPlayer.Size = v/10 end })
-            s:AddSlider({ Name = "エッジ間隔密度 (x10)", Min = 5, Max = 30, Default = 10, Callback = function(v) cfg.MirrorPlayer.EdgeSpacing = v/10 end })
         
         elseif m == "Beam" then
             s:AddSlider({ Name = "ビーム本数", Min = 1, Max = 20, Default = 8, Callback = function(v) cfg.Beam.Count = v end })
