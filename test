@@ -1042,10 +1042,20 @@ local function startEffect()
     local plotItemsFolder = Workspace:FindFirstChild("PlotItems")
 
     -- 0. Get items from SpawnedInToys (Cosmic style)
-    local spawnedToys = Workspace:FindFirstChild(myName .. "SpawnedInToys")
-    if spawnedToys then
-        for _, item in ipairs(spawnedToys:GetChildren()) do
-            table.insert(allMyItems, item)
+    if useOtherToys then
+        for _, folder in ipairs(Workspace:GetChildren()) do
+            if folder.Name:match("SpawnedInToys$") then
+                for _, item in ipairs(folder:GetChildren()) do
+                    table.insert(allMyItems, item)
+                end
+            end
+        end
+    else
+        local spawnedToys = Workspace:FindFirstChild(myName .. "SpawnedInToys")
+        if spawnedToys then
+            for _, item in ipairs(spawnedToys:GetChildren()) do
+                table.insert(allMyItems, item)
+            end
         end
     end
 
@@ -1057,7 +1067,9 @@ local function startEffect()
             if ownerObj then
                 local val = ownerObj:FindFirstChild("Value") or ownerObj
                 local data = val:FindFirstChild("Data") or val
-                if (data:IsA("StringValue") and data.Value == myName) then
+                local isMine = (data:IsA("StringValue") and data.Value == myName)
+                
+                if isMine or useOtherToys then
                     local myPlotName = plot.Name
                     local targetFolder = plotItemsFolder:FindFirstChild(myPlotName)
                     if targetFolder then
@@ -1065,7 +1077,7 @@ local function startEffect()
                             table.insert(allMyItems, item)
                         end
                     end
-                    break
+                    if isMine and not useOtherToys then break end
                 end
             end
         end
@@ -1678,7 +1690,7 @@ local function StartHolonHUB()
     end)
 
     local Window = OrionLib:MakeWindow({
-        Name = "Holon HUB v1.3.7",
+        Name = "Holon HUB v1.3.8",
         HidePremium = false,
         SaveConfig = false, -- 初期化時の干渉を防ぐため無効化
         ConfigFolder = "HolonHUB",
@@ -2002,10 +2014,20 @@ local function refreshToyList()
     local plotItemsFolder = Workspace:FindFirstChild("PlotItems")
 
     -- 0. Get items from SpawnedInToys
-    local spawnedToys = Workspace:FindFirstChild(myName .. "SpawnedInToys")
-    if spawnedToys then
-        for _, item in ipairs(spawnedToys:GetChildren()) do
-            table.insert(allMyItems, item)
+    if useOtherToys then
+        for _, folder in ipairs(Workspace:GetChildren()) do
+            if folder.Name:match("SpawnedInToys$") then
+                for _, item in ipairs(folder:GetChildren()) do
+                    table.insert(allMyItems, item)
+                end
+            end
+        end
+    else
+        local spawnedToys = Workspace:FindFirstChild(myName .. "SpawnedInToys")
+        if spawnedToys then
+            for _, item in ipairs(spawnedToys:GetChildren()) do
+                table.insert(allMyItems, item)
+            end
         end
     end
 
@@ -2017,7 +2039,9 @@ local function refreshToyList()
             if ownerObj then
                 local val = ownerObj:FindFirstChild("Value") or ownerObj
                 local data = val:FindFirstChild("Data") or val
-                if (data:IsA("StringValue") and data.Value == myName) then
+                local isMine = (data:IsA("StringValue") and data.Value == myName)
+                
+                if isMine or useOtherToys then
                     local myPlotName = plot.Name
                     local targetFolder = plotItemsFolder:FindFirstChild(myPlotName)
                     if targetFolder then
@@ -2025,13 +2049,13 @@ local function refreshToyList()
                             table.insert(allMyItems, item)
                         end
                         -- ★このフォルダの増減を監視開始 (初回のみ)
-                        if not _G.ToyWatcher then
+                        if isMine and not _G.ToyWatcher then
                             _G.ToyWatcher = true
                             targetFolder.ChildAdded:Connect(function() task.wait(0.1) refreshToyList() end)
                             targetFolder.ChildRemoved:Connect(function() task.wait(0.1) refreshToyList() end)
                         end
                     end
-                    break
+                    if isMine and not useOtherToys then break end
                 end
             end
         end
