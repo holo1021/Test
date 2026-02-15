@@ -142,28 +142,36 @@ MainTab:AddToggle({
                         for _, t in pairs(toys:GetChildren()) do
                             if t.Name == "NinjaKunai" then
                                 pcall(function()
-                                    local root = t:IsA("Model") and (t.PrimaryPart or t:FindFirstChildWhichIsA("BasePart")) or t
+                                    local root = t:IsA("BasePart") and t or (t:IsA("Model") and (t.PrimaryPart or t:FindFirstChildWhichIsA("BasePart")))
+                                    if root and t:IsA("Model") and not t.PrimaryPart then t.PrimaryPart = root end
+
                                     for _, p in pairs(t:GetDescendants()) do
                                         if p:IsA("BasePart") then
                                             p.CanCollide = false
                                             p.Anchored = false -- オーナー権限(ネットワークオーナーシップ)を利用して複製させる
                                             p.Massless = true
+                                            p.AssemblyLinearVelocity = Vector3.zero
+                                            p.AssemblyAngularVelocity = Vector3.zero
                                         end
                                     end
                                     if t:IsA("BasePart") then
                                         t.CanCollide = false
                                         t.Anchored = false
                                         t.Massless = true
+                                        t.AssemblyLinearVelocity = Vector3.zero
+                                        t.AssemblyAngularVelocity = Vector3.zero
                                     end
 
                                     if root and not t:FindFirstChild("OwnerWeld") then
                                         if t:IsA("Model") then t:SetPrimaryPartCFrame(hrp.CFrame)
                                         else t.CFrame = hrp.CFrame end
                                         
-                                        local w = Instance.new("WeldConstraint")
+                                        local w = Instance.new("Weld")
                                         w.Name = "OwnerWeld"
                                         w.Part0 = hrp
                                         w.Part1 = root
+                                        w.C0 = CFrame.new(0, 0, 0)
+                                        w.C1 = CFrame.new(0, 0, 0)
                                         w.Parent = t
                                     end
                                 end)
