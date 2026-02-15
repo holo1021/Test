@@ -8,7 +8,7 @@ pcall(function()
 end)
 
 local Window = OrionLib:MakeWindow({
-    Name = "Advanced Grab Mod1", 
+    Name = "Advanced Grab Mod2", 
     HidePremium = false, 
     SaveConfig = true, 
     ConfigFolder = "GrabModConfig",
@@ -145,25 +145,23 @@ MainTab:AddToggle({
                                     local root = t:IsA("BasePart") and t or (t:IsA("Model") and (t.PrimaryPart or t:FindFirstChildWhichIsA("BasePart")))
                                     if root and t:IsA("Model") and not t.PrimaryPart then t.PrimaryPart = root end
 
-                                    for _, p in pairs(t:GetDescendants()) do
+                                    local parts = t:GetDescendants()
+                                    if t:IsA("BasePart") then table.insert(parts, t) end
+
+                                    for _, p in pairs(parts) do
                                         if p:IsA("BasePart") then
                                             p.CanCollide = false
-                                            p.Anchored = false -- オーナー権限(ネットワークオーナーシップ)を利用して複製させる
+                                            p.CanQuery = false
+                                            p.CanTouch = false
+                                            p.Anchored = false 
                                             p.Massless = true
                                             p.AssemblyLinearVelocity = Vector3.zero
                                             p.AssemblyAngularVelocity = Vector3.zero
                                         end
                                     end
-                                    if t:IsA("BasePart") then
-                                        t.CanCollide = false
-                                        t.Anchored = false
-                                        t.Massless = true
-                                        t.AssemblyLinearVelocity = Vector3.zero
-                                        t.AssemblyAngularVelocity = Vector3.zero
-                                    end
 
-                                    if root and not t:FindFirstChild("OwnerWeld") then
-                                        if t:IsA("Model") then t:SetPrimaryPartCFrame(hrp.CFrame)
+                                    if root and not root:FindFirstChild("OwnerWeld") then
+                                        if t:IsA("Model") then t:PivotTo(hrp.CFrame)
                                         else t.CFrame = hrp.CFrame end
                                         
                                         local w = Instance.new("Weld")
@@ -172,13 +170,13 @@ MainTab:AddToggle({
                                         w.Part1 = root
                                         w.C0 = CFrame.new(0, 0, 0)
                                         w.C1 = CFrame.new(0, 0, 0)
-                                        w.Parent = t
+                                        w.Parent = root
                                     end
                                 end)
                             end
                         end
                     end
-                    RunService.RenderStepped:Wait()
+                    RunService.Stepped:Wait()
                 end
             end)
         end
