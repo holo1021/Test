@@ -8,7 +8,7 @@ pcall(function()
 end)
 
 local Window = OrionLib:MakeWindow({
-    Name = "Advanced Grab Mod2", 
+    Name = "Advanced Grab Mod v3", 
     HidePremium = false, 
     SaveConfig = true, 
     ConfigFolder = "GrabModConfig",
@@ -160,17 +160,14 @@ MainTab:AddToggle({
                                         end
                                     end
 
-                                    if root and not root:FindFirstChild("OwnerWeld") then
+                                    if root then
+                                        if root:FindFirstChild("OwnerWeld") then root.OwnerWeld:Destroy() end
+                                        
                                         if t:IsA("Model") then t:PivotTo(hrp.CFrame)
                                         else t.CFrame = hrp.CFrame end
-                                        
-                                        local w = Instance.new("Weld")
-                                        w.Name = "OwnerWeld"
-                                        w.Part0 = hrp
-                                        w.Part1 = root
-                                        w.C0 = CFrame.new(0, 0, 0)
-                                        w.C1 = CFrame.new(0, 0, 0)
-                                        w.Parent = root
+
+                                        root.AssemblyLinearVelocity = Vector3.zero
+                                        root.AssemblyAngularVelocity = Vector3.zero
                                     end
                                 end)
                             end
