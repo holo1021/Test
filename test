@@ -8,10 +8,10 @@ pcall(function()
 end)
 
 local Window = OrionLib:MakeWindow({
-    Name = "Ultimate Grab & Anti-Kick", 
+    Name = "Advanced Grab Mod", 
     HidePremium = false, 
     SaveConfig = true, 
-    ConfigFolder = "GrabModConfigV3",
+    ConfigFolder = "GrabModConfig",
     IntroEnabled = false
 })
 
@@ -27,7 +27,7 @@ _G.AntiKickEnabled = false
 _G.GrabKillEnabled = false
 _G.GrabNoclipEnabled = false
 _G.SuperThrowEnabled = false
-_G.ThrowPower = 500
+_G.ThrowPower = 500 -- デフォルトの投げ強度
 
 local lastGrabbedPart = nil
 local originalCollisions = {}
@@ -58,7 +58,7 @@ local function findGrabbedTarget()
     return nil
 end
 
--- --- 掴みメインロジック ---
+-- --- メインロジック監視 ---
 if grabNotify then
     grabNotify.Event:Connect(function(isGrabbing)
         if isGrabbing then
@@ -67,14 +67,14 @@ if grabNotify then
             if target then
                 lastGrabbedPart = target
                 
-                -- 1. キル処理
+                -- 1. キル処理 (独立トグル)
                 if _G.GrabKillEnabled then
                     local char = target.Parent
-                    local hum = char:FindFirstChildOfClass("Humanoid") or (char.Parent and char.Parent:FindFirstChildOfClass("Humanoid"))
+                    local hum = char:FindFirstChild("Humanoid") or char.Parent:FindFirstChild("Humanoid")
                     if hum then hum.Health = 0 end
                 end
 
-                -- 2. すり抜け処理 (1回目で発動)
+                -- 2. 壁すり抜け処理 (独立トグル)
                 if _G.GrabNoclipEnabled then
                     local root = target.Parent:IsA("Model") and target.Parent or target
                     pcall(function()
@@ -88,30 +88,33 @@ if grabNotify then
                 end
             end
         else
-            -- 離した時
+            -- 離した時 (投げた時)
             if lastGrabbedPart then
-                -- スーパースロー
+                -- 3. スーパースロー処理
                 if _G.SuperThrowEnabled then
                     pcall(function()
+                        -- 物理演算の主導権があるうちに力を加える
                         local force = Camera.CFrame.LookVector * _G.ThrowPower
                         lastGrabbedPart:ApplyImpulse(force * lastGrabbedPart:GetMass())
                     end)
                 end
 
-                -- 当たり判定復元
+                -- 当たり判定の復元
                 for part, state in pairs(originalCollisions) do
                     if part and part.Parent then
                         pcall(function() part.CanCollide = state end)
                     end
                 end
+                
                 originalCollisions = {}
+                -- 投げた後に少し待ってから参照を消す
                 task.delay(0.1, function() lastGrabbedPart = nil end)
             end
         end
     end)
 end
 
--- --- アンチキック (NinjaKunai) ロジック ---
+-- --- NinjaKunai (アンチキック) ロジック ---
 local function spawnKunai()
     local hrp = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
     if hrp then
@@ -120,62 +123,72 @@ local function spawnKunai()
     end
 end
 
-RunService.RenderStepped:Connect(function()
-    if _G.AntiKickEnabled then
-        local toys = Workspace:FindFirstChild(localPlayer.Name .. "SpawnedInToys")
-        local hrp = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if hrp and toys then
-            for _, t in pairs(toys:GetChildren()) do
-                if t.Name == "NinjaKunai" then
-                    pcall(function()
-                        if t:IsA("Model") then t:SetPrimaryPartCFrame(hrp.CFrame)
-                        else t.CFrame = hrp.CFrame end
-                    end)
-                end
-            end
-        end
-    end
-end)
+-- --- UI構成 ---
+local MainTab = Window:MakeTab({ Name = "Main", Icon = "rbxassetid://4483345998" })
 
--- --- UI ---
-local Tab1 = Window:MakeTab({ Name = "Main", Icon = "rbxassetid://4483345998" })
-
-Tab1:AddToggle({
-    Name = "アンチキック (NinjaKunai追従)",
+-- アンチキック
+MainTab:AddToggle({
+    Name = "アンチキック (NinjaKunai)",
     Default = false,
-    Callback = function(v) 
-        _G.AntiKickEnabled = v 
-        if v then spawnKunai() end
+    Callback = function(v)
+        _G.AntiKickEnabled = v
+        if v then
+            spawnKunai()
+            task.spawn(function()
+                while _G.AntiKickEnabled do
+                    local toys = Workspace:FindFirstChild(localPlayer.Name .. "SpawnedInToys")
+                    local hrp = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
+                    if hrp and toys then
+                        for _, t in pairs(toys:GetChildren()) do
+                            if t.Name == "NinjaKunai" then
+                                pcall(function()
+                                    for _, p in pairs(t:GetDescendants()) do
+                                        if p:IsA("BasePart") then
+                                            p.CanCollide = false
+                                            p.Anchored = true
+                                        end
+                                    end
+                                    if t:IsA("Model") then t:SetPrimaryPartCFrame(hrp.CFrame)
+                                    else t.CFrame = hrp.CFrame end
+                                end)
+                            end
+                        end
+                    end
+                    RunService.RenderStepped:Wait()
+                end
+            end)
+        end
     end
 })
 
-local Tab2 = Window:MakeTab({ Name = "Grab Mod", Icon = "rbxassetid://4483345998" })
+local GrabTab = Window:MakeTab({ Name = "Grab Mod", Icon = "rbxassetid://4483345998" })
 
-Tab2:AddToggle({
+GrabTab:AddToggle({
     Name = "掴んだらキル",
     Default = false,
     Callback = function(v) _G.GrabKillEnabled = v end
 })
 
-Tab2:AddToggle({
-    Name = "掴みすり抜け (1回で発動)",
+GrabTab:AddToggle({
+    Name = "掴んでいる間すり抜け (Noclip)",
     Default = false,
     Callback = function(v) _G.GrabNoclipEnabled = v end
 })
 
-Tab2:AddSection({ Name = "Throw Settings" })
+GrabTab:AddSection({ Name = "Throw Settings" })
 
-Tab2:AddToggle({
-    Name = "スーパースロー",
+GrabTab:AddToggle({
+    Name = "スーパースロー (投げ飛ばし)",
     Default = false,
     Callback = function(v) _G.SuperThrowEnabled = v end
 })
 
-Tab2:AddSlider({
-    Name = "投げパワー",
+GrabTab:AddSlider({
+    Name = "投げ飛ばす強さ",
     Min = 0,
-    Max = 10000,
+    Max = 5000,
     Default = 500,
+    Color = Color3.fromRGB(255, 255, 255),
     Increment = 100,
     ValueName = "Power",
     Callback = function(v) _G.ThrowPower = v end
