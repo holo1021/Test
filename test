@@ -8,7 +8,7 @@ pcall(function()
 end)
 
 local Window = OrionLib:MakeWindow({
-    Name = "Advanced Grab Mod v4", 
+    Name = "Advanced Grab Mod v5", 
     HidePremium = false, 
     SaveConfig = true, 
     ConfigFolder = "GrabModConfig",
@@ -28,6 +28,90 @@ _G.GrabKillEnabled = false
 _G.GrabNoclipEnabled = false
 _G.SuperThrowEnabled = false
 _G.ThrowPower = 500 -- デフォルトの投げ強度
+
+-- --- 家リセット用変数 ---
+_G.PlotReturnEnabled = false
+_G.PlotReturnInterval = 60
+local timeRemaining = _G.PlotReturnInterval
+local currentHouseName = nil
+local houseCoords = {
+    ["桜の家"] = CFrame.new(548, 123, -73),
+    ["水色の家"] = CFrame.new(509, 83, -338),
+    ["紫の家"] = CFrame.new(255, -7, 449),
+    ["緑の家"] = CFrame.new(-534, -7, 89),
+    ["ピンクの家"] = CFrame.new(-485, -7, -163)
+}
+
+-- --- 情報表示用GUI ---
+local InfoGui = Instance.new("ScreenGui")
+InfoGui.Name = "HomeResetInfo"
+if game:GetService("CoreGui"):FindFirstChild("HomeResetInfo") then game:GetService("CoreGui").HomeResetInfo:Destroy() end
+InfoGui.Parent = game:GetService("CoreGui")
+
+local InfoLabel = Instance.new("TextLabel")
+InfoLabel.Name = "Status"
+InfoLabel.Size = UDim2.new(0, 250, 0, 60)
+InfoLabel.Position = UDim2.new(0.5, -125, 0.05, 0)
+InfoLabel.BackgroundTransparency = 0.6
+InfoLabel.BackgroundColor3 = Color3.new(0, 0, 0)
+InfoLabel.TextColor3 = Color3.new(1, 1, 1)
+InfoLabel.TextSize = 18
+InfoLabel.Font = Enum.Font.SourceSansBold
+InfoLabel.Parent = InfoGui
+InfoLabel.Visible = false
+
+-- --- 家リセットループ ---
+task.spawn(function()
+    while true do
+        task.wait(1)
+        if _G.PlotReturnEnabled then
+            local char = localPlayer.Character
+            local root = char and char:FindFirstChild("HumanoidRootPart")
+            
+            if root then
+                local detected = nil
+                local distLimit = 150 -- 検知距離
+
+                for name, cf in pairs(houseCoords) do
+                    if (root.Position - cf.Position).Magnitude < distLimit then
+                        detected = name
+                        break
+                    end
+                end
+
+                if detected then
+                    if currentHouseName ~= detected then
+                        currentHouseName = detected
+                        timeRemaining = _G.PlotReturnInterval
+                    end
+
+                    timeRemaining = timeRemaining - 1
+                    InfoLabel.Visible = true
+                    InfoLabel.Text = "家: " .. detected .. "\nリセットまで: " .. timeRemaining .. "秒"
+                    
+                    if timeRemaining <= 5 then
+                        local targetCF = houseCoords[detected]
+                        local oldCF = root.CFrame
+                        
+                        -- 一瞬テレポートしてリセット
+                        root.CFrame = targetCF
+                        task.wait(0.1)
+                        root.CFrame = oldCF
+                        
+                        timeRemaining = _G.PlotReturnInterval -- タイマーリセット
+                    end
+                else
+                    currentHouseName = nil
+                    timeRemaining = _G.PlotReturnInterval
+                    InfoLabel.Visible = true
+                    InfoLabel.Text = "家エリア外\n待機中..."
+                end
+            end
+        else
+            InfoLabel.Visible = false
+        end
+    end
+end)
 
 local lastGrabbedPart = nil
 local originalCollisions = {}
@@ -119,7 +203,7 @@ local function spawnKunai()
     local hrp = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
     if hrp then
         local rf = ReplicatedStorage:FindFirstChild("MenuToys") and ReplicatedStorage.MenuToys:FindFirstChild("SpawnToyRemoteFunction")
-        if rf then rf:InvokeServer("NinjaKunai", hrp.CFrame, Vector3.zero) end
+        if rf then rf:InvokeServer("NinjaKunai", hrp.CFrame, Vector3.zero) end -- 自分の位置に出現
     end
 end
 
@@ -175,6 +259,29 @@ MainTab:AddToggle({
                 end
             end)
         end
+    end
+})
+
+local HomeTab = Window:MakeTab({ Name = "Home Reset", Icon = "rbxassetid://4483345998" })
+
+HomeTab:AddToggle({
+    Name = "自動家検知＆リセット",
+    Default = false,
+    Callback = function(v) 
+        _G.PlotReturnEnabled = v 
+        if not v then InfoLabel.Visible = false end
+    end
+})
+
+HomeTab:AddSlider({
+    Name = "リセット間隔 (秒)",
+    Min = 30, Max = 300,
+    Default = 60,
+    Increment = 10,
+    ValueName = "Sec",
+    Callback = function(v) 
+        _G.PlotReturnInterval = v 
+        timeRemaining = v
     end
 })
 
