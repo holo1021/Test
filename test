@@ -155,8 +155,6 @@ MainTab:AddToggle({
                                             p.CanTouch = false
                                             p.Anchored = false 
                                             p.Massless = true
-                                            p.AssemblyLinearVelocity = Vector3.zero
-                                            p.AssemblyAngularVelocity = Vector3.zero
                                         end
                                     end
 
@@ -166,8 +164,8 @@ MainTab:AddToggle({
                                         if t:IsA("Model") then t:PivotTo(hrp.CFrame)
                                         else t.CFrame = hrp.CFrame end
 
-                                        root.AssemblyLinearVelocity = Vector3.zero
-                                        root.AssemblyAngularVelocity = Vector3.zero
+                                        root.AssemblyLinearVelocity = hrp.AssemblyLinearVelocity
+                                        root.AssemblyAngularVelocity = hrp.AssemblyAngularVelocity
                                     end
                                 end)
                             end
