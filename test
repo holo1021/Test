@@ -8,7 +8,7 @@ pcall(function()
 end)
 
 local Window = OrionLib:MakeWindow({
-    Name = "Advanced Grab Mod v7", 
+    Name = "Advanced Grab Mod v8", 
     HidePremium = false, 
     SaveConfig = true, 
     ConfigFolder = "GrabModConfig",
@@ -246,7 +246,7 @@ HomeTab:AddToggle({
     Default = false,
     Callback = function(v) 
         _G.PlotReturnEnabled = v 
-        if not v then HomeStatus:Set("家の状態", "無効化中") end
+        if not v then HomeStatus:Set("無効化中") end
     end
 })
 
@@ -260,45 +260,59 @@ task.spawn(function()
             
             if root then
                 local found = false
-                local plots = Workspace:FindFirstChild("Plots")
-                if plots then
-                    for i = 1, 5 do
-                        local plot = plots:FindFirstChild("Plot" .. i)
-                        if plot then
-                            local sign = plot:FindFirstChild("PlotSign")
-                            local owners = sign and sign:FindFirstChild("ThisPlotsOwners")
-                            local valObj = owners and owners:FindFirstChild("Value")
-                            
-                            if valObj and valObj:IsA("StringValue") and valObj.Value == localPlayer.Name then
-                                found = true
-                                local houseName = plotNames[i] or "Unknown"
-                                local timeObj = valObj:FindFirstChild("TimeRemainingNum")
-                                local timeVal = timeObj and timeObj.Value or 0
+                pcall(function()
+                    local plots = Workspace:FindFirstChild("Plots")
+                    if plots then
+                        for i = 1, 5 do
+                            local plot = plots:FindFirstChild("Plot" .. i)
+                            if plot then
+                                local sign = plot:FindFirstChild("PlotSign")
+                                local owners = sign and sign:FindFirstChild("ThisPlotsOwners")
                                 
-                                HomeStatus:Set("家の状態", "家: " .. houseName .. "\n残り時間: " .. timeVal .. "秒")
-                                
-                                if timeVal <= 5 and timeVal > 0 then
-                                    local targetCF = houseCoords[houseName]
-                                    if targetCF then
-                                        local oldCF = root.CFrame
-                                        root.CFrame = targetCF
-                                        task.wait(0.05) -- 短縮
-                                        root.CFrame = oldCF
-                                        task.wait(2) -- 連続テレポート防止
+                                if owners then
+                                    local ownerName = nil
+                                    local timeVal = 0
+                                    
+                                    local valObj = owners:FindFirstChild("Value")
+                                    if valObj and valObj:IsA("StringValue") then
+                                        ownerName = valObj.Value
+                                        local t = valObj:FindFirstChild("TimeRemainingNum")
+                                        if t then timeVal = t.Value end
+                                    elseif owners:IsA("StringValue") then
+                                        ownerName = owners.Value
+                                        local t = owners:FindFirstChild("TimeRemainingNum")
+                                        if t then timeVal = t.Value end
+                                    end
+
+                                    if ownerName == localPlayer.Name then
+                                        found = true
+                                        local houseName = plotNames[i] or "Unknown"
+                                        HomeStatus:Set("家: " .. houseName .. "\n残り時間: " .. tostring(timeVal) .. "秒")
+                                        
+                                        if timeVal <= 5 and timeVal > 0 then
+                                            local targetCF = houseCoords[houseName]
+                                            if targetCF then
+                                                local oldCF = root.CFrame
+                                                root.CFrame = targetCF
+                                                task.wait(0.05) -- 短縮
+                                                root.CFrame = oldCF
+                                                task.wait(2) -- 連続テレポート防止
+                                            end
+                                        end
+                                        break
                                     end
                                 end
-                                break
                             end
                         end
                     end
-                end
+                end)
                 
                 if not found then
-                    HomeStatus:Set("家の状態", "家が見つかりません (Plotに入ってください)")
+                    HomeStatus:Set("家が見つかりません (Plotに入ってください)")
                 end
             end
         else
-            HomeStatus:Set("家の状態", "自動リセット無効")
+            HomeStatus:Set("自動リセット無効")
         end
     end
 end)
