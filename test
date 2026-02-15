@@ -8,7 +8,7 @@ pcall(function()
 end)
 
 local Window = OrionLib:MakeWindow({
-    Name = "Advanced Grab Mod v6", 
+    Name = "Advanced Grab Mod v7", 
     HidePremium = false, 
     SaveConfig = true, 
     ConfigFolder = "GrabModConfig",
@@ -28,6 +28,7 @@ _G.GrabKillEnabled = false
 _G.GrabNoclipEnabled = false
 _G.SuperThrowEnabled = false
 _G.ThrowPower = 500 -- デフォルトの投げ強度
+_G.SilentAimEnabled = false
 
 -- --- 家リセット用変数 ---
 _G.PlotReturnEnabled = false
@@ -42,77 +43,49 @@ local houseCoords = {
     ["ピンクの家"] = CFrame.new(-485, -7, -163)
 }
 
--- --- 情報表示用GUI ---
-local InfoGui = Instance.new("ScreenGui")
-InfoGui.Name = "HomeResetInfo"
-if game:GetService("CoreGui"):FindFirstChild("HomeResetInfo") then game:GetService("CoreGui").HomeResetInfo:Destroy() end
-InfoGui.Parent = game:GetService("CoreGui")
-
-local InfoLabel = Instance.new("TextLabel")
-InfoLabel.Name = "Status"
-InfoLabel.Size = UDim2.new(0, 250, 0, 60)
-InfoLabel.Position = UDim2.new(0.5, -125, 0.05, 0)
-InfoLabel.BackgroundTransparency = 0.6
-InfoLabel.BackgroundColor3 = Color3.new(0, 0, 0)
-InfoLabel.TextColor3 = Color3.new(1, 1, 1)
-InfoLabel.TextSize = 18
-InfoLabel.Font = Enum.Font.SourceSansBold
-InfoLabel.Parent = InfoGui
-InfoLabel.Visible = false
-
--- --- 家リセットループ ---
-task.spawn(function()
-    while true do
-        task.wait(1)
-        if _G.PlotReturnEnabled then
-            local char = localPlayer.Character
-            local root = char and char:FindFirstChild("HumanoidRootPart")
-            
-            if root then
-                local found = false
-                local plots = Workspace:FindFirstChild("Plots")
-                if plots then
-                    for i = 1, 5 do
-                        local plot = plots:FindFirstChild("Plot" .. i)
-                        if plot then
-                            local sign = plot:FindFirstChild("PlotSign")
-                            local owners = sign and sign:FindFirstChild("ThisPlotsOwners")
-                            local valObj = owners and owners:FindFirstChild("Value")
-                            
-                            if valObj and valObj:IsA("StringValue") and valObj.Value == localPlayer.Name then
-                                found = true
-                                local houseName = plotNames[i] or "Unknown"
-                                local timeObj = valObj:FindFirstChild("TimeRemainingNum")
-                                local timeVal = timeObj and timeObj.Value or 0
-                                
-                                InfoLabel.Visible = true
-                                InfoLabel.Text = "家: " .. houseName .. "\n残り時間: " .. timeVal .. "秒"
-                                
-                                if timeVal <= 5 and timeVal > 0 then
-                                    local targetCF = houseCoords[houseName]
-                                    if targetCF then
-                                        local oldCF = root.CFrame
-                                        root.CFrame = targetCF
-                                        task.wait(0.2)
-                                        root.CFrame = oldCF
-                                        task.wait(2) -- 連続テレポート防止
-                                    end
-                                end
-                                break
-                            end
-                        end
+-- --- Silent Aim Logic ---
+local function getClosestTarget()
+    local mouse = localPlayer:GetMouse()
+    local closestDist = 200 -- FOV
+    local closestPart = nil
+    
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= localPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local hrp = player.Character.HumanoidRootPart
+            local hum = player.Character:FindFirstChild("Humanoid")
+            if hum and hum.Health > 0 then
+                local pos, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+                if onScreen then
+                    local dist = (Vector2.new(mouse.X, mouse.Y) - Vector2.new(pos.X, pos.Y)).Magnitude
+                    if dist < closestDist then
+                        closestDist = dist
+                        closestPart = hrp
                     end
                 end
-                
-                if not found then
-                    InfoLabel.Visible = true
-                    InfoLabel.Text = "家が見つかりません\n(Plotに入ってください)"
-                end
             end
-        else
-            InfoLabel.Visible = false
         end
     end
+    return closestPart
+end
+
+pcall(function()
+    local mt = getrawmetatable(game)
+    local oldIndex = mt.__index
+    setreadonly(mt, false)
+    
+    mt.__index = newcclosure(function(self, k)
+        if _G.SilentAimEnabled and self == localPlayer:GetMouse() then
+            if k == "Target" then
+                local t = getClosestTarget()
+                if t then return t end
+            elseif k == "Hit" then
+                local t = getClosestTarget()
+                if t then return t.CFrame end
+            end
+        end
+        return oldIndex(self, k)
+    end)
+    setreadonly(mt, true)
 end)
 
 local lastGrabbedPart = nil
@@ -266,16 +239,77 @@ MainTab:AddToggle({
 
 local HomeTab = Window:MakeTab({ Name = "Home Reset", Icon = "rbxassetid://4483345998" })
 
+local HomeStatus = HomeTab:AddParagraph("家の状態", "待機中...")
+
 HomeTab:AddToggle({
     Name = "自動家検知＆リセット",
     Default = false,
     Callback = function(v) 
         _G.PlotReturnEnabled = v 
-        if not v then InfoLabel.Visible = false end
+        if not v then HomeStatus:Set("家の状態", "無効化中") end
     end
 })
 
+-- --- 家リセットループ (UI生成後に移動) ---
+task.spawn(function()
+    while true do
+        task.wait(1)
+        if _G.PlotReturnEnabled then
+            local char = localPlayer.Character
+            local root = char and char:FindFirstChild("HumanoidRootPart")
+            
+            if root then
+                local found = false
+                local plots = Workspace:FindFirstChild("Plots")
+                if plots then
+                    for i = 1, 5 do
+                        local plot = plots:FindFirstChild("Plot" .. i)
+                        if plot then
+                            local sign = plot:FindFirstChild("PlotSign")
+                            local owners = sign and sign:FindFirstChild("ThisPlotsOwners")
+                            local valObj = owners and owners:FindFirstChild("Value")
+                            
+                            if valObj and valObj:IsA("StringValue") and valObj.Value == localPlayer.Name then
+                                found = true
+                                local houseName = plotNames[i] or "Unknown"
+                                local timeObj = valObj:FindFirstChild("TimeRemainingNum")
+                                local timeVal = timeObj and timeObj.Value or 0
+                                
+                                HomeStatus:Set("家の状態", "家: " .. houseName .. "\n残り時間: " .. timeVal .. "秒")
+                                
+                                if timeVal <= 5 and timeVal > 0 then
+                                    local targetCF = houseCoords[houseName]
+                                    if targetCF then
+                                        local oldCF = root.CFrame
+                                        root.CFrame = targetCF
+                                        task.wait(0.05) -- 短縮
+                                        root.CFrame = oldCF
+                                        task.wait(2) -- 連続テレポート防止
+                                    end
+                                end
+                                break
+                            end
+                        end
+                    end
+                end
+                
+                if not found then
+                    HomeStatus:Set("家の状態", "家が見つかりません (Plotに入ってください)")
+                end
+            end
+        else
+            HomeStatus:Set("家の状態", "自動リセット無効")
+        end
+    end
+end)
+
 local GrabTab = Window:MakeTab({ Name = "Grab Mod", Icon = "rbxassetid://4483345998" })
+
+GrabTab:AddToggle({
+    Name = "サイレントエイム (掴み補助)",
+    Default = false,
+    Callback = function(v) _G.SilentAimEnabled = v end
+})
 
 GrabTab:AddToggle({
     Name = "掴んだらキル",
