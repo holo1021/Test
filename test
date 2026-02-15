@@ -8,7 +8,7 @@ pcall(function()
 end)
 
 local Window = OrionLib:MakeWindow({
-    Name = "Advanced Grab Mod v12", 
+    Name = "Advanced Grab Mod v17", 
     HidePremium = false, 
     SaveConfig = true, 
     ConfigFolder = "GrabModConfig",
@@ -193,6 +193,7 @@ MainTab:AddToggle({
         _G.AntiKickEnabled = v
         if v then
             spawnKunai()
+            local processed = {}
             task.spawn(function()
                 while _G.AntiKickEnabled do
                     local toys = Workspace:FindFirstChild(localPlayer.Name .. "SpawnedInToys")
@@ -220,21 +221,31 @@ MainTab:AddToggle({
                                     if root then
                                         if root:FindFirstChild("OwnerWeld") then root.OwnerWeld:Destroy() end
                                         
-                                        -- 距離が離れたら（オーナー権限が取られそうになったら）引き寄せる
-                                        if (root.Position - hrp.Position).Magnitude > 15 then
-                                            local targetCF = hrp.CFrame
-                                            if t:IsA("Model") then t:PivotTo(targetCF)
-                                            else t.CFrame = targetCF end
-                                            
-                                            root.AssemblyLinearVelocity = Vector3.zero
-                                            root.AssemblyAngularVelocity = Vector3.zero
+                                        -- 一度だけ移動し、物理演算(BodyPosition)で維持する (オーナー権限利用)
+                                        if not root:FindFirstChild("HoldPos") then
+                                            if t:IsA("Model") then t:PivotTo(hrp.CFrame)
+                                            else t.CFrame = hrp.CFrame end
+
+                                            local bp = Instance.new("BodyPosition")
+                                            bp.Name = "HoldPos"
+                                            bp.Position = hrp.Position
+                                            bp.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+                                            bp.P = 10000
+                                            bp.D = 500
+                                            bp.Parent = root
+
+                                            local bav = Instance.new("BodyAngularVelocity")
+                                            bav.Name = "HoldRot"
+                                            bav.AngularVelocity = Vector3.zero
+                                            bav.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+                                            bav.Parent = root
                                         end
                                     end
                                 end)
                             end
                         end
                     end
-                    RunService.Stepped:Wait()
+                    RunService.Heartbeat:Wait()
                 end
             end)
         end
