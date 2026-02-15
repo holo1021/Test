@@ -8,7 +8,7 @@ pcall(function()
 end)
 
 local Window = OrionLib:MakeWindow({
-    Name = "Advanced Grab Mod v5", 
+    Name = "Advanced Grab Mod v6", 
     HidePremium = false, 
     SaveConfig = true, 
     ConfigFolder = "GrabModConfig",
@@ -31,9 +31,9 @@ _G.ThrowPower = 500 -- デフォルトの投げ強度
 
 -- --- 家リセット用変数 ---
 _G.PlotReturnEnabled = false
-_G.PlotReturnInterval = 60
-local timeRemaining = _G.PlotReturnInterval
-local currentHouseName = nil
+local plotNames = {
+    [1] = "緑の家", [2] = "ピンクの家", [3] = "紫の家", [4] = "水色の家", [5] = "桜の家"
+}
 local houseCoords = {
     ["桜の家"] = CFrame.new(548, 123, -73),
     ["水色の家"] = CFrame.new(509, 83, -338),
@@ -69,42 +69,44 @@ task.spawn(function()
             local root = char and char:FindFirstChild("HumanoidRootPart")
             
             if root then
-                local detected = nil
-                local distLimit = 150 -- 検知距離
-
-                for name, cf in pairs(houseCoords) do
-                    if (root.Position - cf.Position).Magnitude < distLimit then
-                        detected = name
-                        break
+                local found = false
+                local plots = Workspace:FindFirstChild("Plots")
+                if plots then
+                    for i = 1, 5 do
+                        local plot = plots:FindFirstChild("Plot" .. i)
+                        if plot then
+                            local sign = plot:FindFirstChild("PlotSign")
+                            local owners = sign and sign:FindFirstChild("ThisPlotsOwners")
+                            local valObj = owners and owners:FindFirstChild("Value")
+                            
+                            if valObj and valObj:IsA("StringValue") and valObj.Value == localPlayer.Name then
+                                found = true
+                                local houseName = plotNames[i] or "Unknown"
+                                local timeObj = valObj:FindFirstChild("TimeRemainingNum")
+                                local timeVal = timeObj and timeObj.Value or 0
+                                
+                                InfoLabel.Visible = true
+                                InfoLabel.Text = "家: " .. houseName .. "\n残り時間: " .. timeVal .. "秒"
+                                
+                                if timeVal <= 5 and timeVal > 0 then
+                                    local targetCF = houseCoords[houseName]
+                                    if targetCF then
+                                        local oldCF = root.CFrame
+                                        root.CFrame = targetCF
+                                        task.wait(0.2)
+                                        root.CFrame = oldCF
+                                        task.wait(2) -- 連続テレポート防止
+                                    end
+                                end
+                                break
+                            end
+                        end
                     end
                 end
-
-                if detected then
-                    if currentHouseName ~= detected then
-                        currentHouseName = detected
-                        timeRemaining = _G.PlotReturnInterval
-                    end
-
-                    timeRemaining = timeRemaining - 1
+                
+                if not found then
                     InfoLabel.Visible = true
-                    InfoLabel.Text = "家: " .. detected .. "\nリセットまで: " .. timeRemaining .. "秒"
-                    
-                    if timeRemaining <= 5 then
-                        local targetCF = houseCoords[detected]
-                        local oldCF = root.CFrame
-                        
-                        -- 一瞬テレポートしてリセット
-                        root.CFrame = targetCF
-                        task.wait(0.1)
-                        root.CFrame = oldCF
-                        
-                        timeRemaining = _G.PlotReturnInterval -- タイマーリセット
-                    end
-                else
-                    currentHouseName = nil
-                    timeRemaining = _G.PlotReturnInterval
-                    InfoLabel.Visible = true
-                    InfoLabel.Text = "家エリア外\n待機中..."
+                    InfoLabel.Text = "家が見つかりません\n(Plotに入ってください)"
                 end
             end
         else
@@ -270,18 +272,6 @@ HomeTab:AddToggle({
     Callback = function(v) 
         _G.PlotReturnEnabled = v 
         if not v then InfoLabel.Visible = false end
-    end
-})
-
-HomeTab:AddSlider({
-    Name = "リセット間隔 (秒)",
-    Min = 30, Max = 300,
-    Default = 60,
-    Increment = 10,
-    ValueName = "Sec",
-    Callback = function(v) 
-        _G.PlotReturnInterval = v 
-        timeRemaining = v
     end
 })
 
