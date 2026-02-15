@@ -294,7 +294,7 @@ task.spawn(function()
                                             if targetCF then
                                                 local oldCF = root.CFrame
                                                 root.CFrame = targetCF
-                                                task.wait(0.05) -- 短縮
+                                                task.wait(0.1) -- 短縮
                                                 root.CFrame = oldCF
                                                 task.wait(2) -- 連続テレポート防止
                                             end
