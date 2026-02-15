@@ -8,7 +8,7 @@ pcall(function()
 end)
 
 local Window = OrionLib:MakeWindow({
-    Name = "Anti-Kick & Grab Mod", 
+    Name = "Anti-Kick & Grab Mod (Stable)", 
     HidePremium = false, 
     SaveConfig = true, 
     ConfigFolder = "AntiKickSimple",
@@ -23,28 +23,24 @@ local localPlayer = Players.LocalPlayer
 
 -- 変数管理
 _G.AntiKickEnabled = false
-_G.GrabKillEnabled = false -- 新規：掴みキルの有効フラグ
+_G.GrabKillEnabled = false
 local grabbedObject = nil
 local originalCollisions = {}
 
--- --- GrabNotifyEventの取得 --- 
-local grabNotify = localPlayer:WaitForChild("PlayerScripts"):WaitForChild("CharacterAndBeamMove"):WaitForChild("GrabNotifyEvent")
-
--- --- NinjaKunai生成ロジック ---
-local function spawnKunaiAtStomach()
-    local character = localPlayer.Character
-    local hrp = character and character:FindFirstChild("HumanoidRootPart")
-    
-    if hrp then
-        local spawnToyRF = ReplicatedStorage:WaitForChild("MenuToys"):WaitForChild("SpawnToyRemoteFunction")
-        local stomachCFrame = hrp.CFrame
-        spawnToyRF:InvokeServer("NinjaKunai", stomachCFrame, Vector3.new(0, 0, 0))
-    end
+-- --- イベントの安全な取得 ---
+-- タイムアウトを設けて、見つからない場合にスクリプト全体が止まるのを防ぐ
+local function getGrabNotify()
+    local ps = localPlayer:WaitForChild("PlayerScripts", 10)
+    if not ps then return nil end
+    local cbm = ps:WaitForChild("CharacterAndBeamMove", 10) --
+    if not cbm then return nil end
+    return cbm:WaitForChild("GrabNotifyEvent", 10) --
 end
 
--- --- 掴んだ対象を特定する関数 ---
+local grabNotify = getGrabNotify()
+
+-- --- ターゲット特定ロジック ---
 local function findGrabbedTarget()
-    -- 元のスクリプトが生成するGrabPartsから対象を取得
     local grabParts = Workspace:FindFirstChild("GrabParts")
     if grabParts then
         local grabPart = grabParts:FindFirstChild("GrabPart")
@@ -58,113 +54,112 @@ local function findGrabbedTarget()
     return nil
 end
 
--- --- 掴みイベントの監視ロジック ---
-grabNotify.Event:Connect(function(isGrabbing)
-    if not _G.GrabKillEnabled then return end
+-- --- 掴みキル/すり抜け実行メイン ---
+if grabNotify then
+    grabNotify.Event:Connect(function(isGrabbing)
+        if not _G.GrabKillEnabled then return end
 
-    if isGrabbing then
-        task.wait(0.05) -- 接続完了まで僅かに待機
-        local target = findGrabbedTarget()
-        
-        if target then
-            grabbedObject = target
-            local character = target.Parent
-            local humanoid = character:FindFirstChild("Humanoid") or character.Parent:FindFirstChild("Humanoid")
+        if isGrabbing then
+            task.wait(0.1)
+            local target = findGrabbedTarget()
+            
+            if target then
+                grabbedObject = target
+                local character = target.Parent
+                local humanoid = character:FindFirstChild("Humanoid") or character.Parent:FindFirstChild("Humanoid")
 
-            -- 1. キル処理
-            if humanoid then
-                humanoid.Health = 0
-            end
-
-            -- 2. すり抜け処理 (CanCollide = false) 
-            local root = character:IsA("Model") and character or target
-            for _, p in pairs(root:GetDescendants()) do
-                if p:IsA("BasePart") then
-                    originalCollisions[p] = p.CanCollide
-                    p.CanCollide = false
+                -- キル
+                if humanoid then
+                    humanoid.Health = 0
                 end
-            end
-        end
-    else
-        -- 離した時に当たり判定を復元
-        if grabbedObject then
-            for part, state in pairs(originalCollisions) do
-                if part and part.Parent then
-                    part.CanCollide = state
-                end
-            end
-            grabbedObject = nil
-            originalCollisions = {}
-        end
-    end
-end)
 
--- --- クナイ同期ロジック ---
-local syncConnection = nil
-local function startSync()
-    if syncConnection then syncConnection:Disconnect() end
-    syncConnection = RunService.RenderStepped:Connect(function()
-        if not _G.AntiKickEnabled then 
-            if syncConnection then syncConnection:Disconnect() end
-            return 
-        end
-        local char = localPlayer.Character
-        local hrp = char and char:FindFirstChild("HumanoidRootPart")
-        local toysFolder = Workspace:FindFirstChild(localPlayer.Name .. "SpawnedInToys")
-        if hrp and toysFolder then
-            for _, toy in pairs(toysFolder:GetChildren()) do
-                if toy.Name == "NinjaKunai" then
-                    local targetCFrame = hrp.CFrame
-                    if toy:IsA("Model") then
-                        if toy.PrimaryPart then toy:SetPrimaryPartCFrame(targetCFrame)
-                        elseif toy:FindFirstChild("Handle") then toy.Handle.CFrame = targetCFrame end
-                        for _, part in pairs(toy:GetDescendants()) do
-                            if part:IsA("BasePart") then
-                                part.CanCollide = false [cite: 2]
-                                part.AssemblyLinearVelocity = Vector3.zero
-                                part.AssemblyAngularVelocity = Vector3.zero
-                            end
+                -- すり抜け
+                local root = character:IsA("Model") and character or target
+                pcall(function()
+                    for _, p in pairs(root:GetDescendants()) do
+                        if p:IsA("BasePart") then
+                            originalCollisions[p] = p.CanCollide
+                            p.CanCollide = false
                         end
-                    elseif toy:IsA("BasePart") then
-                        toy.CFrame = targetCFrame
-                        toy.CanCollide = false [cite: 2]
-                        toy.AssemblyLinearVelocity = Vector3.zero
+                    end
+                end)
+            end
+        else
+            -- 復元
+            if grabbedObject then
+                for part, state in pairs(originalCollisions) do
+                    if part and part.Parent then
+                        pcall(function() part.CanCollide = state end)
                     end
                 end
+                grabbedObject = nil
+                originalCollisions = {}
             end
         end
     end)
+else
+    warn("GrabNotifyEventが見つかりませんでした。このゲームでは動作しない可能性があります。")
 end
 
--- --- UI構成 ---
+-- --- NinjaKunai生成 ---
+local function spawnKunaiAtStomach()
+    local character = localPlayer.Character
+    local hrp = character and character:FindFirstChild("HumanoidRootPart")
+    
+    if hrp then
+        local menuToys = ReplicatedStorage:WaitForChild("MenuToys", 5)
+        if menuToys then
+            local spawnToyRF = menuToys:WaitForChild("SpawnToyRemoteFunction", 5)
+            if spawnToyRF then
+                spawnToyRF:InvokeServer("NinjaKunai", hrp.CFrame, Vector3.new(0, 0, 0))
+            end
+        end
+    end
+end
+
+-- --- UI ---
 local Tab = Window:MakeTab({
     Name = "Main Features",
     Icon = "rbxassetid://4483345998"
 })
 
--- 既存のアンチキックトグル
 Tab:AddToggle({
-    Name = "アンチキック開始 (NinjaKunai)",
+    Name = "アンチキック (NinjaKunai)",
     Default = false,
     Callback = function(Value)
         _G.AntiKickEnabled = Value
         if Value then
-            OrionLib:MakeNotification({Name = "System", Content = "クナイの生成を開始", Time = 3})
             pcall(spawnKunaiAtStomach)
-            startSync()
+            -- 同期ロジックの開始 (既存のRenderStepped処理)
+            task.spawn(function()
+                while _G.AntiKickEnabled do
+                    local toysFolder = Workspace:FindFirstChild(localPlayer.Name .. "SpawnedInToys")
+                    local hrp = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
+                    if hrp and toysFolder then
+                        for _, toy in pairs(toysFolder:GetChildren()) do
+                            if toy.Name == "NinjaKunai" then
+                                pcall(function()
+                                    if toy:IsA("Model") and toy.PrimaryPart then
+                                        toy:SetPrimaryPartCFrame(hrp.CFrame)
+                                    elseif toy:IsA("BasePart") then
+                                        toy.CFrame = hrp.CFrame
+                                    end
+                                end)
+                            end
+                        end
+                    end
+                    RunService.RenderStepped:Wait()
+                end
+            end)
         end
     end
 })
 
--- 新規：掴みキル & すり抜けトグル
 Tab:AddToggle({
     Name = "掴みキル & すり抜け",
     Default = false,
     Callback = function(Value)
         _G.GrabKillEnabled = Value
-        if Value then
-            OrionLib:MakeNotification({Name = "System", Content = "掴みキル機能を有効にしました", Time = 3})
-        end
     end
 })
 
