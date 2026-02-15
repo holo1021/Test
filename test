@@ -8,7 +8,7 @@ pcall(function()
 end)
 
 local Window = OrionLib:MakeWindow({
-    Name = "Advanced Grab Mod v8", 
+    Name = "Advanced Grab Mod v12", 
     HidePremium = false, 
     SaveConfig = true, 
     ConfigFolder = "GrabModConfig",
@@ -220,11 +220,15 @@ MainTab:AddToggle({
                                     if root then
                                         if root:FindFirstChild("OwnerWeld") then root.OwnerWeld:Destroy() end
                                         
-                                        if t:IsA("Model") then t:PivotTo(hrp.CFrame)
-                                        else t.CFrame = hrp.CFrame end
-
-                                        root.AssemblyLinearVelocity = hrp.AssemblyLinearVelocity
-                                        root.AssemblyAngularVelocity = hrp.AssemblyAngularVelocity
+                                        -- 距離が離れたら（オーナー権限が取られそうになったら）引き寄せる
+                                        if (root.Position - hrp.Position).Magnitude > 15 then
+                                            local targetCF = hrp.CFrame
+                                            if t:IsA("Model") then t:PivotTo(targetCF)
+                                            else t.CFrame = targetCF end
+                                            
+                                            root.AssemblyLinearVelocity = Vector3.zero
+                                            root.AssemblyAngularVelocity = Vector3.zero
+                                        end
                                     end
                                 end)
                             end
