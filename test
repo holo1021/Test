@@ -8,10 +8,10 @@ pcall(function()
 end)
 
 local Window = OrionLib:MakeWindow({
-    Name = "Ultra Grab Mod V2", 
+    Name = "Ultimate Grab & Anti-Kick", 
     HidePremium = false, 
     SaveConfig = true, 
-    ConfigFolder = "GrabModConfigV2",
+    ConfigFolder = "GrabModConfigV3",
     IntroEnabled = false
 })
 
@@ -28,7 +28,6 @@ _G.GrabKillEnabled = false
 _G.GrabNoclipEnabled = false
 _G.SuperThrowEnabled = false
 _G.ThrowPower = 500
-_G.GrabCount = 0 -- すり抜け用のカウント
 
 local lastGrabbedPart = nil
 local originalCollisions = {}
@@ -59,25 +58,10 @@ local function findGrabbedTarget()
     return nil
 end
 
--- --- 改良版キル関数 ---
-local function killTarget(target)
-    if not target then return end
-    -- パーツの親、そのまた親まで検索してHumanoidを探す
-    local character = target.Parent
-    local humanoid = character:FindFirstChildOfClass("Humanoid") or (character.Parent and character.Parent:FindFirstChildOfClass("Humanoid"))
-    
-    if humanoid then
-        humanoid.Health = 0
-        -- ローカルで死なない場合への対策（念のため）
-        humanoid.MaxHealth = 0 
-    end
-end
-
--- --- メインロジック ---
+-- --- 掴みメインロジック ---
 if grabNotify then
     grabNotify.Event:Connect(function(isGrabbing)
         if isGrabbing then
-            _G.GrabCount = _G.GrabCount + 1 -- 掴むたびにカウントアップ
             task.wait(0.05)
             local target = findGrabbedTarget()
             if target then
@@ -85,11 +69,13 @@ if grabNotify then
                 
                 -- 1. キル処理
                 if _G.GrabKillEnabled then
-                    killTarget(target)
+                    local char = target.Parent
+                    local hum = char:FindFirstChildOfClass("Humanoid") or (char.Parent and char.Parent:FindFirstChildOfClass("Humanoid"))
+                    if hum then hum.Health = 0 end
                 end
 
-                -- 2. すり抜け処理 (2回以上掴んでいる場合のみ)
-                if _G.GrabNoclipEnabled and _G.GrabCount >= 2 then
+                -- 2. すり抜け処理 (1回目で発動)
+                if _G.GrabNoclipEnabled then
                     local root = target.Parent:IsA("Model") and target.Parent or target
                     pcall(function()
                         for _, p in pairs(root:GetDescendants()) do
@@ -119,49 +105,76 @@ if grabNotify then
                     end
                 end
                 originalCollisions = {}
-                
-                -- 投げた後にリセット（連続で投げるときのため）
-                -- ※もし「一度離してもカウントを維持したい」場合はここを消してください
-                -- _G.GrabCount = 0 
-                
                 task.delay(0.1, function() lastGrabbedPart = nil end)
             end
         end
     end)
 end
 
--- --- UI ---
-local Tab = Window:MakeTab({ Name = "Grab Mods", Icon = "rbxassetid://4483345998" })
+-- --- アンチキック (NinjaKunai) ロジック ---
+local function spawnKunai()
+    local hrp = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if hrp then
+        local rf = ReplicatedStorage:FindFirstChild("MenuToys") and ReplicatedStorage.MenuToys:FindFirstChild("SpawnToyRemoteFunction")
+        if rf then rf:InvokeServer("NinjaKunai", hrp.CFrame, Vector3.zero) end
+    end
+end
 
-Tab:AddToggle({
-    Name = "掴んだらキル (強化版)",
+RunService.RenderStepped:Connect(function()
+    if _G.AntiKickEnabled then
+        local toys = Workspace:FindFirstChild(localPlayer.Name .. "SpawnedInToys")
+        local hrp = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if hrp and toys then
+            for _, t in pairs(toys:GetChildren()) do
+                if t.Name == "NinjaKunai" then
+                    pcall(function()
+                        if t:IsA("Model") then t:SetPrimaryPartCFrame(hrp.CFrame)
+                        else t.CFrame = hrp.CFrame end
+                    end)
+                end
+            end
+        end
+    end
+end)
+
+-- --- UI ---
+local Tab1 = Window:MakeTab({ Name = "Main", Icon = "rbxassetid://4483345998" })
+
+Tab1:AddToggle({
+    Name = "アンチキック (NinjaKunai追従)",
+    Default = false,
+    Callback = function(v) 
+        _G.AntiKickEnabled = v 
+        if v then spawnKunai() end
+    end
+})
+
+local Tab2 = Window:MakeTab({ Name = "Grab Mod", Icon = "rbxassetid://4483345998" })
+
+Tab2:AddToggle({
+    Name = "掴んだらキル",
     Default = false,
     Callback = function(v) _G.GrabKillEnabled = v end
 })
 
-Tab:AddToggle({
-    Name = "掴みすり抜け (2回掴みで発動)",
+Tab2:AddToggle({
+    Name = "掴みすり抜け (1回で発動)",
     Default = false,
-    Callback = function(v) 
-        _G.GrabNoclipEnabled = v 
-        _G.GrabCount = 0 -- 設定変更時にリセット
-    end
+    Callback = function(v) _G.GrabNoclipEnabled = v end
 })
 
-Tab:AddLabel("※すり抜けは2回連続で掴み動作をすると有効になります。")
+Tab2:AddSection({ Name = "Throw Settings" })
 
-Tab:AddSection({ Name = "Throw Settings" })
-
-Tab:AddToggle({
+Tab2:AddToggle({
     Name = "スーパースロー",
     Default = false,
     Callback = function(v) _G.SuperThrowEnabled = v end
 })
 
-Tab:AddSlider({
+Tab2:AddSlider({
     Name = "投げパワー",
     Min = 0,
-    Max = 10000, -- 10,000まで拡張
+    Max = 10000,
     Default = 500,
     Increment = 100,
     ValueName = "Power",
