@@ -142,14 +142,30 @@ MainTab:AddToggle({
                         for _, t in pairs(toys:GetChildren()) do
                             if t.Name == "NinjaKunai" then
                                 pcall(function()
+                                    local root = t:IsA("Model") and (t.PrimaryPart or t:FindFirstChildWhichIsA("BasePart")) or t
                                     for _, p in pairs(t:GetDescendants()) do
                                         if p:IsA("BasePart") then
                                             p.CanCollide = false
-                                            p.Anchored = true
+                                            p.Anchored = false -- オーナー権限(ネットワークオーナーシップ)を利用して複製させる
+                                            p.Massless = true
                                         end
                                     end
-                                    if t:IsA("Model") then t:SetPrimaryPartCFrame(hrp.CFrame)
-                                    else t.CFrame = hrp.CFrame end
+                                    if t:IsA("BasePart") then
+                                        t.CanCollide = false
+                                        t.Anchored = false
+                                        t.Massless = true
+                                    end
+
+                                    if root and not t:FindFirstChild("OwnerWeld") then
+                                        if t:IsA("Model") then t:SetPrimaryPartCFrame(hrp.CFrame)
+                                        else t.CFrame = hrp.CFrame end
+                                        
+                                        local w = Instance.new("WeldConstraint")
+                                        w.Name = "OwnerWeld"
+                                        w.Part0 = hrp
+                                        w.Part1 = root
+                                        w.Parent = t
+                                    end
                                 end)
                             end
                         end
