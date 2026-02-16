@@ -8,7 +8,7 @@ pcall(function()
 end)
 
 local Window = OrionLib:MakeWindow({
-    Name = "Advanced Grab Mod v17", 
+    Name = "Advanced Grab Mod v18", 
     HidePremium = false, 
     SaveConfig = true, 
     ConfigFolder = "GrabModConfig",
@@ -369,6 +369,155 @@ GrabTab:AddSlider({
     Increment = 100,
     ValueName = "Power",
     Callback = function(v) _G.ThrowPower = v end
+})
+
+-- --- Kick Tab (Blobman Kick) ---
+local KickTab = Window:MakeTab({ Name = "Kick", Icon = "rbxassetid://4483345998" })
+
+local selectedPlayer = nil
+local playersList = {}
+
+local function updatePlayerList()
+    playersList = {}
+    for _, p in pairs(Players:GetPlayers()) do
+        if p ~= localPlayer then
+            table.insert(playersList, p.Name)
+        end
+    end
+end
+
+-- Blobman Kick Logic (移植版)
+local function runBlobmanKick(targetPlayer)
+    if not targetPlayer or not targetPlayer.Character then return end
+    local targetRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not targetRoot then return end
+
+    -- 1. Blobman確保
+    local blobman = nil
+    local spawned = Workspace:FindFirstChild(localPlayer.Name .. "SpawnedInToys")
+    if spawned then blobman = spawned:FindFirstChild("CreatureBlobman") end
+    
+    if not blobman then
+        local mt = ReplicatedStorage:FindFirstChild("MenuToys")
+        local st = mt and mt:FindFirstChild("SpawnToyRemoteFunction")
+        if st then
+            local myRoot = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
+            local spawnCF = myRoot and (myRoot.CFrame + Vector3.new(0, 5, 0)) or CFrame.new(0, 50, 0)
+            st:InvokeServer("CreatureBlobman", spawnCF, Vector3.zero)
+            task.wait(0.5)
+            spawned = Workspace:FindFirstChild(localPlayer.Name .. "SpawnedInToys")
+            if spawned then blobman = spawned:FindFirstChild("CreatureBlobman") end
+        end
+    end
+    
+    if not blobman then return end
+
+    local scriptObj = blobman:FindFirstChild("BlobmanSeatAndOwnerScript")
+    local grabRemote = scriptObj and scriptObj:FindFirstChild("CreatureGrab")
+    local dropRemote = scriptObj and scriptObj:FindFirstChild("CreatureDrop")
+    local lDet = blobman:FindFirstChild("LeftDetector")
+    local rDet = blobman:FindFirstChild("RightDetector")
+    local lWeld = lDet and (lDet:FindFirstChild("LeftWeld") or lDet:FindFirstChild("RigidConstraint"))
+    local rWeld = rDet and (rDet:FindFirstChild("RightWeld") or rDet:FindFirstChild("RigidConstraint"))
+    local seat = blobman:FindFirstChild("VehicleSeat")
+    local GE = ReplicatedStorage:WaitForChild("GrabEvents")
+    
+    if not (grabRemote and dropRemote and (lDet or rDet)) then return end
+    
+    local Det = rDet or lDet
+    local Weld = rWeld or lWeld
+    local blobRoot = blobman:FindFirstChild("HumanoidRootPart") or blobman.PrimaryPart
+    local savedPos = blobRoot.CFrame
+
+    local hum = localPlayer.Character and localPlayer.Character:FindFirstChild("Humanoid")
+    if seat and hum and seat.Occupant ~= hum then
+        localPlayer.Character.HumanoidRootPart.CFrame = seat.CFrame + Vector3.new(0, 2, 0)
+        seat:Sit(hum)
+        task.wait(0.2)
+    end
+
+    local startTime = tick()
+    while tick() - startTime < 0.5 do
+        if not targetPlayer.Character or not targetPlayer.Character:FindFirstChild("HumanoidRootPart") then break end
+        local tRoot = targetPlayer.Character.HumanoidRootPart
+        blobRoot.CFrame = tRoot.CFrame
+        blobRoot.AssemblyLinearVelocity = Vector3.zero
+        pcall(function()
+            if Det then grabRemote:FireServer(Det, tRoot, Weld) end
+            GE.CreateGrabLine:FireServer(tRoot, Vector3.zero, tRoot.Position, false)
+            GE.SetNetworkOwner:FireServer(tRoot, blobRoot.CFrame)
+        end)
+        RunService.Heartbeat:Wait()
+    end
+
+    local killPos = CFrame.new(0, -490, 0)
+    local lockTime = tick()
+    while tick() - lockTime < 1.0 do
+        if not targetPlayer.Character then break end
+        local tRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if tRoot then
+            blobRoot.CFrame = killPos
+            blobRoot.AssemblyLinearVelocity = Vector3.zero
+            tRoot.CFrame = killPos
+            tRoot.AssemblyLinearVelocity = Vector3.zero
+            pcall(function() GE.SetNetworkOwner:FireServer(tRoot, killPos) end)
+        end
+        RunService.Heartbeat:Wait()
+    end
+
+    pcall(function()
+        local currentWeld = Det:FindFirstChild("RightWeld") or Det:FindFirstChild("LeftWeld") or Det:FindFirstChildWhichIsA("Weld") or Det:FindFirstChild("RigidConstraint")
+        if currentWeld then dropRemote:FireServer(currentWeld) end
+        if targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
+             GE.DestroyGrabLine:FireServer(targetPlayer.Character.HumanoidRootPart)
+        end
+    end)
+    blobRoot.CFrame = savedPos
+    blobRoot.AssemblyLinearVelocity = Vector3.zero
+end
+
+updatePlayerList()
+local PlayerDropdown = KickTab:AddDropdown({
+    Name = "プレイヤー選択",
+    Default = "",
+    Options = playersList,
+    Callback = function(v) selectedPlayer = Players:FindFirstChild(v) end
+})
+
+KickTab:AddButton({
+    Name = "リスト更新",
+    Callback = function()
+        updatePlayerList()
+        PlayerDropdown:Refresh(playersList, true)
+    end
+})
+
+KickTab:AddButton({
+    Name = "選択したプレイヤーをキック",
+    Callback = function()
+        if selectedPlayer then
+            OrionLib:MakeNotification({Name = "実行中", Content = selectedPlayer.Name .. " を処理中...", Time = 2})
+            runBlobmanKick(selectedPlayer)
+            OrionLib:MakeNotification({Name = "完了", Content = "処理完了", Time = 2})
+        else
+            OrionLib:MakeNotification({Name = "エラー", Content = "プレイヤーを選択してください", Time = 3})
+        end
+    end
+})
+
+KickTab:AddButton({
+    Name = "全員キック (All Kick)",
+    Callback = function()
+        local targets = Players:GetPlayers()
+        OrionLib:MakeNotification({Name = "開始", Content = "全員キックを開始します (" .. (#targets - 1) .. "人)", Time = 3})
+        for _, p in pairs(targets) do
+            if p ~= localPlayer then
+                runBlobmanKick(p)
+                task.wait(0.5)
+            end
+        end
+        OrionLib:MakeNotification({Name = "完了", Content = "全員への処理が終了しました", Time = 3})
+    end
 })
 
 OrionLib:Init()
