@@ -98,8 +98,15 @@ if grabNotify then
             -- 離した時 (投げた時)
             if lastGrabbedPart then
                 -- スーパースローがオンの場合、強制位置固定を解除
-                if _G.SuperThrowEnabled and forcedParts[lastGrabbedPart] then
-                    forcedParts[lastGrabbedPart] = nil
+                if _G.SuperThrowEnabled then
+                    local root = lastGrabbedPart.Parent
+                    if root and root:IsA("Model") then
+                        for _, p in pairs(root:GetDescendants()) do
+                            if p:IsA("BasePart") then forcedParts[p] = nil end
+                        end
+                    elseif forcedParts[lastGrabbedPart] then
+                        forcedParts[lastGrabbedPart] = nil
+                    end
                 end
 
                 -- スーパースロー処理
@@ -123,11 +130,25 @@ local function handleAnchorAction(actionName, inputState, inputObject)
             if lastGrabbedPart then selectionBox.Adornee = lastGrabbedPart end
         end
         if lastGrabbedPart and lastGrabbedPart.Parent then
-            if forcedParts[lastGrabbedPart] then
-                forcedParts[lastGrabbedPart] = nil
-                pcall(function() lastGrabbedPart.Anchored = false end)
+            local root = lastGrabbedPart.Parent
+            local parts = {}
+            if root:IsA("Model") then
+                for _, p in pairs(root:GetDescendants()) do
+                    if p:IsA("BasePart") then table.insert(parts, p) end
+                end
             else
-                forcedParts[lastGrabbedPart] = { CFrame = lastGrabbedPart.CFrame }
+                table.insert(parts, lastGrabbedPart)
+            end
+
+            if forcedParts[lastGrabbedPart] then
+                for _, p in pairs(parts) do
+                    forcedParts[p] = nil
+                    pcall(function() p.Anchored = false end)
+                end
+            else
+                for _, p in pairs(parts) do
+                    forcedParts[p] = { CFrame = p.CFrame }
+                end
             end
         else
             OrionLib:MakeNotification({Name="Info", Content="対象なし", Time = 1})
