@@ -28,6 +28,7 @@ _G.ThrowPower = 500
 
 local ContextActionService = game:GetService("ContextActionService")
 local lastGrabbedPart = nil
+local forcedParts = {}
 
 -- --- 通知イベントの取得 ---
 local function getGrabNotify()
@@ -63,6 +64,19 @@ selectionBox.LineThickness = 0.05
 selectionBox.Adornee = nil
 selectionBox.Parent = game:GetService("CoreGui")
 
+-- --- CFrame Forcing Loop ---
+RunService.Heartbeat:Connect(function()
+    for part, data in pairs(forcedParts) do
+        if part and part.Parent then
+            pcall(function()
+                part.CFrame = data.CFrame
+            end)
+        else
+            forcedParts[part] = nil -- Cleanup
+        end
+    end
+end)
+
 -- --- メインロジック監視 ---
 if grabNotify then
     grabNotify.Event:Connect(function(isGrabbing)
@@ -78,11 +92,16 @@ if grabNotify then
 
             if target then
                 lastGrabbedPart = target
-                
+                selectionBox.Adornee = target
             end
         else
             -- 離した時 (投げた時)
             if lastGrabbedPart then
+                -- スーパースローがオンの場合、強制位置固定を解除
+                if _G.SuperThrowEnabled and forcedParts[lastGrabbedPart] then
+                    forcedParts[lastGrabbedPart] = nil
+                end
+
                 -- スーパースロー処理
                 if _G.SuperThrowEnabled then
                     pcall(function()
@@ -92,7 +111,6 @@ if grabNotify then
                         lastGrabbedPart:ApplyImpulse(force * lastGrabbedPart:GetMass())
                     end)
                 end
-                
             end
         end
     end)
@@ -100,20 +118,22 @@ end
 
 local function handleAnchorAction(actionName, inputState, inputObject)
     if inputState == Enum.UserInputState.Begin then
-        if not lastGrabbedPart then
+        if not lastGrabbedPart or not lastGrabbedPart.Parent then
             lastGrabbedPart = findGrabbedTarget()
+            if lastGrabbedPart then selectionBox.Adornee = lastGrabbedPart end
         end
         if lastGrabbedPart and lastGrabbedPart.Parent then
-            pcall(function()
-                lastGrabbedPart.Anchored = not lastGrabbedPart.Anchored
-                selectionBox.Adornee = lastGrabbedPart
-            end)
+            if forcedParts[lastGrabbedPart] then
+                forcedParts[lastGrabbedPart] = nil
+                pcall(function() lastGrabbedPart.Anchored = false end)
+            else
+                forcedParts[lastGrabbedPart] = { CFrame = lastGrabbedPart.CFrame }
+            end
         else
             OrionLib:MakeNotification({Name="Info", Content="対象なし", Time = 1})
         end
     end
 end
-
 -- --- UI構成 ---
 local MainTab = Window:MakeTab({ Name = "Main", Icon = "rbxassetid://4483345998" })
 
@@ -138,20 +158,22 @@ MainTab:AddToggle({
 local ChatKeyboardToggle = nil
 local CustomChatFrame = nil
 
-MainTab:AddButton({
+MainTab:AddToggle({
     Name = "独自チャット (Custom Chat)",
-    Callback = function()
-        if CustomChatFrame then
-            CustomChatFrame:Destroy()
-            CustomChatFrame = nil
+    Default = false,
+    Callback = function(value)
+        if not value then
+            if CustomChatFrame then
+                CustomChatFrame:Destroy()
+                CustomChatFrame = nil
+            end
             return
         end
-
+        if CustomChatFrame then return end
         local screenGui = Instance.new("ScreenGui")
         screenGui.Name = "CustomChatGui"
         screenGui.Parent = game:GetService("CoreGui")
         CustomChatFrame = screenGui
-
         local frame = Instance.new("Frame")
         frame.Size = UDim2.new(0, 300, 0, 200)
         frame.Position = UDim2.new(0.5, -150, 0.5, -100)
@@ -160,7 +182,6 @@ MainTab:AddButton({
         frame.BorderSizePixel = 0
         frame.Active = true
         frame.Draggable = true
-        
         local chatLog = Instance.new("ScrollingFrame")
         chatLog.Size = UDim2.new(0.9, 0, 0.7, 0)
         chatLog.Position = UDim2.new(0.05, 0, 0.05, 0)
@@ -169,8 +190,8 @@ MainTab:AddButton({
         chatLog.CanvasSize = UDim2.new(0, 0, 0, 0)
         
         local layout = Instance.new("UIListLayout")
-        layout.Parent = chatLog
         layout.SortOrder = Enum.SortOrder.LayoutOrder
+        layout.Parent = chatLog
 
         local textBox = Instance.new("TextBox")
         textBox.Size = UDim2.new(0.9, 0, 0.15, 0)
@@ -180,7 +201,6 @@ MainTab:AddButton({
         textBox.TextColor3 = Color3.fromRGB(0, 0, 0)
         textBox.Text = ""
         textBox.ClearTextOnFocus = false
-        
         local button = Instance.new("TextButton")
         button.Size = UDim2.new(0.4, 0, 0.2, 0)
         button.Position = UDim2.new(0.3, 0, 0.84, 0)
@@ -188,7 +208,6 @@ MainTab:AddButton({
         button.Text = "Send"
         button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
         button.TextColor3 = Color3.fromRGB(255, 255, 255)
-        
         local Close = Instance.new("TextButton")
         Close.Size = UDim2.new(0, 20, 0, 20)
         Close.Position = UDim2.new(1, -20, 0, 0)
@@ -196,18 +215,54 @@ MainTab:AddButton({
         Close.TextColor3 = Color3.fromRGB(255, 255, 255)
         Close.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
         Close.Parent = Frame
-        
         Close.MouseButton1Click:Connect(function() 
-            ScreenGui:Destroy() 
+            screenGui:Destroy() 
+            CustomChatFrame = nil
         end)
 
-        Button.MouseButton1Click:Connect(function()
-            local msg = TextBox.Text
+        button.MouseButton1Click:Connect(function()
+            local msg = textBox.Text
             if msg ~= "" then
-                game:GetService("ReplicatedStorage").DefaultChatSystemChatEvents.SayMessageRequest:FireServer(msg, "All")
-                TextBox.Text = ""
+                local TextChatService = game:GetService("TextChatService")
+                if TextChatService and TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+                    pcall(function()
+                        TextChatService:WaitForChild("TextChatInputBar"):WaitForChild("SayMessageRequest"):FireServer(msg, "All")
+                    end)
+                else
+                    pcall(function()
+                        game:GetService("ReplicatedStorage").DefaultChatSystemChatEvents.SayMessageRequest:FireServer(msg, "All")
+                    end)
+                end
+                textBox.Text = ""
             end
         end)
+
+        -- 公式チャット傍受
+        local function addMessage(name, message)
+            local textLabel = Instance.new("TextLabel")
+            textLabel.Size = UDim2.new(1, 0, 0, 20)
+            textLabel.BackgroundColor3 = Color3.new(0, 0, 0)
+            textLabel.BackgroundTransparency = 0.5
+            textLabel.TextColor3 = Color3.new(1, 1, 1)
+            textLabel.Text = name .. ": " .. message
+            textLabel.Font = Enum.Font.SourceSans
+            textLabel.TextSize = 14
+            textLabel.TextXAlignment = Enum.TextXAlignment.Left
+            textLabel.Parent = chatLog
+            chatLog.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y)
+            chatLog.CanvasPosition = Vector2.new(0, layout.AbsoluteContentSize.Y)
+        end
+
+        local TextChatService = game:GetService("TextChatService")
+        if TextChatService and TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+            TextChatService.MessageReceived:Connect(function(msg)
+                if msg.TextSource then addMessage(msg.TextSource.Name, msg.Text) end
+            end)
+        elseif ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents") then
+            ReplicatedStorage.DefaultChatSystemChatEvents.MessageReceived.OnClientEvent:Connect(function(msg)
+                addMessage(msg.FromSpeaker, msg.Message)
+            end)
+        end
     end
 })
 
