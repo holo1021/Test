@@ -25,7 +25,6 @@ local Camera = Workspace.CurrentCamera
 -- --- 変数管理 ---
 _G.SuperThrowEnabled = false
 _G.ThrowPower = 500
-_G.GrabAnchorEnabled = false
 
 local lastGrabbedPart = nil
 
@@ -71,26 +70,29 @@ if grabNotify then
             if target then
                 lastGrabbedPart = target
                 
-                -- 固定処理 (Anchor)
-                if _G.GrabAnchorEnabled then
-                    pcall(function()
-                        target.Anchored = true
-                    end)
-                end
             end
         else
             -- 離した時 (投げた時)
             if lastGrabbedPart then
-                -- 3. スーパースロー処理
+                -- スーパースローがオンでもオフでも、固定されていた場合は解除する
+                pcall(function()
+                    if lastGrabbedPart.Anchored then
+                       lastGrabbedPart.Anchored = false
+                    end
+                end)
+
+                -- スーパースロー処理
                 if _G.SuperThrowEnabled then
                     pcall(function()
-                        lastGrabbedPart.Anchored = false
                         -- 物理演算の主導権があるうちに力を加える
                         local force = Camera.CFrame.LookVector * _G.ThrowPower
                         lastGrabbedPart:ApplyImpulse(force * lastGrabbedPart:GetMass())
                     end)
                 end
                 
+                -- 状態をリセット
+                selectionBox.Adornee = nil
+
                 -- 投げた後に少し待ってから参照を消す
                 task.delay(0.1, function() lastGrabbedPart = nil end)
             end
@@ -99,13 +101,44 @@ if grabNotify then
 end
 
 -- --- UI構成 ---
-local MainTab = Window:MakeTab({ Name = "Main", Icon = "rbxassetid://4483345998" })
+-- スマホ用固定ボタン
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "CustomAnchorGui"
+screenGui.Parent = game:GetService("CoreGui")
 
-MainTab:AddToggle({
-    Name = "掴んだら固定 (Anchor)",
-    Default = false,
-    Callback = function(v) _G.GrabAnchorEnabled = v end
-})
+local anchorButton = Instance.new("TextButton")
+anchorButton.Name = "AnchorButton"
+anchorButton.Text = "固定"
+anchorButton.Size = UDim2.new(0, 100, 0, 50)
+anchorButton.Position = UDim2.new(0.5, -50, 0.85, 0) -- 画面下中央
+anchorButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+anchorButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+anchorButton.BorderColor3 = Color3.fromRGB(200, 200, 200)
+anchorButton.BorderSizePixel = 2
+anchorButton.Parent = screenGui
+
+-- 固定した対象を可視化するためのSelectionBox
+local selectionBox = Instance.new("SelectionBox")
+selectionBox.Name = "AnchorSelectionBox"
+selectionBox.Color3 = Color3.fromRGB(0, 170, 255) -- 水色
+selectionBox.LineThickness = 0.05
+selectionBox.Adornee = nil
+selectionBox.Parent = game:GetService("CoreGui")
+
+anchorButton.MouseButton1Click:Connect(function()
+    if lastGrabbedPart and lastGrabbedPart.Parent then
+        pcall(function()
+            -- ネットワークオーナーを自分に設定して、他のプレイヤーにも見えるようにする
+            lastGrabbedPart:SetNetworkOwner(localPlayer)
+            task.wait(0.05) -- ネットワークの同期を待つ
+            lastGrabbedPart.Anchored = true
+            selectionBox.Adornee = lastGrabbedPart
+        end)
+    end
+end)
+
+-- --- UI構成 ---
+local MainTab = Window:MakeTab({ Name = "Main", Icon = "rbxassetid://4483345998" })
 
 MainTab:AddSection({ Name = "Throw Settings" })
 
