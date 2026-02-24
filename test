@@ -1,139 +1,129 @@
-local Player = game.Players.LocalPlayer
-local Camera = workspace.CurrentCamera
-local RunService = game:GetService(”RunService”)
-local UserInputService = game:GetService(”UserInputService”)
+local OrionLib = loadstring(game:HttpGet(('https://raw.githubusercontent.com/hololove1021/HolonHUB/refs/heads/main/source.txt')))()
 
-local targetPart = nil
-local fixedPart = nil
-
-local highlight = Instance.new(”Highlight”)
-highlight.FillTransparency = 0.5
-highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-
--- --- UI作成 ---
-local ScreenGui = Instance.new(”ScreenGui”)
-ScreenGui.Name = “MobileFixerUI”
-ScreenGui.ResetOnSpawn = false -- 死んでも消えない
-ScreenGui.Parent = game:GetService(”CoreGui”)
-
--- メイン枠（移動させるもの）
-local MainFrame = Instance.new(”Frame”)
-MainFrame.Size = UDim2.new(0, 180, 0, 160)
-MainFrame.Position = UDim2.new(0.7, 0, 0.4, 0)
-MainFrame.BackgroundTransparency = 1
-MainFrame.Parent = ScreenGui
-MainFrame.Visible = false -- 最初は隠しておく
-
--- ONOFF切り替えボタン（常に表示）
-local ToggleButton = Instance.new(”TextButton”)
-ToggleButton.Size = UDim2.new(0, 80, 0, 40)
-ToggleButton.Position = UDim2.new(0.05, 0, 0.4, 0)
-ToggleButton.Text = “MENU”
-ToggleButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-ToggleButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-ToggleButton.Font = Enum.Font.GothamBold
-ToggleButton.Parent = ScreenGui
-local CornerT = Instance.new(”UICorner”)
-CornerT.Parent = ToggleButton
-
--- 固定ボタン
-local FixButton = Instance.new(”TextButton”)
-FixButton.Size = UDim2.new(1, 0, 0.45, 0)
-FixButton.Position = UDim2.new(0, 0, 0, 0)
-FixButton.Text = “持ってる物を固定”
-FixButton.BackgroundColor3 = Color3.fromRGB(0, 180, 0)
-FixButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-FixButton.Font = Enum.Font.GothamBold
-FixButton.Parent = MainFrame
-local Corner1 = Instance.new(”UICorner”)
-Corner1.Parent = FixButton
-
--- 解除ボタン
-local UnfixButton = Instance.new(”TextButton”)
-UnfixButton.Size = UDim2.new(1, 0, 0.45, 0)
-UnfixButton.Position = UDim2.new(0, 0, 0.55, 0)
-UnfixButton.Text = “固定解除”
-UnfixButton.BackgroundColor3 = Color3.fromRGB(180, 0, 0)
-UnfixButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-UnfixButton.Font = Enum.Font.GothamBold
-UnfixButton.Parent = MainFrame
-local Corner2 = Instance.new(”UICorner”)
-Corner2.Parent = UnfixButton
-
--- --- ONOFF機能 ---
-ToggleButton.MouseButton1Click:Connect(function()
-    MainFrame.Visible = not MainFrame.Visible
-    if MainFrame.Visible then
-        ToggleButton.Text = “CLOSE”
-        ToggleButton.BackgroundColor3 = Color3.fromRGB(100, 100, 100)
-    else
-        ToggleButton.Text = “MENU”
-        ToggleButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+-- 二重起動防止
+pcall(function()
+    if game:GetService("CoreGui"):FindFirstChild("Orion") then 
+        game:GetService("CoreGui").Orion:Destroy() 
     end
 end)
 
--- --- ボタン移動機能（スマホ対応） ---
-local dragging, dragStart, startPos
-MainFrame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = true
-        dragStart = input.Position
-        startPos = MainFrame.Position
-    end
-end)
+local Window = OrionLib:MakeWindow({
+    Name = "Test Hub", 
+    HidePremium = false, 
+    SaveConfig = true, 
+    ConfigFolder = "TestHubConfig",
+    IntroEnabled = false
+})
 
-UserInputService.InputChanged:Connect(function(input)
-    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-        local delta = input.Position - dragStart
-        MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-    end
-end)
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local localPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
 
-UserInputService.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = false
-    end
-end)
+-- --- 変数管理 ---
+_G.SuperThrowEnabled = false
+_G.ThrowPower = 500
+_G.GrabAnchorEnabled = false
 
--- --- 固定・解除ロジック ---
-RunService.RenderStepped:Connect(function()
-    local viewportCenter = Camera.ViewportSize / 2
-    local unitRay = Camera:ViewportPointToRay(viewportCenter.X, viewportCenter.Y)
-    local raycastParams = RaycastParams.new()
-    raycastParams.FilterType = Enum.RaycastFilterType.Exclude
-    raycastParams.FilterDescendantsInstances = {Player.Character}
+local lastGrabbedPart = nil
 
-    local result = workspace:Raycast(unitRay.Origin, unitRay.Direction * 500, raycastParams)
+-- --- 通知イベントの取得 ---
+local function getGrabNotify()
+    local ps = localPlayer:WaitForChild("PlayerScripts", 10)
+    if not ps then return nil end
+    local cbm = ps:WaitForChild("CharacterAndBeamMove", 10)
+    if not cbm then return nil end
+    return cbm:WaitForChild("GrabNotifyEvent", 10)
+end
 
-    if result and result.Instance:IsA(”BasePart”) then
-        local obj = result.Instance
-        if obj.Size.X < 100 and obj.Size.Z < 100 and obj ~= fixedPart then
-            targetPart = obj
-            highlight.Adornee = targetPart
-            highlight.Parent = targetPart
-            highlight.FillColor = (targetPart.Anchored) and Color3.fromRGB(0, 255, 255) or Color3.fromRGB(255, 255, 0)
-        end
-    else
-        if not fixedPart then
-            highlight.Parent = nil
-            targetPart = nil
+local grabNotify = getGrabNotify()
+
+-- --- ターゲット特定ロジック ---
+local function findGrabbedTarget()
+    local grabParts = Workspace:FindFirstChild("GrabParts")
+    if grabParts then
+        local grabPart = grabParts:FindFirstChild("GrabPart")
+        if grabPart then
+            local weld = grabPart:FindFirstChild("WeldConstraint")
+            if weld and weld.Part1 then
+                return weld.Part1
+            end
         end
     end
-end)
+    return nil
+end
 
-FixButton.MouseButton1Click:Connect(function()
-    if targetPart then
-        targetPart.Anchored = true
-        fixedPart = targetPart
-        highlight.FillColor = Color3.fromRGB(0, 255, 255)
-    end
-end)
+-- --- メインロジック監視 ---
+if grabNotify then
+    grabNotify.Event:Connect(function(isGrabbing)
+        if isGrabbing then
+            local target = findGrabbedTarget()
+            if not target then
+                for i = 1, 20 do
+                    RunService.Heartbeat:Wait()
+                    target = findGrabbedTarget()
+                    if target then break end
+                end
+            end
 
-UnfixButton.MouseButton1Click:Connect(function()
-    if fixedPart then
-        fixedPart.Anchored = false
-        fixedPart = nil
-        highlight.Parent = nil
-        targetPart = nil
-    end
-end)
+            if target then
+                lastGrabbedPart = target
+                
+                -- 固定処理 (Anchor)
+                if _G.GrabAnchorEnabled then
+                    pcall(function()
+                        target.Anchored = true
+                    end)
+                end
+            end
+        else
+            -- 離した時 (投げた時)
+            if lastGrabbedPart then
+                -- 3. スーパースロー処理
+                if _G.SuperThrowEnabled then
+                    pcall(function()
+                        lastGrabbedPart.Anchored = false
+                        -- 物理演算の主導権があるうちに力を加える
+                        local force = Camera.CFrame.LookVector * _G.ThrowPower
+                        lastGrabbedPart:ApplyImpulse(force * lastGrabbedPart:GetMass())
+                    end)
+                end
+                
+                -- 投げた後に少し待ってから参照を消す
+                task.delay(0.1, function() lastGrabbedPart = nil end)
+            end
+        end
+    end)
+end
+
+-- --- UI構成 ---
+local MainTab = Window:MakeTab({ Name = "Main", Icon = "rbxassetid://4483345998" })
+
+MainTab:AddToggle({
+    Name = "掴んだら固定 (Anchor)",
+    Default = false,
+    Callback = function(v) _G.GrabAnchorEnabled = v end
+})
+
+MainTab:AddSection({ Name = "Throw Settings" })
+
+MainTab:AddToggle({
+    Name = "スーパースロー (投げ飛ばし)",
+    Default = false,
+    Callback = function(v) _G.SuperThrowEnabled = v end
+})
+
+MainTab:AddSlider({
+    Name = "投げ飛ばす強さ",
+    Min = 0,
+    Max = 5000,
+    Default = 500,
+    Color = Color3.fromRGB(255, 255, 255),
+    Increment = 100,
+    ValueName = "Power",
+    Callback = function(v) _G.ThrowPower = v end
+})
+
+OrionLib:Init()
