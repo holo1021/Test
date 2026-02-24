@@ -105,7 +105,7 @@ local function handleAnchorAction(actionName, inputState, inputObject)
         end
         if lastGrabbedPart and lastGrabbedPart.Parent then
             pcall(function()
-                lastGrabbedPart.Anchored = true
+                lastGrabbedPart.Anchored = not lastGrabbedPart.Anchored
                 selectionBox.Adornee = lastGrabbedPart
             end)
         else
