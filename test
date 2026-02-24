@@ -107,14 +107,16 @@ end
 
 local function handleAnchorAction(actionName, inputState, inputObject)
     if inputState == Enum.UserInputState.Begin then
+        if not lastGrabbedPart then
+            lastGrabbedPart = findGrabbedTarget()
+        end
         if lastGrabbedPart and lastGrabbedPart.Parent then
             pcall(function()
-                -- ネットワークオーナーを自分に設定して、他のプレイヤーにも見えるようにする
-                lastGrabbedPart:SetNetworkOwner(localPlayer)
-                task.wait(0.05) -- ネットワークの同期を待つ
                 lastGrabbedPart.Anchored = true
                 selectionBox.Adornee = lastGrabbedPart
             end)
+        else
+            OrionLib:MakeNotification({Name="Info", Content="対象なし", Time = 1})
         end
     end
 end
@@ -129,7 +131,11 @@ MainTab:AddToggle({
         if v then
             ContextActionService:BindAction("AnchorAction", handleAnchorAction, true, Enum.KeyCode.H)
             ContextActionService:SetTitle("AnchorAction", "固定")
-            ContextActionService:SetPosition("AnchorAction", UDim2.new(0.6, 0, 0.6, 0))
+            local btn = ContextActionService:GetButton("AnchorAction")
+            if btn then
+                btn.Size = UDim2.new(0, 120, 0, 120)
+                btn.Position = UDim2.new(0, 20, 0.5, -60)
+            end
         else
             ContextActionService:UnbindAction("AnchorAction")
         end
