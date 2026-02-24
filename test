@@ -83,16 +83,10 @@ if grabNotify then
         else
             -- 離した時 (投げた時)
             if lastGrabbedPart then
-                -- スーパースローがオンでもオフでも、固定されていた場合は解除する
-                pcall(function()
-                    if lastGrabbedPart.Anchored then
-                       lastGrabbedPart.Anchored = false
-                    end
-                end)
-
                 -- スーパースロー処理
                 if _G.SuperThrowEnabled then
                     pcall(function()
+                        lastGrabbedPart.Anchored = false
                         -- 物理演算の主導権があるうちに力を加える
                         local force = Camera.CFrame.LookVector * _G.ThrowPower
                         lastGrabbedPart:ApplyImpulse(force * lastGrabbedPart:GetMass())
@@ -135,9 +129,65 @@ MainTab:AddToggle({
         if v then
             ContextActionService:BindAction("AnchorAction", handleAnchorAction, true, Enum.KeyCode.H)
             ContextActionService:SetTitle("AnchorAction", "固定")
+            ContextActionService:SetPosition("AnchorAction", UDim2.new(0.6, 0, 0.6, 0))
         else
             ContextActionService:UnbindAction("AnchorAction")
         end
+    end
+})
+
+MainTab:AddButton({
+    Name = "独自チャット (Custom Chat)",
+    Callback = function()
+        local ScreenGui = Instance.new("ScreenGui")
+        ScreenGui.Name = "CustomChatGui"
+        ScreenGui.Parent = game:GetService("CoreGui")
+        
+        local Frame = Instance.new("Frame")
+        Frame.Size = UDim2.new(0, 300, 0, 100)
+        Frame.Position = UDim2.new(0.5, -150, 0.5, -50)
+        Frame.Parent = ScreenGui
+        Frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        Frame.BorderSizePixel = 0
+        Frame.Active = true
+        Frame.Draggable = true
+        
+        local TextBox = Instance.new("TextBox")
+        TextBox.Size = UDim2.new(0.9, 0, 0.5, 0)
+        TextBox.Position = UDim2.new(0.05, 0, 0.1, 0)
+        TextBox.Parent = Frame
+        TextBox.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        TextBox.TextColor3 = Color3.fromRGB(0, 0, 0)
+        TextBox.Text = ""
+        TextBox.ClearTextOnFocus = false
+        
+        local Button = Instance.new("TextButton")
+        Button.Size = UDim2.new(0.4, 0, 0.3, 0)
+        Button.Position = UDim2.new(0.3, 0, 0.65, 0)
+        Button.Parent = Frame
+        Button.Text = "Send"
+        Button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        Button.TextColor3 = Color3.fromRGB(255, 255, 255)
+        
+        local Close = Instance.new("TextButton")
+        Close.Size = UDim2.new(0, 20, 0, 20)
+        Close.Position = UDim2.new(1, -20, 0, 0)
+        Close.Text = "X"
+        Close.TextColor3 = Color3.fromRGB(255, 255, 255)
+        Close.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        Close.Parent = Frame
+        
+        Close.MouseButton1Click:Connect(function() 
+            ScreenGui:Destroy() 
+        end)
+
+        Button.MouseButton1Click:Connect(function()
+            local msg = TextBox.Text
+            if msg ~= "" then
+                game:GetService("ReplicatedStorage").DefaultChatSystemChatEvents.SayMessageRequest:FireServer(msg, "All")
+                TextBox.Text = ""
+            end
+        end)
     end
 })
 
