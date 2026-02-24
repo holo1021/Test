@@ -68,9 +68,7 @@ selectionBox.Parent = game:GetService("CoreGui")
 RunService.Heartbeat:Connect(function()
     for part, data in pairs(forcedParts) do
         if part and part.Parent then
-            pcall(function()
-                part.CFrame = data.CFrame
-            end)
+            -- 位置更新を停止 (Anchoredを使用するため)
         else
             if data.Gui then data.Gui:Destroy() end
             forcedParts[part] = nil -- Cleanup
@@ -98,24 +96,11 @@ if grabNotify then
         else
             -- 離した時 (投げた時)
             if lastGrabbedPart then
-                -- スーパースローがオンの場合、強制位置固定を解除
-                if _G.SuperThrowEnabled then
-                    local root = lastGrabbedPart.Parent
-                    if root and root:IsA("Model") then
-                        for _, p in pairs(root:GetDescendants()) do
-                            if p:IsA("BasePart") and forcedParts[p] then
-                                if forcedParts[p].Gui then forcedParts[p].Gui:Destroy() end
-                                forcedParts[p] = nil
-                            end
-                        end
-                    elseif forcedParts[lastGrabbedPart] then
-                        forcedParts[lastGrabbedPart] = nil
-                    end
-                end
-
                 -- スーパースロー処理
-                if _G.SuperThrowEnabled then
+                -- 固定されていないオブジェクトのみスーパースローを適用します
+                if _G.SuperThrowEnabled and not forcedParts[lastGrabbedPart] then
                     pcall(function()
+                        -- 投げるためにアンカーを外します
                         lastGrabbedPart.Anchored = false
                         -- 物理演算の主導権があるうちに力を加える
                         local force = Camera.CFrame.LookVector * _G.ThrowPower
@@ -170,6 +155,7 @@ local function handleAnchorAction(actionName, inputState, inputObject)
                 for _, p in pairs(parts) do
                     local gui = (p == lastGrabbedPart) and bg or nil
                     forcedParts[p] = { CFrame = p.CFrame, Gui = gui }
+                    pcall(function() p.Anchored = true end)
                 end
             end
         else
