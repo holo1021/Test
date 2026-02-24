@@ -93,13 +93,6 @@ if grabNotify then
                     end)
                 end
                 
-                -- 状態をリセット
-                if selectionBox then
-                    selectionBox.Adornee = nil
-                end
-
-                -- 投げた後に少し待ってから参照を消す
-                task.delay(0.1, function() lastGrabbedPart = nil end)
             end
         end
     end)
@@ -174,6 +167,10 @@ MainTab:AddButton({
         chatLog.Parent = frame
         chatLog.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
         chatLog.CanvasSize = UDim2.new(0, 0, 0, 0)
+        
+        local layout = Instance.new("UIListLayout")
+        layout.Parent = chatLog
+        layout.SortOrder = Enum.SortOrder.LayoutOrder
 
         local textBox = Instance.new("TextBox")
         textBox.Size = UDim2.new(0.9, 0, 0.15, 0)
