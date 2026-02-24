@@ -136,38 +136,55 @@ MainTab:AddToggle({
     end
 })
 
+local ChatKeyboardToggle = nil
+local CustomChatFrame = nil
+
 MainTab:AddButton({
     Name = "独自チャット (Custom Chat)",
     Callback = function()
-        local ScreenGui = Instance.new("ScreenGui")
-        ScreenGui.Name = "CustomChatGui"
-        ScreenGui.Parent = game:GetService("CoreGui")
+        if CustomChatFrame then
+            CustomChatFrame:Destroy()
+            CustomChatFrame = nil
+            return
+        end
+
+        local screenGui = Instance.new("ScreenGui")
+        screenGui.Name = "CustomChatGui"
+        screenGui.Parent = game:GetService("CoreGui")
+        CustomChatFrame = screenGui
+
+        local frame = Instance.new("Frame")
+        frame.Size = UDim2.new(0, 300, 0, 200)
+        frame.Position = UDim2.new(0.5, -150, 0.5, -100)
+        frame.Parent = screenGui
+        frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        frame.BorderSizePixel = 0
+        frame.Active = true
+        frame.Draggable = true
         
-        local Frame = Instance.new("Frame")
-        Frame.Size = UDim2.new(0, 300, 0, 100)
-        Frame.Position = UDim2.new(0.5, -150, 0.5, -50)
-        Frame.Parent = ScreenGui
-        Frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-        Frame.BorderSizePixel = 0
-        Frame.Active = true
-        Frame.Draggable = true
+        local chatLog = Instance.new("ScrollingFrame")
+        chatLog.Size = UDim2.new(0.9, 0, 0.7, 0)
+        chatLog.Position = UDim2.new(0.05, 0, 0.05, 0)
+        chatLog.Parent = frame
+        chatLog.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        chatLog.CanvasSize = UDim2.new(0, 0, 0, 0)
+
+        local textBox = Instance.new("TextBox")
+        textBox.Size = UDim2.new(0.9, 0, 0.15, 0)
+        textBox.Position = UDim2.new(0.05, 0, 0.77, 0)
+        textBox.Parent = frame
+        textBox.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        textBox.TextColor3 = Color3.fromRGB(0, 0, 0)
+        textBox.Text = ""
+        textBox.ClearTextOnFocus = false
         
-        local TextBox = Instance.new("TextBox")
-        TextBox.Size = UDim2.new(0.9, 0, 0.5, 0)
-        TextBox.Position = UDim2.new(0.05, 0, 0.1, 0)
-        TextBox.Parent = Frame
-        TextBox.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-        TextBox.TextColor3 = Color3.fromRGB(0, 0, 0)
-        TextBox.Text = ""
-        TextBox.ClearTextOnFocus = false
-        
-        local Button = Instance.new("TextButton")
-        Button.Size = UDim2.new(0.4, 0, 0.3, 0)
-        Button.Position = UDim2.new(0.3, 0, 0.65, 0)
-        Button.Parent = Frame
-        Button.Text = "Send"
-        Button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-        Button.TextColor3 = Color3.fromRGB(255, 255, 255)
+        local button = Instance.new("TextButton")
+        button.Size = UDim2.new(0.4, 0, 0.2, 0)
+        button.Position = UDim2.new(0.3, 0, 0.84, 0)
+        button.Parent = frame
+        button.Text = "Send"
+        button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        button.TextColor3 = Color3.fromRGB(255, 255, 255)
         
         local Close = Instance.new("TextButton")
         Close.Size = UDim2.new(0, 20, 0, 20)
