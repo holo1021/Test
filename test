@@ -246,9 +246,10 @@ MainTab:AddToggle({
             if msg ~= "" then
                 local TextChatService = game:GetService("TextChatService")
                 if TextChatService and TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
-                    pcall(function()
-                        TextChatService:WaitForChild("TextChatInputBar"):WaitForChild("SayMessageRequest"):FireServer(msg, "All")
-                    end)
+                    local rbxg = TextChatService.TextChannels:FindFirstChild("RBXGeneral")
+                    if rbxg then
+                        rbxg:SendAsync(msg)
+                    end
                 else
                     pcall(function()
                         game:GetService("ReplicatedStorage").DefaultChatSystemChatEvents.SayMessageRequest:FireServer(msg, "All")
@@ -277,7 +278,8 @@ MainTab:AddToggle({
         local TextChatService = game:GetService("TextChatService")
         if TextChatService and TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
             TextChatService.MessageReceived:Connect(function(msg)
-                if msg.TextSource then addMessage(msg.TextSource.Name, msg.Text) end
+                local name = msg.TextSource and msg.TextSource.Name or "System"
+                addMessage(name, msg.Text)
             end)
         elseif ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents") then
             ReplicatedStorage.DefaultChatSystemChatEvents.MessageReceived.OnClientEvent:Connect(function(msg)
