@@ -72,6 +72,7 @@ RunService.Heartbeat:Connect(function()
                 part.CFrame = data.CFrame
             end)
         else
+            if data.Gui then data.Gui:Destroy() end
             forcedParts[part] = nil -- Cleanup
         end
     end
@@ -102,7 +103,10 @@ if grabNotify then
                     local root = lastGrabbedPart.Parent
                     if root and root:IsA("Model") then
                         for _, p in pairs(root:GetDescendants()) do
-                            if p:IsA("BasePart") then forcedParts[p] = nil end
+                            if p:IsA("BasePart") and forcedParts[p] then
+                                if forcedParts[p].Gui then forcedParts[p].Gui:Destroy() end
+                                forcedParts[p] = nil
+                            end
                         end
                     elseif forcedParts[lastGrabbedPart] then
                         forcedParts[lastGrabbedPart] = nil
@@ -142,12 +146,30 @@ local function handleAnchorAction(actionName, inputState, inputObject)
 
             if forcedParts[lastGrabbedPart] then
                 for _, p in pairs(parts) do
+                    if forcedParts[p] and forcedParts[p].Gui then forcedParts[p].Gui:Destroy() end
                     forcedParts[p] = nil
                     pcall(function() p.Anchored = false end)
                 end
             else
+                local bg = Instance.new("BillboardGui")
+                bg.Name = "AnchorStatusGui"
+                bg.Adornee = lastGrabbedPart
+                bg.Size = UDim2.new(0, 100, 0, 50)
+                bg.StudsOffset = Vector3.new(0, 2, 0)
+                bg.AlwaysOnTop = true
+                bg.Parent = game:GetService("CoreGui")
+                local tl = Instance.new("TextLabel")
+                tl.Parent = bg
+                tl.Size = UDim2.new(1, 0, 1, 0)
+                tl.BackgroundTransparency = 1
+                tl.Text = "固定中"
+                tl.TextColor3 = Color3.new(1, 0, 0)
+                tl.TextStrokeTransparency = 0
+                tl.TextSize = 20
+                
                 for _, p in pairs(parts) do
-                    forcedParts[p] = { CFrame = p.CFrame }
+                    local gui = (p == lastGrabbedPart) and bg or nil
+                    forcedParts[p] = { CFrame = p.CFrame, Gui = gui }
                 end
             end
         else
@@ -278,7 +300,7 @@ MainTab:AddToggle({
         local TextChatService = game:GetService("TextChatService")
         if TextChatService and TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
             TextChatService.MessageReceived:Connect(function(msg)
-                local name = msg.TextSource and msg.TextSource.Name or "System"
+                local name = msg.TextSource and msg.TextSource.Name or (msg.PrefixText ~= "" and msg.PrefixText:gsub(":", "") or "System")
                 addMessage(name, msg.Text)
             end)
         elseif ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents") then
