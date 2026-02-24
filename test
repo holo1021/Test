@@ -26,6 +26,7 @@ local Camera = Workspace.CurrentCamera
 _G.SuperThrowEnabled = false
 _G.ThrowPower = 500
 
+local ContextActionService = game:GetService("ContextActionService")
 local lastGrabbedPart = nil
 
 -- --- 通知イベントの取得 ---
@@ -53,6 +54,14 @@ local function findGrabbedTarget()
     end
     return nil
 end
+
+-- 固定した対象を可視化するためのSelectionBox
+local selectionBox = Instance.new("SelectionBox")
+selectionBox.Name = "AnchorSelectionBox"
+selectionBox.Color3 = Color3.fromRGB(0, 170, 255) -- 水色
+selectionBox.LineThickness = 0.05
+selectionBox.Adornee = nil
+selectionBox.Parent = game:GetService("CoreGui")
 
 -- --- メインロジック監視 ---
 if grabNotify then
@@ -91,7 +100,9 @@ if grabNotify then
                 end
                 
                 -- 状態をリセット
-                selectionBox.Adornee = nil
+                if selectionBox then
+                    selectionBox.Adornee = nil
+                end
 
                 -- 投げた後に少し待ってから参照を消す
                 task.delay(0.1, function() lastGrabbedPart = nil end)
@@ -100,45 +111,35 @@ if grabNotify then
     end)
 end
 
--- --- UI構成 ---
--- スマホ用固定ボタン
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "CustomAnchorGui"
-screenGui.Parent = game:GetService("CoreGui")
-
-local anchorButton = Instance.new("TextButton")
-anchorButton.Name = "AnchorButton"
-anchorButton.Text = "固定"
-anchorButton.Size = UDim2.new(0, 100, 0, 50)
-anchorButton.Position = UDim2.new(0.5, -50, 0.85, 0) -- 画面下中央
-anchorButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-anchorButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-anchorButton.BorderColor3 = Color3.fromRGB(200, 200, 200)
-anchorButton.BorderSizePixel = 2
-anchorButton.Parent = screenGui
-
--- 固定した対象を可視化するためのSelectionBox
-local selectionBox = Instance.new("SelectionBox")
-selectionBox.Name = "AnchorSelectionBox"
-selectionBox.Color3 = Color3.fromRGB(0, 170, 255) -- 水色
-selectionBox.LineThickness = 0.05
-selectionBox.Adornee = nil
-selectionBox.Parent = game:GetService("CoreGui")
-
-anchorButton.MouseButton1Click:Connect(function()
-    if lastGrabbedPart and lastGrabbedPart.Parent then
-        pcall(function()
-            -- ネットワークオーナーを自分に設定して、他のプレイヤーにも見えるようにする
-            lastGrabbedPart:SetNetworkOwner(localPlayer)
-            task.wait(0.05) -- ネットワークの同期を待つ
-            lastGrabbedPart.Anchored = true
-            selectionBox.Adornee = lastGrabbedPart
-        end)
+local function handleAnchorAction(actionName, inputState, inputObject)
+    if inputState == Enum.UserInputState.Begin then
+        if lastGrabbedPart and lastGrabbedPart.Parent then
+            pcall(function()
+                -- ネットワークオーナーを自分に設定して、他のプレイヤーにも見えるようにする
+                lastGrabbedPart:SetNetworkOwner(localPlayer)
+                task.wait(0.05) -- ネットワークの同期を待つ
+                lastGrabbedPart.Anchored = true
+                selectionBox.Adornee = lastGrabbedPart
+            end)
+        end
     end
-end)
+end
 
 -- --- UI構成 ---
 local MainTab = Window:MakeTab({ Name = "Main", Icon = "rbxassetid://4483345998" })
+
+MainTab:AddToggle({
+    Name = "固定ボタン表示 (スマホ用)",
+    Default = false,
+    Callback = function(v)
+        if v then
+            ContextActionService:BindAction("AnchorAction", handleAnchorAction, true, Enum.KeyCode.H)
+            ContextActionService:SetTitle("AnchorAction", "固定")
+        else
+            ContextActionService:UnbindAction("AnchorAction")
+        end
+    end
+})
 
 MainTab:AddSection({ Name = "Throw Settings" })
 
