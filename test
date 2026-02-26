@@ -214,12 +214,14 @@ local function createPianoUI()
     closeBtn.Text = "X"
     closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
     closeBtn.TextColor3 = Color3.new(1,1,1)
-    closeBtn.Activated:Connect(function()
-        stopSong()
-        manualPlayEnabled = false
-        pianoUIGui.Enabled = false
-        if UIElements.PianoManualUIToggle then
-            UIElements.PianoManualUIToggle:Set(false)
+    closeBtn.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            stopSong()
+            manualPlayEnabled = false
+            pianoUIGui.Enabled = false
+            if UIElements.PianoManualUIToggle then
+                UIElements.PianoManualUIToggle:Set(false)
+            end
         end
     end)
 
@@ -234,16 +236,18 @@ local function createPianoUI()
     recBtn.Text = "録音"
     recBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
     recBtn.TextColor3 = Color3.new(1,1,1)
-    recBtn.Activated:Connect(function()
-        isRecording = not isRecording
-        if isRecording then
-            recordedNotes = {}
-            recordStartTime = tick()
-            recBtn.Text = "停止"
-            OrionLib:MakeNotification({Name="録音", Content="録音を開始しました", Time=2})
-        else
-            recBtn.Text = "録音"
-            OrionLib:MakeNotification({Name="録音", Content="録音を停止しました", Time=2})
+    recBtn.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            isRecording = not isRecording
+            if isRecording then
+                recordedNotes = {}
+                recordStartTime = tick()
+                recBtn.Text = "停止"
+                OrionLib:MakeNotification({Name="録音", Content="録音を開始しました", Time=2})
+            else
+                recBtn.Text = "録音"
+                OrionLib:MakeNotification({Name="録音", Content="録音を停止しました", Time=2})
+            end
         end
     end)
     
@@ -261,8 +265,10 @@ local function createPianoUI()
     saveBtn.Text = "保存"
     saveBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
     saveBtn.TextColor3 = Color3.new(1,1,1)
-    saveBtn.Activated:Connect(function()
-        if _G.HolonSaveRecording then _G.HolonSaveRecording(nameBox.Text) end
+    saveBtn.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            if _G.HolonSaveRecording then _G.HolonSaveRecording(nameBox.Text) end
+        end
     end)
 
     local keysContainer = Instance.new("Frame", mainFrame)
@@ -297,7 +303,11 @@ local function createPianoUI()
     for i, keyName in ipairs(whiteKeys) do
         local btn = Instance.new("TextButton", whiteKeysFrame)
         btn.Name = keyName; btn.Size = UDim2.new(whiteKeyWidth, -1, 1, 0); btn.BackgroundColor3 = Color3.new(1, 1, 1); btn.BorderColor3 = Color3.new(0, 0, 0); btn.LayoutOrder = i; btn.Text = ""
-        btn.Activated:Connect(function() task.spawn(pressPianoKey, keyName) end)
+        btn.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                task.spawn(pressPianoKey, keyName)
+            end
+        end)
         
         -- キー表示
         if _G.HolonPianoKeyMapReverse then
@@ -311,7 +321,11 @@ local function createPianoUI()
             local blackKeyName = blackKeys[keyName]
             local blackBtn = Instance.new("TextButton", blackKeysFrame)
             blackBtn.Name = blackKeyName; blackBtn.AnchorPoint = Vector2.new(0.5, 0); blackBtn.Position = UDim2.new(whiteKeyWidth * i, 0, 0, 0); blackBtn.Size = UDim2.new(whiteKeyWidth * 0.6, 0, 1, 0); blackBtn.BackgroundColor3 = Color3.new(0, 0, 0); blackBtn.BorderColor3 = Color3.new(0.5, 0.5, 0.5); blackBtn.Text = ""; blackBtn.ZIndex = 3
-            blackBtn.Activated:Connect(function() task.spawn(pressPianoKey, blackKeyName) end)
+            blackBtn.InputBegan:Connect(function(input)
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                    task.spawn(pressPianoKey, blackKeyName)
+                end
+            end)
             if _G.HolonPianoKeyMapReverse then
                 blackBtn.Text = _G.HolonPianoKeyMapReverse[blackKeyName] or ""
                 blackBtn.TextColor3 = Color3.new(1,1,1)
@@ -2067,7 +2081,7 @@ local function StartHolonHUB()
     end)
 
     local Window = OrionLib:MakeWindow({
-        Name = "Holon HUB v1.4.3",
+        Name = "Holon HUB v1.4.0",
         HidePremium = false,
         SaveConfig = false, -- 初期化時の干渉を防ぐため無効化
         ConfigFolder = "HolonHUB",
