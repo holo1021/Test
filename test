@@ -1,7 +1,7 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-    Name = "KickBeta Script | Blobman & Sakura",
+    Name = "Kick Script (Nearby Only)",
     LoadingTitle = "KickBeta Script Loading...",
     LoadingSubtitle = "by Lulu",
     ConfigurationSaving = { Enabled = false }
@@ -17,7 +17,7 @@ local LP = Players.LocalPlayer
 local ToggleStatus = {
     KickAll = false,
     ProtectFriends = false,
-    AntiGrab = false
+    KickRange = 50
 }
 
 -- ====================================================================
@@ -43,15 +43,22 @@ end
 -- タブ作成
 -- ====================================================================
 
-local MainTab = Window:CreateTab("Main (Blobman)", 7733916988)
-local SakuraTab = Window:CreateTab("External Hubs", 4483362458)
-local MiscTab = Window:CreateTab("Misc", 4483345998)
+local MainTab = Window:CreateTab("Kick Settings", 7733916988)
 
 -- --- Main Tab (Blobman機能) ---
 MainTab:CreateToggle({
     Name = "Protect Friends (フレンド保護)",
     CurrentValue = false,
     Callback = function(V) ToggleStatus.ProtectFriends = V end,
+})
+
+MainTab:CreateSlider({
+   Name = "Kick Range (範囲)",
+   Range = {10, 300},
+   Increment = 5,
+   Suffix = "Studs",
+   CurrentValue = 50,
+   Callback = function(Value) ToggleStatus.KickRange = Value end,
 })
 
 MainTab:CreateToggle({
@@ -67,7 +74,8 @@ MainTab:CreateToggle({
                         if not ToggleStatus.KickAll then break end
                         if target ~= LP and target.Character and (not ToggleStatus.ProtectFriends or not LP:IsFriendsWith(target.UserId)) then
                             local hrp = target.Character:FindFirstChild("HumanoidRootPart")
-                            if hrp then
+                            local myHrp = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
+                            if hrp and myHrp and (hrp.Position - myHrp.Position).Magnitude <= ToggleStatus.KickRange then
                                 pcall(function()
                                     -- 1. ターゲットの位置へ移動
                                     b.PrimaryPart.Anchored = false
@@ -108,39 +116,3 @@ MainTab:CreateToggle({
         end)
     end,
 })
-
--- --- Sakura Hub Tab ---
-SakuraTab:CreateSection("Sakura Hub")
-
-SakuraTab:CreateButton({
-    Name = "Load Sakura Hub (サクラハブを起動)",
-    Callback = function()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/syumagamingdesu-wq/Sakura-hub/refs/heads/main/FTAP.lua"))()
-        Rayfield:Notify({
-            Title = "Success",
-            Content = "Sakura Hub has been loaded!",
-            Duration = 5,
-            Image = 4483362458,
-        })
-    end,
-})
-
--- --- Misc Tab (その他便利機能) ---
-MiscTab:CreateToggle({
-    Name = "Anti Grab (掴み無効化)",
-    CurrentValue = false,
-    Callback = function(Value)
-        ToggleStatus.AntiGrab = Value
-    end,
-})
-
--- 掴み無効化の実行ループ
-RunService.Stepped:Connect(function()
-    if ToggleStatus.AntiGrab and LP.Character then
-        for _, v in ipairs(LP.Character:GetDescendants()) do
-            if v:IsA("Weld") or v:IsA("ManualWeld") then
-                v:Destroy()
-            end
-        end
-    end
-end)
