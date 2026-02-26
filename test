@@ -3881,15 +3881,13 @@ PianoManualSec:AddToggle({
     Default = false,
     Callback = function(v)
         manualPlayEnabled = v
-        if v then
-            if not pianoUIGui then
-                createPianoUI()
-            end
-
-                   pianoUIGui.Enabled = v
-            pianoUIGui.Enabled = true
-        else
-            if pianoUIGui then pianoUIGui.Enabled = false end
+        -- UIが必要で、まだ作られていない場合にのみ作成
+        if v and not pianoUIGui then
+            createPianoUI()
+        end
+        -- UIが存在すれば、表示状態を切り替える
+        if pianoUIGui then
+            pianoUIGui.Enabled = v
         end
     end
 })
@@ -3928,8 +3926,6 @@ PianoManualSec:AddButton({
                 })
             else
                 warn("Key1Cが見つかりません")
-
-           end
             end
         end
     end
