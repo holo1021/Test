@@ -450,6 +450,8 @@ local function canPressPianoKey()
     return pianoEnabled
 end
 local function pressPianoKey(keyName)
+    if not canPressPianoKey() then return end
+
     -- 毎回直接 MusicKeyboard を探しに行く
     local targetKeyboard = getMusicKeyboard()
     
@@ -705,6 +707,7 @@ local isReturningToPlot = false -- Plot帰還中のフラグ（重要）
 local espCache = {}
 local espCfg = { Enabled = false, Names = true, Tracers = false, Hitbox = false, HitboxSize = 10, ESPColor = Color3.new(1, 0, 0), TargetOnly = false }
 
+local voiceChatTargets = {}
 -- プレイヤー設定用変数
 local walkSpeed = 16
 local jumpPower = 25
@@ -1710,6 +1713,23 @@ local function updateSubFeatures()
                     root.Transparency = 1
                 end
             end
+
+            -- ボイスチャット拡張ロジック
+            if char and char:FindFirstChild("Head") then
+                local head = char.Head
+                -- "Voice"という名前のSoundを再帰的に探す
+                local voiceSound = head:FindFirstChild("Voice", true) 
+                if voiceSound and voiceSound:IsA("Sound") then
+                    if voiceChatTargets[p.Name] then
+                        voiceSound.RollOffMaxDistance = 10000
+                    else
+                        -- 自分が設定した値より大きい場合のみデフォルトに戻す
+                        if voiceSound.RollOffMaxDistance > 1000 then
+                            voiceSound.RollOffMaxDistance = 100 -- デフォルト値
+                        end
+                    end
+                end
+            end
         end
     end
 end
@@ -2394,9 +2414,9 @@ UIElements.EffectToggle = MainSec:AddToggle({
 UIElements.ModeDropdown = MainSec:AddDropdown({
 	Name = "モード選択",
 	Default = "Wing",
-	Options = {"Wing","Heart","Star","Vortex","Sphere","Rotate","Pet","Text","MagicCircle","MagicCircle2","MagicCircle3","FloatStone","Merkaba","Cube","MirrorPlayer","Beam","BackGuard","Tornado", "なし"},
+	Options = {"Wing","Heart","Star","Vortex","Sphere","Rotate","Pet","Text","MagicCircle","MagicCircle2","MagicCircle3","FloatStone","Merkaba","Cube","MirrorPlayer","Beam","BackGuard","Tornado"},
 	Callback = function(v)
-		currentMode = (v == "なし") and "なし" or v
+		currentMode = v
 		combinedActive = false
 	end    
 })
@@ -3310,6 +3330,21 @@ UIElements.EspColor = EspSec:AddColorpicker({
         espCfg.ESPColor = v
     end	  
 })
+
+local VoiceChatSec = SubTab:AddSection({ Name = "ボイスチャット拡張" })
+VoiceChatSec:AddParagraph("Info", "選択したプレイヤーの声が遠くからでも聞こえるようになります。新しい人が参加した場合は、お手数ですがスクリプトを再実行してリストを更新してください。")
+
+for _, p in ipairs(Players:GetPlayers()) do
+    if p ~= LocalPlayer then
+        VoiceChatSec:AddToggle({
+            Name = p.DisplayName,
+            Default = false,
+            Callback = function(v)
+                voiceChatTargets[p.Name] = v
+            end
+        })
+    end
+end
 
 local BarrierSec = SubTab:AddSection({
     Name = "バリア破壊"
