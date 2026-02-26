@@ -180,6 +180,11 @@ local pianoUpdateConnection = nil
 local lastPianoCF = nil
 local pianoOriginalCollisions = {}
 
+-- 録音機能用変数
+local isRecording = false
+local recordedNotes = {}
+local recordStartTime = 0
+
 -- ピアノ手動演奏UI
 local pianoUIGui = nil
 local function createPianoUI()
@@ -190,24 +195,83 @@ local function createPianoUI()
     pianoUIGui.Parent = game:GetService("CoreGui")
     pianoUIGui.Enabled = false
     pianoUIGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
+    pianoUIGui.DisplayOrder = 100 -- 最前面に表示
     pianoUIGui.ResetOnSpawn = false
 
     local mainFrame = Instance.new("Frame")
     mainFrame.AnchorPoint = Vector2.new(0.5, 1)
-    mainFrame.Position = UDim2.new(0.5, 0, 1, -10)
-    mainFrame.Size = UDim2.new(0, 800, 0, 150)
+    mainFrame.Position = UDim2.new(0.5, 0, 0.95, 0)
+    mainFrame.Size = UDim2.new(0, 500, 0, 140) -- サイズ縮小
     mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
     mainFrame.BackgroundTransparency = 0.3
     mainFrame.Parent = pianoUIGui
+    
+    -- 閉じるボタン
+    local closeBtn = Instance.new("TextButton", mainFrame)
+    closeBtn.Size = UDim2.new(0, 20, 0, 20)
+    closeBtn.Position = UDim2.new(1, -25, 0, 5)
+    closeBtn.Text = "X"
+    closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    closeBtn.TextColor3 = Color3.new(1,1,1)
+    closeBtn.Activated:Connect(function()
+        pianoUIGui.Enabled = false
+    end)
 
-    local whiteKeysFrame = Instance.new("Frame", mainFrame)
+    -- 録音・保存UI
+    local recFrame = Instance.new("Frame", mainFrame)
+    recFrame.Size = UDim2.new(1, -40, 0, 25)
+    recFrame.Position = UDim2.new(0, 10, 0, 5)
+    recFrame.BackgroundTransparency = 1
+    
+    local recBtn = Instance.new("TextButton", recFrame)
+    recBtn.Size = UDim2.new(0, 50, 1, 0)
+    recBtn.Text = "録音"
+    recBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    recBtn.TextColor3 = Color3.new(1,1,1)
+    recBtn.Activated:Connect(function()
+        isRecording = not isRecording
+        if isRecording then
+            recordedNotes = {}
+            recordStartTime = tick()
+            recBtn.Text = "停止"
+            OrionLib:MakeNotification({Name="録音", Content="録音を開始しました", Time=2})
+        else
+            recBtn.Text = "録音"
+            OrionLib:MakeNotification({Name="録音", Content="録音を停止しました", Time=2})
+        end
+    end)
+    
+    local nameBox = Instance.new("TextBox", recFrame)
+    nameBox.Size = UDim2.new(0, 120, 1, 0)
+    nameBox.Position = UDim2.new(0, 60, 0, 0)
+    nameBox.PlaceholderText = "ファイル名"
+    nameBox.Text = ""
+    nameBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    nameBox.TextColor3 = Color3.new(1,1,1)
+
+    local saveBtn = Instance.new("TextButton", recFrame)
+    saveBtn.Size = UDim2.new(0, 50, 1, 0)
+    saveBtn.Position = UDim2.new(0, 190, 0, 0)
+    saveBtn.Text = "保存"
+    saveBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+    saveBtn.TextColor3 = Color3.new(1,1,1)
+    saveBtn.Activated:Connect(function()
+        if _G.HolonSaveRecording then _G.HolonSaveRecording(nameBox.Text) end
+    end)
+
+    local keysContainer = Instance.new("Frame", mainFrame)
+    keysContainer.Size = UDim2.new(1, 0, 1, -35)
+    keysContainer.Position = UDim2.new(0, 0, 0, 35)
+    keysContainer.BackgroundTransparency = 1
+
+    local whiteKeysFrame = Instance.new("Frame", keysContainer)
     whiteKeysFrame.Size = UDim2.new(1, 0, 1, 0)
     whiteKeysFrame.BackgroundTransparency = 1
     local whiteLayout = Instance.new("UIListLayout", whiteKeysFrame)
     whiteLayout.FillDirection = Enum.FillDirection.Horizontal
     whiteLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
-    local blackKeysFrame = Instance.new("Frame", mainFrame)
+    local blackKeysFrame = Instance.new("Frame", keysContainer)
     blackKeysFrame.Size = UDim2.new(1, 0, 0.6, 0)
     blackKeysFrame.BackgroundTransparency = 1
     blackKeysFrame.ZIndex = 2
@@ -228,12 +292,26 @@ local function createPianoUI()
         local btn = Instance.new("TextButton", whiteKeysFrame)
         btn.Name = keyName; btn.Size = UDim2.new(whiteKeyWidth, -1, 1, 0); btn.BackgroundColor3 = Color3.new(1, 1, 1); btn.BorderColor3 = Color3.new(0, 0, 0); btn.LayoutOrder = i; btn.Text = ""
         btn.Activated:Connect(function() task.spawn(pressPianoKey, keyName) end)
+        
+        -- キー表示
+        if _G.HolonPianoKeyMapReverse then
+            btn.Text = _G.HolonPianoKeyMapReverse[keyName] or ""
+            btn.TextSize = 14
+            btn.TextColor3 = Color3.new(0,0,0)
+            btn.TextYAlignment = Enum.TextYAlignment.Bottom
+        end
 
         if blackKeys[keyName] then
             local blackKeyName = blackKeys[keyName]
             local blackBtn = Instance.new("TextButton", blackKeysFrame)
             blackBtn.Name = blackKeyName; blackBtn.AnchorPoint = Vector2.new(0.5, 0); blackBtn.Position = UDim2.new(whiteKeyWidth * i, 0, 0, 0); blackBtn.Size = UDim2.new(whiteKeyWidth * 0.6, 0, 1, 0); blackBtn.BackgroundColor3 = Color3.new(0, 0, 0); blackBtn.BorderColor3 = Color3.new(0.5, 0.5, 0.5); blackBtn.Text = ""; blackBtn.ZIndex = 3
             blackBtn.Activated:Connect(function() task.spawn(pressPianoKey, blackKeyName) end)
+            if _G.HolonPianoKeyMapReverse then
+                blackBtn.Text = _G.HolonPianoKeyMapReverse[blackKeyName] or ""
+                blackBtn.TextColor3 = Color3.new(1,1,1)
+                blackBtn.TextSize = 12
+                blackBtn.TextYAlignment = Enum.TextYAlignment.Bottom
+            end
         end
     end
 end
@@ -360,6 +438,12 @@ local pianoKeyMap = {
     ["v"] = "Key2Asharp"
 }
 
+-- 逆引きマップをグローバルに保存してUIから参照可能にする
+_G.HolonPianoKeyMapReverse = {}
+for k, v in pairs(pianoKeyMap) do
+    _G.HolonPianoKeyMapReverse[v] = k:upper()
+end
+
 -- 1. 鍵盤を叩く関数
 local function pressPianoKey(keyName)
     -- 毎回直接 MusicKeyboard を探しに行く
@@ -375,6 +459,11 @@ local function pressPianoKey(keyName)
         
         -- 指定の待機時間
         task.wait(0.15)
+    end
+    
+    -- 録音処理
+    if isRecording then
+        table.insert(recordedNotes, {key = keyName, time = tick()})
     end
 end
 
@@ -435,6 +524,48 @@ end
 -- 曲の再生を停止
 local function stopSong()
     isPlayingSong = false
+end
+
+-- 録音保存関数 (UIから呼び出し)
+_G.HolonSaveRecording = function(filename)
+    if #recordedNotes == 0 then 
+        OrionLib:MakeNotification({Name="保存", Content="録音データがありません", Time=3})
+        return 
+    end
+    
+    -- ノート間の遅延を計算して保存用データを作成
+    local finalData = {}
+    for i = 1, #recordedNotes do
+        local current = recordedNotes[i]
+        local nextNote = recordedNotes[i+1]
+        local delay = 0.1
+        if nextNote then
+            delay = nextNote.time - current.time
+        end
+        table.insert(finalData, {key = current.key, delay = delay})
+    end
+    
+    local fname = filename
+    if not fname or fname == "" then
+        -- 自動命名: Test_1, Test_2 ...
+        local idx = 1
+        while isfile("FTAP_Notes/Test_" .. idx .. ".json") do
+            idx = idx + 1
+        end
+        fname = "Test_" .. idx
+    end
+    
+    if not fname:match("%.json$") then fname = fname .. ".json" end
+    
+    local success, json = pcall(function() return HttpService:JSONEncode(finalData) end)
+    if success then
+        writefile("FTAP_Notes/" .. fname, json)
+        OrionLib:MakeNotification({Name="保存", Content=fname.." を保存しました", Time=3})
+        -- 録音状態リセット
+        isRecording = false
+    else
+        warn("JSON Encode Error")
+    end
 end
 
 --------------------------------------------------------------------------------
@@ -523,7 +654,7 @@ local defaultConfig = {
     Wing = { Size = 30, Gap = 3.0, Speed = 6, Height = 0.5, Back = 0, Joints = 3, V_Angle = 0, Tilt = 0, Strength = 15, RootFixed = true }, -- RootFixedを追加
     Heart = { Size = 8, Speed = 2, Height = 5, Back = 2 },
     Star = { Size = 10, Speed = 2, Height = 5, Back = 0 },
-    Vortex = { Size = 12, Speed = 3, Height = 0, Back = 0 },
+    Vortex = { Size = 5, Speed = 3, Height = 0, Back = 0 },
     Sphere = { Size = 30, Speed = 30, Height = 5, Back = 0 },
     Rotate = { Size = 15, Speed = 6, Height = 7, Back = 0 },
     Pet = { Size = 8, Speed = 2, Height = 4, Back = 12, Count = 2, Joints = 3, Gap = 13 },
@@ -538,11 +669,11 @@ local defaultConfig = {
     Beam = { Size = 60, Speed = 50, Height = 0.5, Back = 0, Count = 8 },
     BackGuard = { Size = 10, Speed = 2, Height = 2, Back = 15 },
     Tornado = { Size = 20, Speed = 5, Height = 0, Back = 0, Radius = 5, TopRadius = 20 },
-    Combined = {Mode1 = "Wing", Mode2 = "Merkaba", Mode3 = "なし", Mode1Count = 15, Mode2Count = 15, Mode3Count = 0 },
+    Combined = {Mode1 = "Wing", Mode2 = "Merkaba", Mode3 = "なし", Mode1Count = 15, Mode2Count = 15, Mode3Count = 0},
     AnimSpeed = 1.0,
     PlotReturn = { Enabled = false, Interval = 30, PlotCFrame = nil},
     GrabMod = { Kill = false, Noclip = false, Spin = false, SuperThrow = false, ThrowPower = 500 },
-    Global = { MaxToys = 30 },
+    Global = { MaxToys = 30, EffectRotation = Vector3.new(0,0,0), IndividualRotation = Vector3.new(0, -90, 0) },
 }
 
 -- Deep Copy Helper
@@ -560,8 +691,8 @@ local useOtherToys = false
 local isEnabled, currentMode, combinedActive = false, "Wing", false
 local followPlayer = true
 local lastBaseCF = nil
-local targetMain, targetSub = LocalPlayer, LocalPlayer
-local GLOBAL_ANGLE, autoWidth = -90, true
+local targetMain, targetSub = LocalPlayer, LocalPlayer    
+local autoWidth = true
 local activeToys = {}        -- {A0, A1, AP, AO, Part}
 local originalCollisions = {} -- {Part: Boolean}
 local updateConnection = nil
@@ -1295,8 +1426,16 @@ local function startEffect()
     end
 
     local t = tick()
-    local individualRotation = CFrame.Angles(0, math.rad(GLOBAL_ANGLE), 0)
+    
+    -- エフェクト全体の回転を計算
+    local effectRot = cfg.Global.EffectRotation or Vector3.zero
+    local effectRotationCF = CFrame.Angles(math.rad(effectRot.X), math.rad(effectRot.Y), math.rad(effectRot.Z))
+    local rotatedBaseCF = baseCF * effectRotationCF
 
+    -- おもちゃ個別の回転を計算
+    local indivRot = cfg.Global.IndividualRotation or Vector3.new(0, -90, 0)
+    local individualRotation = CFrame.Angles(math.rad(indivRot.X), math.rad(indivRot.Y), math.rad(indivRot.Z))
+    
     for i, fw in ipairs(activeToys) do
         -- 奈落判定
         if fw.Part.Position.Y <= -90 then
@@ -1332,15 +1471,15 @@ local function startEffect()
 
             if m and m ~= "なし" then
                 local relativePos = getPositionForMode(m, relIdx, relTotal, t)
-                local worldPos = baseCF:PointToWorldSpace(relativePos)
+                local worldPos = rotatedBaseCF:PointToWorldSpace(relativePos)
                 fw.AP.Position = worldPos
                 if m == "BackGuard" then
-                    fw.AO.CFrame = CFrame.lookAt(worldPos, baseCF.Position) * individualRotation
+                    fw.AO.CFrame = CFrame.lookAt(worldPos, rotatedBaseCF.Position) * individualRotation
                 elseif m == "Rotate" or m == "MagicCircle" or m == "FloatStone" or m == "Merkaba" or m == "Cube" or m == "Tornado" then
-                    local nextPos = baseCF:PointToWorldSpace(getPositionForMode(m, relIdx, relTotal, t + 0.05))
+                    local nextPos = rotatedBaseCF:PointToWorldSpace(getPositionForMode(m, relIdx, relTotal, t + 0.05))
                     fw.AO.CFrame = CFrame.lookAt(worldPos, nextPos) * individualRotation
                 else
-                    fw.AO.CFrame = baseCF * individualRotation
+                    fw.AO.CFrame = rotatedBaseCF * individualRotation
                 end
             else
                 fw.AP.Position = Vector3.new(0, -10000, 0)
@@ -2645,12 +2784,6 @@ GlobalSec:AddButton({
     end
 })
 
-UIElements.OrientationSlider = GlobalSec:AddSlider({
-    Name = "おもちゃ自体の向き",
-    Min = -180, Max = 180, Default = -90,
-    Callback = function(v) GLOBAL_ANGLE = v end
-})
-
 UIElements.MaxToysSlider = GlobalSec:AddSlider({
     Name = "使用するおもちゃの最大数",
     Min = 1, Max = 200, Default = cfg.Global.MaxToys or 100,
@@ -2752,6 +2885,34 @@ CoordSec:AddButton({
     end
 })
 
+local EffectRotSec = ConfigTab:AddSection({ Name = "エフェクト全体の向き" })
+UIElements.EffectRotationX = EffectRotSec:AddSlider({
+    Name = "X軸 (Pitch)", Min = -180, Max = 180, Default = 0,
+    Callback = function(v) cfg.Global.EffectRotation = Vector3.new(v, cfg.Global.EffectRotation.Y, cfg.Global.EffectRotation.Z) end
+})
+UIElements.EffectRotationY = EffectRotSec:AddSlider({
+    Name = "Y軸 (Yaw)", Min = -180, Max = 180, Default = 0,
+    Callback = function(v) cfg.Global.EffectRotation = Vector3.new(cfg.Global.EffectRotation.X, v, cfg.Global.EffectRotation.Z) end
+})
+UIElements.EffectRotationZ = EffectRotSec:AddSlider({
+    Name = "Z軸 (Roll)", Min = -180, Max = 180, Default = 0,
+    Callback = function(v) cfg.Global.EffectRotation = Vector3.new(cfg.Global.EffectRotation.X, cfg.Global.EffectRotation.Y, v) end
+})
+
+local IndivRotSec = ConfigTab:AddSection({ Name = "おもちゃ自体の向き" })
+UIElements.IndividualRotationX = IndivRotSec:AddSlider({
+    Name = "X軸 (Pitch)", Min = -180, Max = 180, Default = 0,
+    Callback = function(v) cfg.Global.IndividualRotation = Vector3.new(v, cfg.Global.IndividualRotation.Y, cfg.Global.IndividualRotation.Z) end
+})
+UIElements.IndividualRotationY = IndivRotSec:AddSlider({
+    Name = "Y軸 (Yaw)", Min = -180, Max = 180, Default = -90,
+    Callback = function(v) cfg.Global.IndividualRotation = Vector3.new(cfg.Global.IndividualRotation.X, v, cfg.Global.IndividualRotation.Z) end
+})
+UIElements.IndividualRotationZ = IndivRotSec:AddSlider({
+    Name = "Z軸 (Roll)", Min = -180, Max = 180, Default = 0,
+    Callback = function(v) cfg.Global.IndividualRotation = Vector3.new(cfg.Global.IndividualRotation.X, cfg.Global.IndividualRotation.Y, v) end
+})
+
 ----- データ管理 ---
 local SaveSec = ConfigTab:AddSection({Name = "データ管理 (リアルタイム更新)"})
 
@@ -2796,7 +2957,19 @@ SaveSec:AddButton({
                         currentMode = s.CurrentMode or "Wing"
                         combinedActive = s.CombinedActive or false
                         followPlayer = s.FollowPlayer or true
-                        GLOBAL_ANGLE = s.GlobalAngle or -90
+                        
+                        local effectRot = s.EffectRotation
+                        if effectRot and type(effectRot) == "table" then
+                            cfg.Global.EffectRotation = Vector3.new(effectRot.X or 0, effectRot.Y or 0, effectRot.Z or 0)
+                        else
+                            cfg.Global.EffectRotation = Vector3.new(0,0,0)
+                        end
+                        local indivRot = s.IndividualRotation
+                        if indivRot and type(indivRot) == "table" then
+                            cfg.Global.IndividualRotation = Vector3.new(indivRot.X or 0, indivRot.Y or -90, indivRot.Z or 0)
+                        else
+                            cfg.Global.IndividualRotation = Vector3.new(0,-90,0)
+                        end
                         useOtherToys = s.UseOtherToys or false
                         autoWidth = s.AutoWidth or true
                         if s.Esp then espCfg = s.Esp end
@@ -2815,8 +2988,13 @@ SaveSec:AddButton({
                         if UIElements.EffectToggle then UIElements.EffectToggle:Set(isEnabled) end
                         if UIElements.ModeDropdown then UIElements.ModeDropdown:Set(currentMode) end
                         if UIElements.CombinedToggle then UIElements.CombinedToggle:Set(combinedActive) end
-                        if UIElements.FollowToggle then UIElements.FollowToggle:Set(followPlayer) end
-                        if UIElements.OrientationSlider then UIElements.OrientationSlider:Set(GLOBAL_ANGLE) end
+                        if UIElements.FollowToggle then UIElements.FollowToggle:Set(followPlayer) end                        
+                        if UIElements.EffectRotationX then UIElements.EffectRotationX:Set(cfg.Global.EffectRotation.X) end
+                        if UIElements.EffectRotationY then UIElements.EffectRotationY:Set(cfg.Global.EffectRotation.Y) end
+                        if UIElements.EffectRotationZ then UIElements.EffectRotationZ:Set(cfg.Global.EffectRotation.Z) end
+                        if UIElements.IndividualRotationX then UIElements.IndividualRotationX:Set(cfg.Global.IndividualRotation.X) end
+                        if UIElements.IndividualRotationY then UIElements.IndividualRotationY:Set(cfg.Global.IndividualRotation.Y) end
+                        if UIElements.IndividualRotationZ then UIElements.IndividualRotationZ:Set(cfg.Global.IndividualRotation.Z) end
                         if UIElements.MaxToysSlider then UIElements.MaxToysSlider:Set(cfg.Global.MaxToys) end
                         if UIElements.AutoWidthToggle then UIElements.AutoWidthToggle:Set(autoWidth) end
                         if UIElements.AnimSpeedSlider then UIElements.AnimSpeedSlider:Set(cfg.AnimSpeed * 10) end
@@ -2925,7 +3103,8 @@ SaveSec:AddButton({
                 CurrentMode = currentMode,
                 CombinedActive = combinedActive,
                 FollowPlayer = followPlayer,
-                GlobalAngle = GLOBAL_ANGLE,
+                EffectRotation = cfg.Global.EffectRotation,
+                IndividualRotation = cfg.Global.IndividualRotation,
                 UseOtherToys = useOtherToys,
                 AutoWidth = autoWidth,
                 Esp = espCfg, -- ESP設定(テーブル)も保存
@@ -3708,6 +3887,19 @@ PianoManualSec:AddToggle({
         end
     end
 })
+
+-- PCキーボード入力対応
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if not pianoEnabled then return end
+    
+    if input.UserInputType == Enum.UserInputType.Keyboard then
+        local char = UserInputService:GetStringForKeyCode(input.KeyCode):lower()
+        if pianoKeyMap[char] then
+            pressPianoKey(pianoKeyMap[char])
+        end
+    end
+end)
 
 -- PianoManualSecの下に追加
 PianoManualSec:AddButton({
