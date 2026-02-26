@@ -1779,7 +1779,7 @@ local function updateSubFeatures()
     end
 end
 
-RunService.RenderStepped:Connect(updateSubFeatures)
+RunService.Heartbeat:Connect(updateSubFeatures)
 
 -- プレイヤー機能ループ
 UserInputService.JumpRequest:Connect(function()
@@ -2069,7 +2069,7 @@ local function StartHolonHUB()
     end)
 
     local Window = OrionLib:MakeWindow({
-        Name = "Holon HUB v1.4.1",
+        Name = "Holon HUB v1.4.0",
         HidePremium = false,
         SaveConfig = false, -- 初期化時の干渉を防ぐため無効化
         ConfigFolder = "HolonHUB",
@@ -3983,25 +3983,21 @@ UIElements.PianoManualUIToggle = PianoManualSec:AddToggle({
     Default = false,
     Callback = function(v)
         manualPlayEnabled = v
-        if v then -- If turning ON
-            -- 1. Try to enable the main piano feature
-            if not pianoEnabled then
-                UIElements.PianoEnabled:Set(true) -- This triggers the keyboard search
-            end
-
-            -- 2. After the attempt, check if it was successful
-            task.wait() -- Give the other callback a moment to run
-            if pianoEnabled then
-                -- Success: Create and show the UI
+        if v then
+            pianoKeyboard = getMusicKeyboard()
+            if pianoKeyboard then
+                pianoEnabled = true
+                if UIElements.PianoEnabled then UIElements.PianoEnabled:Set(true) end
                 if not pianoUIGui then createPianoUI() end
                 if pianoUIGui then pianoUIGui.Enabled = true end
             else
-                -- Failure: Revert this toggle
+                pianoEnabled = false
                 manualPlayEnabled = false
-                UIElements.PianoManualUIToggle:Set(false)
-                -- The error notification is already handled by the other toggle's callback
+                if UIElements.PianoEnabled then UIElements.PianoEnabled:Set(false) end
+                if UIElements.PianoManualUIToggle then UIElements.PianoManualUIToggle:Set(false) end
+                OrionLib:MakeNotification({Name = "エラー", Content = "MusicKeyboardが見つかりません", Time = 5})
             end
-        else -- If turning OFF
+        else
             if pianoUIGui then pianoUIGui.Enabled = false end
         end
     end
