@@ -179,6 +179,7 @@ local isPlayingSong = false
 local pianoUpdateConnection = nil
 local lastPianoCF = nil
 local pianoOriginalCollisions = {}
+local manualPlayEnabled = false -- 手動演奏UIの状態管理
 
 -- 録音機能用変数
 local isRecording = false
@@ -215,7 +216,11 @@ local function createPianoUI()
     closeBtn.TextColor3 = Color3.new(1,1,1)
     closeBtn.Activated:Connect(function()
         stopSong()
+        manualPlayEnabled = false
         pianoUIGui.Enabled = false
+        if UIElements.PianoManualUIToggle then
+            UIElements.PianoManualUIToggle:Set(false)
+        end
     end)
 
     -- 録音・保存UI
@@ -468,7 +473,7 @@ local function pressPianoKey(keyName)
     end
     
     -- 録音処理
-    if isRecording and pianoEnabled then
+    if isRecording and canPressPianoKey() then
         table.insert(recordedNotes, {key = keyName, time = tick()})
     end
 end
@@ -1758,10 +1763,12 @@ local function updateSubFeatures()
                 if voiceSound and voiceSound:IsA("Sound") then
                     if voiceChatTargets[p.Name] then
                         voiceSound.RollOffMaxDistance = 10000
+                        voiceSound.RollOffMinDistance = 10000 -- 距離減衰を無効化してはっきり聞こえるようにする
                     else
                         -- 自分が設定した値より大きい場合のみデフォルトに戻す
                         if voiceSound.RollOffMaxDistance > 1000 then
                             voiceSound.RollOffMaxDistance = 100 -- デフォルト値
+                            voiceSound.RollOffMinDistance = 10
                         end
                     end
                 end
@@ -3968,8 +3975,7 @@ local PianoManualSec = PianoTab:AddSection({
     Name = "マニュアル操作・テスト"
 })
 
-local manualPlayEnabled = false
-PianoManualSec:AddToggle({
+UIElements.PianoManualUIToggle = PianoManualSec:AddToggle({
     Name = "手動演奏UIを表示",
     Default = false,
     Callback = function(v)
