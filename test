@@ -193,7 +193,7 @@ local function createPianoUI()
     pianoUIGui = Instance.new("ScreenGui")
     pianoUIGui.Name = "HolonPianoUI"
     pianoUIGui.Parent = game:GetService("CoreGui")
-    pianoUIGui.Enabled = false
+    pianoUIGui.Enabled = manualPlayEnabled
     pianoUIGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
     pianoUIGui.DisplayOrder = 100 -- 最前面に表示
     pianoUIGui.ResetOnSpawn = false
@@ -214,6 +214,7 @@ local function createPianoUI()
     closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
     closeBtn.TextColor3 = Color3.new(1,1,1)
     closeBtn.Activated:Connect(function()
+        stopSong()
         pianoUIGui.Enabled = false
     end)
 
@@ -445,6 +446,9 @@ for k, v in pairs(pianoKeyMap) do
 end
 
 -- 1. 鍵盤を叩く関数
+local function canPressPianoKey()
+    return pianoEnabled
+end
 local function pressPianoKey(keyName)
     -- 毎回直接 MusicKeyboard を探しに行く
     local targetKeyboard = getMusicKeyboard()
@@ -452,7 +456,7 @@ local function pressPianoKey(keyName)
     -- 見つからなければ終了
     if not targetKeyboard then return end
 
-    local key = targetKeyboard:FindFirstChild(keyName, true)
+   local key = targetKeyboard:FindFirstChild(keyName, true)
     if key and key:IsA("BasePart") then
         -- ネットワークオーナーの設定（サーバーへ通知）
         SetNetworkOwner:FireServer(key, key.CFrame)
@@ -462,7 +466,7 @@ local function pressPianoKey(keyName)
     end
     
     -- 録音処理
-    if isRecording then
+    if isRecording and pianoEnabled then
         table.insert(recordedNotes, {key = keyName, time = tick()})
     end
 end
@@ -3881,12 +3885,15 @@ PianoManualSec:AddToggle({
             if not pianoUIGui then
                 createPianoUI()
             end
+
+                   pianoUIGui.Enabled = v
             pianoUIGui.Enabled = true
         else
             if pianoUIGui then pianoUIGui.Enabled = false end
         end
     end
 })
+
 
 -- PCキーボード入力対応
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
@@ -3896,7 +3903,7 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if input.UserInputType == Enum.UserInputType.Keyboard then
         local char = UserInputService:GetStringForKeyCode(input.KeyCode):lower()
         if pianoKeyMap[char] then
-            pressPianoKey(pianoKeyMap[char])
+           if canPressPianoKey() then pressPianoKey(pianoKeyMap[char]) end
         end
     end
 end)
@@ -3907,7 +3914,7 @@ PianoManualSec:AddButton({
     Callback = function()
         if pianoKeyboard then
             local testKey = pianoKeyboard:FindFirstChild("Key1C", true)
-            if testKey then
+           if testKey and canPressPianoKey() then
                 -- 音を鳴らす命令
                 SetNetworkOwner:FireServer(testKey, testKey.CFrame)
                 
@@ -3921,6 +3928,8 @@ PianoManualSec:AddButton({
                 })
             else
                 warn("Key1Cが見つかりません")
+
+           end
             end
         end
     end
