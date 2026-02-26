@@ -214,14 +214,12 @@ local function createPianoUI()
     closeBtn.Text = "X"
     closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
     closeBtn.TextColor3 = Color3.new(1,1,1)
-    closeBtn.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            stopSong()
-            manualPlayEnabled = false
-            pianoUIGui.Enabled = false
-            if UIElements.PianoManualUIToggle then
-                UIElements.PianoManualUIToggle:Set(false)
-            end
+    closeBtn.MouseButton1Click:Connect(function()
+        stopSong()
+        manualPlayEnabled = false
+        pianoUIGui.Enabled = false
+        if UIElements.PianoManualUIToggle then
+            UIElements.PianoManualUIToggle:Set(false)
         end
     end)
 
@@ -236,18 +234,16 @@ local function createPianoUI()
     recBtn.Text = "録音"
     recBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
     recBtn.TextColor3 = Color3.new(1,1,1)
-    recBtn.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            isRecording = not isRecording
-            if isRecording then
-                recordedNotes = {}
-                recordStartTime = tick()
-                recBtn.Text = "停止"
-                OrionLib:MakeNotification({Name="録音", Content="録音を開始しました", Time=2})
-            else
-                recBtn.Text = "録音"
-                OrionLib:MakeNotification({Name="録音", Content="録音を停止しました", Time=2})
-            end
+    recBtn.MouseButton1Click:Connect(function()
+        isRecording = not isRecording
+        if isRecording then
+            recordedNotes = {}
+            recordStartTime = tick()
+            recBtn.Text = "停止"
+            OrionLib:MakeNotification({Name="録音", Content="録音を開始しました", Time=2})
+        else
+            recBtn.Text = "録音"
+            OrionLib:MakeNotification({Name="録音", Content="録音を停止しました", Time=2})
         end
     end)
     
@@ -265,10 +261,8 @@ local function createPianoUI()
     saveBtn.Text = "保存"
     saveBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
     saveBtn.TextColor3 = Color3.new(1,1,1)
-    saveBtn.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            if _G.HolonSaveRecording then _G.HolonSaveRecording(nameBox.Text) end
-        end
+    saveBtn.MouseButton1Click:Connect(function()
+        if _G.HolonSaveRecording then _G.HolonSaveRecording(nameBox.Text) end
     end)
 
     local keysContainer = Instance.new("Frame", mainFrame)
@@ -303,10 +297,8 @@ local function createPianoUI()
     for i, keyName in ipairs(whiteKeys) do
         local btn = Instance.new("TextButton", whiteKeysFrame)
         btn.Name = keyName; btn.Size = UDim2.new(whiteKeyWidth, -1, 1, 0); btn.BackgroundColor3 = Color3.new(1, 1, 1); btn.BorderColor3 = Color3.new(0, 0, 0); btn.LayoutOrder = i; btn.Text = ""
-        btn.InputBegan:Connect(function(input)
-            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                task.spawn(pressPianoKey, keyName)
-            end
+        btn.MouseButton1Click:Connect(function()
+            task.spawn(pressPianoKey, keyName)
         end)
         
         -- キー表示
@@ -321,10 +313,8 @@ local function createPianoUI()
             local blackKeyName = blackKeys[keyName]
             local blackBtn = Instance.new("TextButton", blackKeysFrame)
             blackBtn.Name = blackKeyName; blackBtn.AnchorPoint = Vector2.new(0.5, 0); blackBtn.Position = UDim2.new(whiteKeyWidth * i, 0, 0, 0); blackBtn.Size = UDim2.new(whiteKeyWidth * 0.6, 0, 1, 0); blackBtn.BackgroundColor3 = Color3.new(0, 0, 0); blackBtn.BorderColor3 = Color3.new(0.5, 0.5, 0.5); blackBtn.Text = ""; blackBtn.ZIndex = 3
-            blackBtn.InputBegan:Connect(function(input)
-                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-                    task.spawn(pressPianoKey, blackKeyName)
-                end
+            blackBtn.MouseButton1Click:Connect(function()
+                task.spawn(pressPianoKey, blackKeyName)
             end)
             if _G.HolonPianoKeyMapReverse then
                 blackBtn.Text = _G.HolonPianoKeyMapReverse[blackKeyName] or ""
@@ -1770,10 +1760,8 @@ local function updateSubFeatures()
             end
 
             -- ボイスチャット拡張ロジック
-            if char and char:FindFirstChild("Head") then
-                local head = char.Head
-                -- "Voice"という名前のSoundを再帰的に探す
-                local voiceSound = head:FindFirstChild("Voice", true) 
+            if char then
+                local voiceSound = char:FindFirstChild("Voice", true)
                 if voiceSound and voiceSound:IsA("Sound") then
                     if voiceChatTargets[p.Name] then
                         voiceSound.RollOffMaxDistance = 10000
@@ -1791,7 +1779,7 @@ local function updateSubFeatures()
     end
 end
 
-RunService.Heartbeat:Connect(updateSubFeatures)
+RunService.RenderStepped:Connect(updateSubFeatures)
 
 -- プレイヤー機能ループ
 UserInputService.JumpRequest:Connect(function()
@@ -2081,7 +2069,7 @@ local function StartHolonHUB()
     end)
 
     local Window = OrionLib:MakeWindow({
-        Name = "Holon HUB v1.4.0",
+        Name = "Holon HUB v1.4.1",
         HidePremium = false,
         SaveConfig = false, -- 初期化時の干渉を防ぐため無効化
         ConfigFolder = "HolonHUB",
@@ -3787,6 +3775,7 @@ UIElements.PianoEnabled = PianoControlSec:AddToggle({
 				})
 			else
 				pianoEnabled = false
+				UIElements.PianoEnabled:Set(false) -- 失敗したらトグルを元に戻す
 				OrionLib:MakeNotification({
 					Name = "エラー",
 					Content = "MusicKeyboardが見つかりません",
@@ -3994,13 +3983,26 @@ UIElements.PianoManualUIToggle = PianoManualSec:AddToggle({
     Default = false,
     Callback = function(v)
         manualPlayEnabled = v
-        -- UIが必要で、まだ作られていない場合にのみ作成
-        if v and not pianoUIGui then
-            createPianoUI()
-        end
-        -- UIが存在すれば、表示状態を切り替える
-        if pianoUIGui then
-            pianoUIGui.Enabled = v
+        if v then -- If turning ON
+            -- 1. Try to enable the main piano feature
+            if not pianoEnabled then
+                UIElements.PianoEnabled:Set(true) -- This triggers the keyboard search
+            end
+
+            -- 2. After the attempt, check if it was successful
+            task.wait() -- Give the other callback a moment to run
+            if pianoEnabled then
+                -- Success: Create and show the UI
+                if not pianoUIGui then createPianoUI() end
+                if pianoUIGui then pianoUIGui.Enabled = true end
+            else
+                -- Failure: Revert this toggle
+                manualPlayEnabled = false
+                UIElements.PianoManualUIToggle:Set(false)
+                -- The error notification is already handled by the other toggle's callback
+            end
+        else -- If turning OFF
+            if pianoUIGui then pianoUIGui.Enabled = false end
         end
     end
 })
