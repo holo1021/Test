@@ -2173,6 +2173,20 @@ local function getPList()
     return plist
 end
 
+-- ボイスチャット用のプレイヤーリストを生成する関数
+local function getVoicePlayerList()
+    local plist = {}
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then
+            -- 現在の状態（有効/無効）を名前に含める
+            local status = voiceChatTargets[p.Name] and " [有効]" or ""
+            table.insert(plist, p.DisplayName .. " (@" .. p.Name .. ")" .. status)
+        end
+    end
+    if #plist == 0 then table.insert(plist, "他のプレイヤーがいません") end
+    return plist
+end
+
 -- UI要素を管理するテーブル
 local UIElements = {}
 
@@ -2410,6 +2424,7 @@ local MainSec = MainTab:AddSection({
 -- メイン対象ドロップダウン（変数として定義）
 local targetMainName = "" -- 名前を保存する変数を新しく用意
 local tpDropdown = nil
+local voiceDropdown = nil
 
 local pDropMain
 UIElements.MainTargetDropdown = MainSec:AddDropdown({
@@ -2428,13 +2443,15 @@ pDropMain = UIElements.MainTargetDropdown
 Players.PlayerAdded:Connect(function()
     task.wait(0.5)
     pDropMain:Refresh(getPList(), true)
-    if tpDropdown then tpDropdown:Refresh(getPList(), true) end
+    if tpDropdown then tpDropdown:Refresh(getPList(), true) end -- テレポート用
+    if voiceDropdown then voiceDropdown:Refresh(getVoicePlayerList(), true) end -- ボイチャ用
 end)
 
 Players.PlayerRemoving:Connect(function()
     task.wait(0.5)
     pDropMain:Refresh(getPList(), true)
-    if tpDropdown then tpDropdown:Refresh(getPList(), true) end
+    if tpDropdown then tpDropdown:Refresh(getPList(), true) end -- テレポート用
+    if voiceDropdown then voiceDropdown:Refresh(getVoicePlayerList(), true) end -- ボイチャ用
 end)
 
 -- エフェクト有効化トグル
@@ -3367,20 +3384,25 @@ UIElements.EspColor = EspSec:AddColorpicker({
     end	  
 })
 
-local VoiceChatSec = SubTab:AddSection({ Name = "ボイスチャット拡張" })
-VoiceChatSec:AddParagraph("Info", "選択したプレイヤーの声が遠くからでも聞こえるようになります。新しい人が参加した場合は、お手数ですがスクリプトを再実行してリストを更新してください。")
+-- ボイスチャット拡張セクション
+local VoiceChatSec = SubTab:AddSection({Name = "ボイスチャット拡張"})
+VoiceChatSec:AddParagraph("Info", "ドロップダウンからプレイヤーを選択すると、そのプレイヤーのボイスチャットが有効/無効に切り替わります。")
 
-for _, p in ipairs(Players:GetPlayers()) do
-    if p ~= LocalPlayer then
-        VoiceChatSec:AddToggle({
-            Name = p.DisplayName,
-            Default = false,
-            Callback = function(v)
-                voiceChatTargets[p.Name] = v
-            end
-        })
+-- ドロップダウンを前方宣言済みの変数に代入
+voiceDropdown = VoiceChatSec:AddDropdown({
+    Name = "プレイヤーを選択して切替",
+    Default = "選択...",
+    Options = getVoicePlayerList(),
+    Callback = function(v)
+        local name = v:match("@([^)]+)")
+        if name then
+            voiceChatTargets[name] = not voiceChatTargets[name] -- 状態をトグル
+            local status = voiceChatTargets[name] and "有効" or "無効"
+            OrionLib:MakeNotification({Name = "ボイスチャット", Content = name .. " を" .. status .. "にしました。", Time = 3})
+            voiceDropdown:Refresh(getVoicePlayerList(), true) -- 表示を更新
+        end
     end
-end
+})
 
 local BarrierSec = SubTab:AddSection({
     Name = "バリア破壊"
