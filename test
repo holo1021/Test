@@ -28,6 +28,10 @@ local function findBlobman()
         if v.Name == "CreatureBlobman" and v:FindFirstChild("VehicleSeat") then
             local weld = v.VehicleSeat:FindFirstChild("SeatWeld")
             if weld and weld.Part1 and weld.Part1:IsDescendantOf(LP.Character) then
+                -- PrimaryPartがない場合は設定する（テレポートに必須）
+                if not v.PrimaryPart then
+                    v.PrimaryPart = v:FindFirstChild("HumanoidRootPart") or v:FindFirstChildWhichIsA("BasePart")
+                end
                 return v
             end
         end
@@ -51,23 +55,49 @@ MainTab:CreateToggle({
 })
 
 MainTab:CreateToggle({
-    Name = "Kick All Loop (全員キック)",
+    Name = "Kick All Loop (Void Kick)",
     CurrentValue = false,
     Callback = function(Value)
         ToggleStatus.KickAll = Value
         task.spawn(function()
             while ToggleStatus.KickAll do
                 local b = findBlobman()
-                if b then
+                if b and b.PrimaryPart then
                     for _, target in ipairs(Players:GetPlayers()) do
+                        if not ToggleStatus.KickAll then break end
                         if target ~= LP and target.Character and (not ToggleStatus.ProtectFriends or not LP:IsFriendsWith(target.UserId)) then
                             local hrp = target.Character:FindFirstChild("HumanoidRootPart")
                             if hrp then
-                                -- 超高速掴み/離し
                                 pcall(function()
-                                    b.BlobmanSeatAndOwnerScript.CreatureGrab:FireServer(b.LeftDetector, hrp, b.LeftDetector:FindFirstChild("LeftWeld"))
-                                    task.wait(0.01)
-                                    b.BlobmanSeatAndOwnerScript.CreatureGrab:FireServer(b.LeftDetector, nil, nil)
+                                    -- 1. ターゲットの位置へ移動
+                                    b.PrimaryPart.Anchored = false
+                                    b:SetPrimaryPartCFrame(hrp.CFrame)
+                                    task.wait(0.1)
+                                    
+                                    -- 2. 掴む
+                                    local scriptObj = b:FindFirstChild("BlobmanSeatAndOwnerScript")
+                                    local grabRemote = scriptObj and (scriptObj:FindFirstChild("CreatureGrab") or scriptObj:FindFirstChild("Grab"))
+                                    local dropRemote = scriptObj and (scriptObj:FindFirstChild("CreatureDrop") or scriptObj:FindFirstChild("Drop"))
+                                    local lDet = b:FindFirstChild("LeftDetector")
+                                    local lWeld = lDet and (lDet:FindFirstChild("LeftWeld") or lDet:FindFirstChild("RigidConstraint"))
+                                    
+                                    if grabRemote and lDet then
+                                        grabRemote:FireServer(lDet, hrp, lWeld)
+                                        task.wait(0.2)
+                                        
+                                        -- 3. 奈落/上空へ移動 (Void Kick)
+                                        b:SetPrimaryPartCFrame(CFrame.new(999999, 999999, 999999))
+                                        b.PrimaryPart.Velocity = Vector3.new(0, 0, 0)
+                                        task.wait(0.1)
+                                        
+                                        -- 4. 離す
+                                        if dropRemote then
+                                            local activeWeld = lDet:FindFirstChildWhichIsA("Weld") or lDet:FindFirstChildWhichIsA("RigidConstraint")
+                                            if activeWeld then dropRemote:FireServer(activeWeld) end
+                                        else
+                                            grabRemote:FireServer(lDet, nil, nil)
+                                        end
+                                    end
                                 end)
                             end
                         end
@@ -114,4 +144,3 @@ RunService.Stepped:Connect(function()
         end
     end
 end)
-
