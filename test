@@ -1,7 +1,7 @@
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
 local Window = Rayfield:CreateWindow({
-    Name = "Kick Script (Nearby Only)",
+    Name = "Kick Script",
     LoadingTitle = "KickBeta Script Loading...",
     LoadingSubtitle = "by Lulu",
     ConfigurationSaving = { Enabled = false }
@@ -16,8 +16,7 @@ local LP = Players.LocalPlayer
 
 local ToggleStatus = {
     KickAll = false,
-    ProtectFriends = false,
-    KickRange = 50
+    ProtectFriends = false
 }
 
 -- ====================================================================
@@ -50,15 +49,6 @@ MainTab:CreateToggle({
     Name = "Protect Friends (フレンド保護)",
     CurrentValue = false,
     Callback = function(V) ToggleStatus.ProtectFriends = V end,
-})
-
-MainTab:CreateSlider({
-   Name = "Kick Range (範囲)",
-   Range = {10, 300},
-   Increment = 5,
-   Suffix = "Studs",
-   CurrentValue = 50,
-   Callback = function(Value) ToggleStatus.KickRange = Value end,
 })
 
 MainTab:CreateToggle({
