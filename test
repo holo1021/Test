@@ -671,6 +671,7 @@ local defaultConfig = {
     FloatStone = { Size = 10, Speed = 2, Height = 2, Back = 0, Chaos = false },
     Merkaba = { Size = 8, Speed = 2, Height = 7, Back = 0 },
     Cube = { Size = 5, Speed = 1, Height = 5, Back = 0 },
+    Pyramid = { Size = 5, Speed = 1, Height = 5, Back = 0 },
     MirrorPlayer = { Size = 60, Speed = 10, Height = 0, Back = 0, Scale = 1, EdgeSpacing = 1 },
     Beam = { Size = 60, Speed = 50, Height = 0.5, Back = 0, Count = 8 },
     BackGuard = { Size = 10, Speed = 2, Height = 2, Back = 15 },
@@ -1082,6 +1083,41 @@ elseif mode == "MagicCircle3" then
         local pos = p1:Lerp(p2, alpha)
         
         return pos + Vector3.new(0, c.Height, c.Back)
+
+    elseif mode == "Pyramid" then
+        local s = c.Size
+        -- ピラミッドの頂点定義
+        local top = Vector3.new(0, s, 0)
+        local fl = Vector3.new(-s, -s, s)  -- 前左
+        local fr = Vector3.new(s, -s, s)   -- 前右
+        local br = Vector3.new(s, -s, -s)  -- 後右
+        local bl = Vector3.new(-s, -s, -s) -- 後左
+        
+        -- 面（頂点のループ）を定義
+        local faces = {
+            {top, fl, fr}, -- 前面
+            {top, fr, br}, -- 右面
+            {top, br, bl}, -- 後面
+            {top, bl, fl}, -- 左面
+            {fl, fr, br, bl} -- 底面
+        }
+        
+        local numFaces = #faces
+        local faceIdx = ((i - 1) % numFaces) + 1
+        local currentFace = faces[faceIdx]
+        local numVerts = #currentFace
+        
+        local speed = c.Speed * 0.5
+        local totalProgress = (time * speed) + (i * 0.25)
+        
+        local edgeIndex = math.floor(totalProgress) % numVerts + 1
+        local nextEdgeIndex = (edgeIndex % numVerts) + 1
+        local alpha = totalProgress % 1
+        
+        local p1 = currentFace[edgeIndex]
+        local p2 = currentFace[nextEdgeIndex]
+        
+        return p1:Lerp(p2, alpha) + Vector3.new(0, c.Height, c.Back)
 
     elseif mode == "MirrorPlayer" then
         local char = targetMain.Character
@@ -2414,7 +2450,7 @@ UIElements.EffectToggle = MainSec:AddToggle({
 UIElements.ModeDropdown = MainSec:AddDropdown({
 	Name = "モード選択",
 	Default = "Wing",
-	Options = {"Wing","Heart","Star","Vortex","Sphere","Rotate","Pet","Text","MagicCircle","MagicCircle2","MagicCircle3","FloatStone","Merkaba","Cube","MirrorPlayer","Beam","BackGuard","Tornado"},
+	Options = {"Wing","Heart","Star","Vortex","Sphere","Rotate","Pet","Text","MagicCircle","MagicCircle2","MagicCircle3","FloatStone","Merkaba","Cube","Pyramid","MirrorPlayer","Beam","BackGuard","Tornado"},
 	Callback = function(v)
 		currentMode = v
 		combinedActive = false
@@ -2623,7 +2659,7 @@ local CombineSec = ModeSetTab:AddSection({
     Name = "合体設定"
 })
 
-local modeOptions = {"なし", "Wing","Heart","Star","Vortex","Sphere","Rotate","Pet","Text","MagicCircle","MagicCircle2","MagicCircle3","FloatStone","Merkaba","Cube","MirrorPlayer","Beam","BackGuard","Tornado"}
+local modeOptions = {"なし", "Wing","Heart","Star","Vortex","Sphere","Rotate","Pet","Text","MagicCircle","MagicCircle2","MagicCircle3","FloatStone","Merkaba","Cube","Pyramid","MirrorPlayer","Beam","BackGuard","Tornado"}
 
 UIElements.CombineMode1 = CombineSec:AddDropdown({
     Name = "合体: モード1",
@@ -2681,7 +2717,7 @@ local EditSec = ModeSetTab:AddSection({
     Name = "共通設定エディタ"
 })
 
-local modes = {"Wing","Heart","Star","Vortex","Sphere","Rotate","Pet","Text","MagicCircle", "MagicCircle2", "MagicCircle3", "FloatStone", "Merkaba", "Cube", "MirrorPlayer", "Beam", "BackGuard", "Tornado"}
+local modes = {"Wing","Heart","Star","Vortex","Sphere","Rotate","Pet","Text","MagicCircle", "MagicCircle2", "MagicCircle3", "FloatStone", "Merkaba", "Cube", "Pyramid", "MirrorPlayer", "Beam", "BackGuard", "Tornado"}
 
 local currentEditMode = "Wing"
 local sl_Speed, sl_Size, sl_Height, sl_Back
