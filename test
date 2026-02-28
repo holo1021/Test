@@ -1,83 +1,688 @@
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+local OrionLib = loadstring(game:HttpGet(('https://raw.githubusercontent.com/hololove1021/HolonHUB/refs/heads/main/source.txt')))()
 
-local Window = Rayfield:CreateWindow({
-    Name = "Kick Script",
-    LoadingTitle = "KickBeta Script Loading...",
-    LoadingSubtitle = "by Lulu",
-    ConfigurationSaving = { Enabled = false }
+-- 二重起動防止
+pcall(function()
+    if game:GetService("CoreGui"):FindFirstChild("Orion") then 
+        game:GetService("CoreGui").Orion:Destroy() 
+    end
+end)
+
+local Window = OrionLib:MakeWindow({
+    Name = "Test Hub", 
+    HidePremium = false, 
+    SaveConfig = true, 
+    ConfigFolder = "TestHubConfig",
+    IntroEnabled = false
 })
 
--- ====================================================================
--- 変数とサービスの設定
--- ====================================================================
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local LP = Players.LocalPlayer
+local Workspace = game:GetService("Workspace")
+local localPlayer = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
 
-local ToggleStatus = {
-    KickAll = false,
-    ProtectFriends = false
-}
+-- --- 変数管理 ---
+_G.SuperThrowEnabled = false
+_G.ThrowPower = 500
+-- For Hitbox Expander
+_G.SilentAimSelectedTargets = {} -- 新しいサイレントエイム対象リスト
+_G.SilentAimEnabled = false
+_G.HitboxSize = 25
+-- New Silent Aim Variables
+_G.RaycastSilentAimEnabled = false
+_G.SilentAimRange = 30
+_G.TriggerBotEnabled = false
+_G.TriggerDelay = 0.1
 
--- ====================================================================
--- 便利関数の定義
--- ====================================================================
-local function findBlobman()
-    for _, v in ipairs(workspace:GetDescendants()) do
-        if v.Name == "CreatureBlobman" and v:FindFirstChild("VehicleSeat") then
-            local weld = v.VehicleSeat:FindFirstChild("SeatWeld")
-            if weld and weld.Part1 and weld.Part1:IsDescendantOf(LP.Character) then
-                -- PrimaryPartがない場合は設定する（テレポートに必須）
-                if not v.PrimaryPart then
-                    v.PrimaryPart = v:FindFirstChild("HumanoidRootPart") or v:FindFirstChildWhichIsA("BasePart")
-                end
-                return v
+local ContextActionService = game:GetService("ContextActionService")
+local lastGrabbedPart = nil
+local forcedParts = {}
+
+-- --- 通知イベントの取得 ---
+local function getGrabNotify()
+    local ps = localPlayer:WaitForChild("PlayerScripts", 10)
+    if not ps then return nil end
+    local cbm = ps:WaitForChild("CharacterAndBeamMove", 10)
+    if not cbm then return nil end
+    return cbm:WaitForChild("GrabNotifyEvent", 10)
+end
+
+local grabNotify = getGrabNotify()
+
+-- --- ターゲット特定ロジック ---
+local function findGrabbedTarget()
+    local grabParts = Workspace:FindFirstChild("GrabParts")
+    if grabParts then
+        local grabPart = grabParts:FindFirstChild("GrabPart")
+        if grabPart then
+            local weld = grabPart:FindFirstChild("WeldConstraint")
+            if weld and weld.Part1 then
+                return weld.Part1
             end
         end
     end
     return nil
 end
 
--- ====================================================================
--- タブ作成
--- ====================================================================
+-- 固定した対象を可視化するためのSelectionBox
+local selectionBox = Instance.new("SelectionBox")
+selectionBox.Name = "AnchorSelectionBox"
+selectionBox.Color3 = Color3.fromRGB(0, 170, 255) -- 水色
+selectionBox.LineThickness = 0.05
+selectionBox.Adornee = nil
+selectionBox.Parent = game:GetService("CoreGui")
 
-local MainTab = Window:CreateTab("Kick Settings", 7733916988)
+-- --- Hitbox Expander Silent Aim Logic ---
+RunService.RenderStepped:Connect(function()
+    if _G.SilentAimEnabled then
+        for _, player in pairs(Players:GetPlayers()) do
+            if player ~= localPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                pcall(function()
+                    local hrp = player.Character.HumanoidRootPart
+                    hrp.Size = Vector3.new(_G.HitboxSize, _G.HitboxSize, _G.HitboxSize)
+                    hrp.Transparency = 0.7
+                    hrp.CanCollide = false
+                    hrp.Massless = true
+                end)
+            end
+        end
+    end
+end)
 
--- --- Main Tab (Blobman機能) ---
-MainTab:CreateToggle({
-    Name = "Protect Friends (フレンド保護)",
-    CurrentValue = false,
-    Callback = function(V) ToggleStatus.ProtectFriends = V end,
-})
+-- --- Raycast Silent Aim & Trigger Bot Logic ---
+local UserInputService = game:GetService("UserInputService")
 
-MainTab:CreateToggle({
-    Name = "Kick All Loop (全員キック)",
-    CurrentValue = false,
-    Callback = function(Value)
-        ToggleStatus.KickAll = Value
-        task.spawn(function()
-            while ToggleStatus.KickAll do
-                local b = findBlobman()
-                if b then
-                    for _, target in ipairs(Players:GetPlayers()) do
-                        if not ToggleStatus.KickAll then break end
-                        if target ~= LP and target.Character and (not ToggleStatus.ProtectFriends or not LP:IsFriendsWith(target.UserId)) then
-                            local hrp = target.Character:FindFirstChild("HumanoidRootPart")
-                            local myHrp = LP.Character and LP.Character:FindFirstChild("HumanoidRootPart")
-                            if hrp and myHrp and (hrp.Position - myHrp.Position).Magnitude <= ToggleStatus.KickRange then
-                                -- 超高速掴み/離し
-                                pcall(function()
-                                    b.BlobmanSeatAndOwnerScript.CreatureGrab:FireServer(b.LeftDetector, hrp, b.LeftDetector:FindFirstChild("LeftWeld"))
-                                    task.wait(0.01)
-                                    b.BlobmanSeatAndOwnerScript.CreatureGrab:FireServer(b.LeftDetector, nil, nil)
-                                end)
-                            end
-                        end
+local function GetDirection(Origin, Position)
+    return (Position - Origin).Unit * (Origin - Position).Magnitude
+end
+
+local function GetClosestPlayerInWorld()
+    local Closest, Distance = nil, _G.SilentAimRange
+    local hrp = localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return nil end
+
+    local playersToConsider = {}
+    if #_G.SilentAimSelectedTargets > 0 then
+        for _, name in ipairs(_G.SilentAimSelectedTargets) do
+            local p = Players:FindFirstChild(name)
+            if p and p ~= localPlayer then table.insert(playersToConsider, p) end
+        end
+    else
+        playersToConsider = Players:GetPlayers()
+    end
+
+    for _, Player in ipairs(playersToConsider) do
+        local Character = Player.Character
+        local Head = Character and Character:FindFirstChild("Head")
+        local Humanoid = Character and Character:FindFirstChild("Humanoid")
+        if Head and (Humanoid and Humanoid.Health > 0) then
+            local _Distance = (hrp.Position - Head.Position).Magnitude
+            if _Distance <= Distance then
+                Closest = Head
+                Distance = _Distance
+            end
+        end
+    end
+    return Closest
+end
+
+local LastTriggerTime = 0
+local TriggerConnection = nil
+
+local function UpdateTriggerBot()
+    if TriggerConnection then
+        TriggerConnection:Disconnect()
+        TriggerConnection = nil
+    end
+    
+    if _G.TriggerBotEnabled then
+        TriggerConnection = RunService.Heartbeat:Connect(function()
+            local CurrentTime = tick()
+            if UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
+                if CurrentTime - LastTriggerTime >= _G.TriggerDelay then
+                    local Target = GetClosestPlayerInWorld()
+                    if Target then
+                        pcall(function()
+                            mouse1click()
+                        end)
+                        LastTriggerTime = CurrentTime
                     end
                 end
-                task.wait(0.1)
             end
         end)
-    end,
+        OrionLib:MakeNotification({Name = "Trigger Bot", Content = "Activated", Time = 3})
+    else
+        OrionLib:MakeNotification({Name = "Trigger Bot", Content = "Deactivated", Time = 3})
+    end
+end
+
+local oldNamecall = nil
+local function HookSilentAim()
+    if oldNamecall then return end
+    oldNamecall = hookmetamethod(game, "__namecall", function(...)
+        local Method = getnamecallmethod()
+        local Arguments = {...}
+        if _G.RaycastSilentAimEnabled and Arguments[1] == Workspace and Method == "Raycast" then
+            if typeof(Arguments[#Arguments]) ~= "RaycastParams" then
+                return oldNamecall(...)
+            end
+            local HitPart = GetClosestPlayerInWorld()
+            if HitPart then
+                Arguments[3] = GetDirection(Arguments[2], HitPart.Position)
+                return oldNamecall(unpack(Arguments))
+            end
+        end
+        return oldNamecall(...)
+    end)
+end
+
+-- --- CFrame Forcing Loop ---
+RunService.Heartbeat:Connect(function()
+    for part, data in pairs(forcedParts) do
+        if part and part.Parent then
+            -- 位置更新を停止 (Anchoredを使用するため)
+        else
+            if data.Gui then data.Gui:Destroy() end
+            forcedParts[part] = nil -- Cleanup
+        end
+    end
+end)
+
+-- --- メインロジック監視 ---
+if grabNotify then
+    grabNotify.Event:Connect(function(isGrabbing)
+        if isGrabbing then
+            local target = findGrabbedTarget()
+            if not target then
+                for i = 1, 20 do
+                    RunService.Heartbeat:Wait()
+                    target = findGrabbedTarget()
+                    if target then break end
+                end
+            end
+
+            if target then
+                lastGrabbedPart = target
+                selectionBox.Adornee = target
+            end
+        else
+            -- 離した時 (投げた時)
+            if lastGrabbedPart then
+                -- スーパースロー処理
+                -- 固定されていないオブジェクトのみスーパースローを適用します
+                if _G.SuperThrowEnabled and not forcedParts[lastGrabbedPart] then
+                    pcall(function()
+                        -- 投げるためにアンカーを外します
+                        lastGrabbedPart.Anchored = false
+                        -- 物理演算の主導権があるうちに力を加える
+                        local force = Camera.CFrame.LookVector * _G.ThrowPower
+                        lastGrabbedPart:ApplyImpulse(force * lastGrabbedPart:GetMass())
+                    end)
+                end
+            end
+        end
+    end)
+end
+
+local function handleAnchorAction(actionName, inputState, inputObject)
+    if inputState == Enum.UserInputState.Begin then
+        if not lastGrabbedPart or not lastGrabbedPart.Parent then
+            lastGrabbedPart = findGrabbedTarget()
+            if lastGrabbedPart then selectionBox.Adornee = lastGrabbedPart end
+        end
+        if lastGrabbedPart and lastGrabbedPart.Parent then
+            local root = lastGrabbedPart.Parent
+            local parts = {}
+            if root:IsA("Model") then
+                for _, p in pairs(root:GetDescendants()) do
+                    if p:IsA("BasePart") then table.insert(parts, p) end
+                end
+            else
+                table.insert(parts, lastGrabbedPart)
+            end
+
+            if forcedParts[lastGrabbedPart] then
+                for _, p in pairs(parts) do
+                    if forcedParts[p] and forcedParts[p].Gui then forcedParts[p].Gui:Destroy() end
+                    forcedParts[p] = nil
+                    pcall(function() p.Anchored = false end)
+                end
+            else
+                local bg = Instance.new("BillboardGui")
+                bg.Name = "AnchorStatusGui"
+                bg.Adornee = lastGrabbedPart
+                bg.Size = UDim2.new(0, 100, 0, 50)
+                bg.StudsOffset = Vector3.new(0, 2, 0)
+                bg.AlwaysOnTop = true
+                bg.Parent = game:GetService("CoreGui")
+                local tl = Instance.new("TextLabel")
+                tl.Parent = bg
+                tl.Size = UDim2.new(1, 0, 1, 0)
+                tl.BackgroundTransparency = 1
+                tl.Text = "固定中"
+                tl.TextColor3 = Color3.new(1, 0, 0)
+                tl.TextStrokeTransparency = 0
+                tl.TextSize = 20
+                
+                for _, p in pairs(parts) do
+                    local gui = (p == lastGrabbedPart) and bg or nil
+                    forcedParts[p] = { CFrame = p.CFrame, Gui = gui }
+                    pcall(function() p.Anchored = true end)
+                end
+            end
+        else
+            OrionLib:MakeNotification({Name="Info", Content="対象なし", Time = 1})
+        end
+    end
+end
+-- --- UI構成 ---
+local MainTab = Window:MakeTab({ Name = "Main", Icon = "rbxassetid://4483345998" })
+
+MainTab:AddToggle({
+    Name = "固定ボタン表示 (スマホ用)",
+    Default = false,
+    Callback = function(v)
+        if v then
+            ContextActionService:BindAction("AnchorAction", handleAnchorAction, true, Enum.KeyCode.H)
+            ContextActionService:SetTitle("AnchorAction", "固定")
+            local btn = ContextActionService:GetButton("AnchorAction")
+            if btn then
+                btn.Size = UDim2.new(0, 120, 0, 120)
+                btn.Position = UDim2.new(0, 20, 0.5, -60)
+            end
+        else
+            ContextActionService:UnbindAction("AnchorAction")
+        end
+    end
 })
+
+local ChatKeyboardToggle = nil
+local CustomChatFrame = nil
+
+MainTab:AddToggle({
+    Name = "独自チャット (Custom Chat)",
+    Default = false,
+    Callback = function(value)
+        if not value then
+            if CustomChatFrame then
+                CustomChatFrame:Destroy()
+                CustomChatFrame = nil
+            end
+            return
+        end
+        if CustomChatFrame then return end
+        local screenGui = Instance.new("ScreenGui")
+        screenGui.Name = "CustomChatGui"
+        screenGui.Parent = game:GetService("CoreGui")
+        CustomChatFrame = screenGui
+        local frame = Instance.new("Frame")
+        frame.Size = UDim2.new(0, 300, 0, 200)
+        frame.Position = UDim2.new(0.5, -150, 0.5, -100)
+        frame.Parent = screenGui
+        frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+        frame.BorderSizePixel = 0
+        frame.Active = true
+        frame.Draggable = true
+        local chatLog = Instance.new("ScrollingFrame")
+        chatLog.Size = UDim2.new(0.9, 0, 0.7, 0)
+        chatLog.Position = UDim2.new(0.05, 0, 0.05, 0)
+        chatLog.Parent = frame
+        chatLog.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        chatLog.CanvasSize = UDim2.new(0, 0, 0, 0)
+        
+        local layout = Instance.new("UIListLayout")
+        layout.SortOrder = Enum.SortOrder.LayoutOrder
+        layout.Parent = chatLog
+
+        local textBox = Instance.new("TextBox")
+        textBox.Size = UDim2.new(0.9, 0, 0.15, 0)
+        textBox.Position = UDim2.new(0.05, 0, 0.77, 0)
+        textBox.Parent = frame
+        textBox.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+        textBox.TextColor3 = Color3.fromRGB(0, 0, 0)
+        textBox.Text = ""
+        textBox.ClearTextOnFocus = false
+        local button = Instance.new("TextButton")
+        button.Size = UDim2.new(0.4, 0, 0.2, 0)
+        button.Position = UDim2.new(0.3, 0, 0.84, 0)
+        button.Parent = frame
+        button.Text = "Send"
+        button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+        button.TextColor3 = Color3.fromRGB(255, 255, 255)
+        local Close = Instance.new("TextButton")
+        Close.Size = UDim2.new(0, 20, 0, 20)
+        Close.Position = UDim2.new(1, -20, 0, 0)
+        Close.Text = "X"
+        Close.TextColor3 = Color3.fromRGB(255, 255, 255)
+        Close.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        Close.Parent = Frame
+        Close.MouseButton1Click:Connect(function() 
+            screenGui:Destroy() 
+            CustomChatFrame = nil
+        end)
+
+        button.MouseButton1Click:Connect(function()
+            local msg = textBox.Text
+            if msg ~= "" then
+                local TextChatService = game:GetService("TextChatService")
+                if TextChatService and TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+                    local rbxg = TextChatService.TextChannels:FindFirstChild("RBXGeneral")
+                    if rbxg then
+                        rbxg:SendAsync(msg)
+                    end
+                else
+                    pcall(function()
+                        game:GetService("ReplicatedStorage").DefaultChatSystemChatEvents.SayMessageRequest:FireServer(msg, "All")
+                    end)
+                end
+                textBox.Text = ""
+            end
+        end)
+
+        -- 公式チャット傍受
+        local function addMessage(name, message)
+            local textLabel = Instance.new("TextLabel")
+            textLabel.Size = UDim2.new(1, 0, 0, 20)
+            textLabel.BackgroundColor3 = Color3.new(0, 0, 0)
+            textLabel.BackgroundTransparency = 0.5
+            textLabel.TextColor3 = Color3.new(1, 1, 1)
+            textLabel.Text = name .. ": " .. message
+            textLabel.Font = Enum.Font.SourceSans
+            textLabel.TextSize = 14
+            textLabel.TextXAlignment = Enum.TextXAlignment.Left
+            textLabel.Parent = chatLog
+            chatLog.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y)
+            chatLog.CanvasPosition = Vector2.new(0, layout.AbsoluteContentSize.Y)
+        end
+
+        local TextChatService = game:GetService("TextChatService")
+        if TextChatService and TextChatService.ChatVersion == Enum.ChatVersion.TextChatService then
+            TextChatService.MessageReceived:Connect(function(msg)
+                local name = msg.TextSource and msg.TextSource.Name or (msg.PrefixText ~= "" and msg.PrefixText:gsub(":", "") or "System")
+                addMessage(name, msg.Text)
+            end)
+        elseif ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents") then
+            ReplicatedStorage.DefaultChatSystemChatEvents.MessageReceived.OnClientEvent:Connect(function(msg)
+                addMessage(msg.FromSpeaker, msg.Message)
+            end)
+        end
+    end
+})
+
+MainTab:AddSection({ Name = "Throw Settings" })
+
+MainTab:AddToggle({
+    Name = "スーパースロー (投げ飛ばし)",
+    Default = false,
+    Callback = function(v) _G.SuperThrowEnabled = v end
+})
+
+MainTab:AddSlider({
+    Name = "投げ飛ばす強さ",
+    Min = 0,
+    Max = 5000,
+    Default = 500,
+    Color = Color3.fromRGB(255, 255, 255),
+    Increment = 100,
+    ValueName = "Power",
+    Callback = function(v) _G.ThrowPower = v end
+})
+
+MainTab:AddSection({ Name = "サイレントエイム (掴み補助)" })
+
+MainTab:AddToggle({
+    Name = "サイレントエイム (掴み補助)",
+    Default = false,
+    Callback = function(v) 
+        _G.SilentAimEnabled = v 
+        if not v then
+            -- OFFにした時にサイズを戻す
+            for _, player in pairs(Players:GetPlayers()) do
+                if player ~= localPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                    pcall(function()
+                        local hrp = player.Character.HumanoidRootPart
+                        hrp.Size = Vector3.new(2, 2, 1)
+                        hrp.Transparency = 1
+                        hrp.CanCollide = true
+                        hrp.Massless = false
+                    end)
+                end
+            end
+        end
+    end
+})
+
+MainTab:AddSlider({
+    Name = "Hitbox Size",
+    Min = 2,
+    Max = 50,
+    Default = 25,
+    Color = Color3.fromRGB(255, 255, 255),
+    Increment = 1,
+    ValueName = "Size",
+    Callback = function(Value)
+        _G.HitboxSize = Value
+    end
+})
+
+MainTab:AddSection({ Name = "Raycast Silent Aim & TriggerBot" })
+
+MainTab:AddToggle({
+    Name = "Silent Aim (Raycast)",
+    Default = false,
+    Callback = function(v)
+        _G.RaycastSilentAimEnabled = v
+        if v then HookSilentAim() end
+    end
+})
+
+MainTab:AddSlider({
+    Name = "Aim Range (Studs)",
+    Min = 5,
+    Max = 500,
+    Default = 30,
+    Color = Color3.fromRGB(255, 255, 255),
+    Increment = 1,
+    ValueName = "Studs",
+    Callback = function(v) _G.SilentAimRange = v end
+})
+
+MainTab:AddToggle({
+    Name = "Trigger Bot",
+    Default = false,
+    Callback = function(v)
+        _G.TriggerBotEnabled = v
+        UpdateTriggerBot()
+    end
+})
+
+MainTab:AddSlider({
+    Name = "Trigger Delay",
+    Min = 0.05,
+    Max = 1.0,
+    Default = 0.1,
+    Color = Color3.fromRGB(255, 255, 255),
+    Increment = 0.01,
+    ValueName = "Sec",
+    Callback = function(v) _G.TriggerDelay = v end
+})
+
+MainTab:AddSection({ Name = "Target Selector & Grab" })
+
+local kickTargetName = ""
+local selectedTargets = {}
+local TargetsLabel = MainTab:AddParagraph("Target List", "None")
+
+local function getPList()
+    local list = {}
+    for _, v in pairs(Players:GetPlayers()) do
+        if v ~= localPlayer then
+            table.insert(list, v.DisplayName .. " (@" .. v.Name .. ")")
+        end
+    end
+    return list
+end
+
+local function updateTargetsLabel()
+    if #selectedTargets == 0 then
+        TargetsLabel:Set("Target List", "None")
+    else
+        TargetsLabel:Set("Target List", table.concat(selectedTargets, ", "))
+    end
+end
+
+local KickDropdown = MainTab:AddDropdown({
+    Name = "Select Player",
+    Default = "Select Player",
+    Options = getPList(),
+    Callback = function(v)
+        kickTargetName = v:match("@([^)]+)")
+    end
+})
+
+MainTab:AddButton({
+    Name = "Add/Remove Selected to List",
+    Callback = function()
+        if kickTargetName ~= "" then
+            local found = false
+            for i, v in ipairs(selectedTargets) do
+                if v == kickTargetName then
+                    table.remove(selectedTargets, i)
+                    found = true
+                    break
+                end
+            end
+            if not found then
+                table.insert(selectedTargets, kickTargetName)
+            end
+            updateTargetsLabel()
+        end
+    end
+})
+
+MainTab:AddButton({
+    Name = "Refresh Player List",
+    Callback = function()
+        KickDropdown:Refresh(getPList(), true)
+    end
+})
+
+MainTab:AddButton({
+    Name = "Grab Selected Players",
+    Callback = function()
+        local targetsToGrab = {}
+        if #selectedTargets > 0 then
+            for _, name in ipairs(selectedTargets) do
+                local p = Players:FindFirstChild(name)
+                if p then table.insert(targetsToGrab, p) end
+            end
+        elseif kickTargetName ~= "" then
+            local p = Players:FindFirstChild(kickTargetName)
+            if p then table.insert(targetsToGrab, p) end
+        end
+
+        local blobman = getOrSpawnBlobman()
+        if #targetsToGrab == 0 or not blobman then 
+            OrionLib:MakeNotification({Name = "Error", Content = "No targets or Blobman failed", Time = 3})
+            return 
+        end
+
+        -- 1. 乗る
+        local seat = blobman:FindFirstChild("VehicleSeat")
+        local hum = localPlayer.Character and localPlayer.Character:FindFirstChild("Humanoid")
+        if seat and hum and seat.Occupant ~= hum then
+            pcall(function()
+                localPlayer.Character.HumanoidRootPart.CFrame = seat.CFrame + Vector3.new(0, 2, 0)
+                seat:Sit(hum)
+            end)
+            task.wait(0.2)
+        end
+
+        -- 2. 掴む
+        local scriptObj = blobman:FindFirstChild("BlobmanSeatAndOwnerScript")
+        local grabRemote = scriptObj and (scriptObj:FindFirstChild("CreatureGrab") or scriptObj:FindFirstChild("Grab"))
+        local lDet, rDet = blobman:FindFirstChild("LeftDetector"), blobman:FindFirstChild("RightDetector")
+        local lWeld = lDet and (lDet:FindFirstChild("LeftWeld") or lDet:FindFirstChild("RigidConstraint"))
+        local rWeld = rDet and (rDet:FindFirstChild("RightWeld") or rDet:FindFirstChild("RigidConstraint"))
+
+        if grabRemote then
+            for _, target in ipairs(targetsToGrab) do
+                if target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+                    local hrp = target.Character.HumanoidRootPart
+                    if blobman.PrimaryPart then
+                        blobman.PrimaryPart.Anchored = false
+                        blobman:SetPrimaryPartCFrame(hrp.CFrame)
+                        task.wait(0.1)
+                    end
+                    if lDet then grabRemote:FireServer(lDet, hrp, lWeld) end
+                    if rDet then grabRemote:FireServer(rDet, hrp, rWeld) end
+                    task.wait(0.1)
+                end
+            end
+        end
+        OrionLib:MakeNotification({ Name = "Done", Content = "Grab attempt finished", Time = 3 })
+    end
+})
+
+MainTab:AddSection({ Name = "サイレントエイム対象選択" })
+
+local silentAimTargetName = ""
+local silentAimSelectedTargets = {}
+local SilentAimTargetsLabel = MainTab:AddParagraph("Silent Aim Target List", "None")
+
+local function updateSilentAimTargetsLabel()
+    if #silentAimSelectedTargets == 0 then
+        SilentAimTargetsLabel:Set("Silent Aim Target List", "None")
+    else
+        SilentAimTargetsLabel:Set("Silent Aim Target List", table.concat(silentAimSelectedTargets, ", "))
+    end
+end
+
+MainTab:AddDropdown({
+    Name = "Select Player for Silent Aim",
+    Default = "Select Player",
+    Options = getPList(),
+    Callback = function(v)
+        silentAimTargetName = v:match("@([^)]+)")
+    end
+})
+
+MainTab:AddButton({
+    Name = "Add/Remove Selected to Silent Aim List",
+    Callback = function()
+        if silentAimTargetName ~= "" then
+            local found = false
+            for i, v in ipairs(silentAimSelectedTargets) do
+                if v == silentAimTargetName then
+                    table.remove(silentAimSelectedTargets, i)
+                    found = true
+                    break
+                end
+            end
+            if not found then
+                table.insert(silentAimSelectedTargets, silentAimTargetName)
+            end
+            _G.SilentAimSelectedTargets = silentAimSelectedTargets
+            updateSilentAimTargetsLabel()
+        end
+    end
+})
+
+MainTab:AddButton({
+    Name = "Clear Silent Aim Target List",
+    Callback = function()
+        silentAimSelectedTargets = {}
+        _G.SilentAimSelectedTargets = silentAimSelectedTargets
+        updateSilentAimTargetsLabel()
+    end
+})
+
+MainTab:AddButton({
+    Name = "Refresh Player List (Silent Aim)",
+    Callback = function()
+        MainTab:GetDropdown("Select Player for Silent Aim"):Refresh(getPList(), true)
+    end
+})
+
+OrionLib:Init()
