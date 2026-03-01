@@ -19,6 +19,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
+local SoundService = game:GetService("SoundService")
 local localPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 
@@ -27,17 +28,21 @@ _G.SuperThrowEnabled = false
 _G.ThrowPower = 500
 -- For Hitbox Expander
 _G.SilentAimSelectedTargets = {} -- 新しいサイレントエイム対象リスト
-_G.SilentAimEnabled = false
-_G.HitboxSize = 25
+-- _G.SilentAimEnabled = false -- Removed Hitbox Expander
+-- _G.HitboxSize = 25 -- Removed Hitbox Expander
 -- New Silent Aim Variables
 _G.RaycastSilentAimEnabled = false
 _G.SilentAimRange = 30
 _G.TriggerBotEnabled = false
 _G.TriggerDelay = 0.1
+-- Remote Audio Variables
+_G.RemoteListenerEnabled = false
+_G.RemoteVoiceEnabled = false
 
 local ContextActionService = game:GetService("ContextActionService")
 local lastGrabbedPart = nil
 local forcedParts = {}
+local AnchorPart = nil -- For Remote Voice Camera Anchor
 
 -- --- 通知イベントの取得 ---
 local function getGrabNotify()
@@ -73,19 +78,80 @@ selectionBox.LineThickness = 0.05
 selectionBox.Adornee = nil
 selectionBox.Parent = game:GetService("CoreGui")
 
--- --- Hitbox Expander Silent Aim Logic ---
-RunService.RenderStepped:Connect(function()
-    if _G.SilentAimEnabled then
-        for _, player in pairs(Players:GetPlayers()) do
-            if player ~= localPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-                pcall(function()
-                    local hrp = player.Character.HumanoidRootPart
-                    hrp.Size = Vector3.new(_G.HitboxSize, _G.HitboxSize, _G.HitboxSize)
-                    hrp.Transparency = 0.7
-                    hrp.CanCollide = false
-                    hrp.Massless = true
-                end)
+-- --- Remote Listener Logic (Hear from far away) ---
+task.spawn(function()
+    while true do
+        task.wait(0.2)
+        if _G.RemoteListenerEnabled then
+            local target = nil
+            if #_G.SilentAimSelectedTargets > 0 then
+                for _, name in ipairs(_G.SilentAimSelectedTargets) do
+                    local p = Players:FindFirstChild(name)
+                    if p and p.Character and p.Character:FindFirstChild("Head") then
+                        target = p.Character.Head
+                        break
+                    end
+                end
             end
+            
+            if target then
+                SoundService:SetListener(Enum.ListenerType.Object, target)
+            else
+                -- Fallback if target lost
+                SoundService:SetListener(Enum.ListenerType.Camera, nil)
+            end
+        else
+             if not _G.RemoteListenerEnabled and SoundService.Listener ~= nil then
+                 SoundService:SetListener(Enum.ListenerType.Camera, nil)
+             end
+        end
+    end
+end)
+
+-- --- Remote Voice Logic (Speak from far away / Body Teleport) ---
+RunService.RenderStepped:Connect(function()
+    if _G.RemoteVoiceEnabled then
+        local targetRoot = nil
+        if #_G.SilentAimSelectedTargets > 0 then
+            for _, name in ipairs(_G.SilentAimSelectedTargets) do
+                local p = Players:FindFirstChild(name)
+                if p and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                    targetRoot = p.Character.HumanoidRootPart
+                    break
+                end
+            end
+        end
+
+        if targetRoot and localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart") then
+             -- Create Anchor if not exists to keep camera view
+             if not AnchorPart then
+                 AnchorPart = Instance.new("Part")
+                 AnchorPart.Name = "CameraAnchorPart"
+                 AnchorPart.Transparency = 1
+                 AnchorPart.Anchored = true
+                 AnchorPart.CanCollide = false
+                 if localPlayer.Character:FindFirstChild("Head") then
+                     AnchorPart.Position = localPlayer.Character.Head.Position
+                 else
+                     AnchorPart.Position = localPlayer.Character.HumanoidRootPart.Position + Vector3.new(0, 1.5, 0)
+                 end
+                 AnchorPart.Parent = Workspace
+                 Workspace.CurrentCamera.CameraSubject = AnchorPart
+             end
+             
+             -- Teleport Body to target
+             localPlayer.Character.HumanoidRootPart.CFrame = targetRoot.CFrame
+             localPlayer.Character.HumanoidRootPart.Velocity = Vector3.zero
+        end
+    else
+        if AnchorPart then
+            if Workspace.CurrentCamera.CameraSubject == AnchorPart then
+                if localPlayer.Character and localPlayer.Character:FindFirstChild("Humanoid") then
+                    Workspace.CurrentCamera.CameraSubject = localPlayer.Character.Humanoid
+                end
+            end
+            AnchorPart:Destroy()
+            AnchorPart = nil
         end
     end
 end)
@@ -109,6 +175,7 @@ local function GetClosestPlayerInWorld()
             if p and p ~= localPlayer then table.insert(playersToConsider, p) end
         end
     else
+        -- If no specific target selected, consider everyone (or disable if you prefer)
         playersToConsider = Players:GetPlayers()
     end
 
@@ -429,43 +496,6 @@ MainTab:AddSlider({
     Callback = function(v) _G.ThrowPower = v end
 })
 
-MainTab:AddSection({ Name = "サイレントエイム (掴み補助)" })
-
-MainTab:AddToggle({
-    Name = "サイレントエイム (掴み補助)",
-    Default = false,
-    Callback = function(v) 
-        _G.SilentAimEnabled = v 
-        if not v then
-            -- OFFにした時にサイズを戻す
-            for _, player in pairs(Players:GetPlayers()) do
-                if player ~= localPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-                    pcall(function()
-                        local hrp = player.Character.HumanoidRootPart
-                        hrp.Size = Vector3.new(2, 2, 1)
-                        hrp.Transparency = 1
-                        hrp.CanCollide = true
-                        hrp.Massless = false
-                    end)
-                end
-            end
-        end
-    end
-})
-
-MainTab:AddSlider({
-    Name = "Hitbox Size",
-    Min = 2,
-    Max = 50,
-    Default = 25,
-    Color = Color3.fromRGB(255, 255, 255),
-    Increment = 1,
-    ValueName = "Size",
-    Callback = function(Value)
-        _G.HitboxSize = Value
-    end
-})
-
 MainTab:AddSection({ Name = "Raycast Silent Aim & TriggerBot" })
 
 MainTab:AddToggle({
@@ -506,6 +536,24 @@ MainTab:AddSlider({
     Increment = 0.01,
     ValueName = "Sec",
     Callback = function(v) _G.TriggerDelay = v end
+})
+
+MainTab:AddSection({ Name = "Remote Audio & Voice" })
+
+MainTab:AddToggle({
+    Name = "Remote Listener (Hear Target)",
+    Default = false,
+    Callback = function(v)
+        _G.RemoteListenerEnabled = v
+    end
+})
+
+MainTab:AddToggle({
+    Name = "Remote Voice (Teleport Body)",
+    Default = false,
+    Callback = function(v)
+        _G.RemoteVoiceEnabled = v
+    end
 })
 
 MainTab:AddSection({ Name = "Target Selector & Grab" })
