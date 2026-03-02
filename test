@@ -1596,8 +1596,14 @@ local function startEffect()
                 if m == "BackGuard" then
                     fw.AO.CFrame = CFrame.lookAt(worldPos, rotatedBaseCF.Position) * individualRotation
                 elseif m == "Rotate" or m == "MagicCircle" or m == "FloatStone" or m == "Merkaba" or m == "Cube" or m == "Tornado" or m == "Pyramid" or m == "Gyro" then
+                    -- CFrame.lookAtが同じ座標でエラーを起こしフリーズするのを防ぐ
                     local nextPos = rotatedBaseCF:PointToWorldSpace(getPositionForMode(m, relIdx, relTotal, t + 0.05))
-                    fw.AO.CFrame = CFrame.lookAt(worldPos, nextPos) * individualRotation
+                    if (worldPos - nextPos).Magnitude < 0.001 then
+                        -- 座標が同じ場合はデフォルトの向きを使い、エラーを回避
+                        fw.AO.CFrame = rotatedBaseCF * individualRotation
+                    else
+                        fw.AO.CFrame = CFrame.lookAt(worldPos, nextPos) * individualRotation
+                    end
                 else
                     fw.AO.CFrame = rotatedBaseCF * individualRotation
                 end
