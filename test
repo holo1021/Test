@@ -768,15 +768,15 @@ local function getPositionForMode(mode, i, count, time)
         flap = flap * distRatio
     end
     
-    -- カーブ（自分向き）の計算
-    local z_curve = 0
+    -- カーブ（上下方向）の計算
+    local y_curve = 0
     if c.Curve then
-        -- 先端にいくほど自分側にカーブする（Z軸のマイナス方向）
-        z_curve = -(distRatio ^ 2) * (c.CurveAmount or 10)
+        -- 2乗カーブ (上下に曲げる)
+        y_curve = -(distRatio ^ 2) * (c.CurveAmount or 10)
     end
 
     local horizontalOffset = c.Gap + (c.Size * distRatio)
-    local pos = Vector3.new(horizontalOffset * side, flap, z_curve)
+    local pos = Vector3.new(horizontalOffset * side, flap + y_curve, 0)
     
     local rotCF = CFrame.Angles(
         math.rad(c.Tilt), 
@@ -2896,8 +2896,8 @@ for _, m in ipairs(modes) do
             s:AddSlider({ Name = "V字角度 (前後方向)", Min = -180, Max = 180, Default = 0, Callback = function(v) cfg.Wing.V_Angle = v end })
             s:AddSlider({ Name = "上下傾斜", Min = -90, Max = 90, Default = 0, Callback = function(v) cfg.Wing.Tilt = v end })
             s:AddSlider({ Name = "羽ばたき強度", Min = 0, Max = 50, Default = 15, Callback = function(v) cfg.Wing.Strength = v end })
-            s:AddToggle({ Name = "カーブ (半円状)", Default = cfg.Wing.Curve or false, Callback = function(v) cfg.Wing.Curve = v end })
-            s:AddSlider({ Name = "カーブ強度", Min = 0, Max = 50, Default = cfg.Wing.CurveAmount or 10, Callback = function(v) cfg.Wing.CurveAmount = v end })
+            s:AddToggle({ Name = "カーブ (上下/アーチ)", Default = cfg.Wing.Curve or false, Callback = function(v) cfg.Wing.Curve = v end })
+            s:AddSlider({ Name = "カーブ強度 (上下)", Min = -50, Max = 50, Default = cfg.Wing.CurveAmount or 10, Callback = function(v) cfg.Wing.CurveAmount = v end })
         
         elseif m == "Pet" then
             s:AddSlider({ Name = "個体数", Min = 1, Max = 10, Default = 2, Callback = function(v) cfg.Pet.Count = v end })
