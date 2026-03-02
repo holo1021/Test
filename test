@@ -671,7 +671,7 @@ local defaultConfig = {
     Star = { Size = 10, Speed = 2, Height = 5, Back = 0 },
     Vortex = { Size = 5, Speed = 3, Height = 0, Back = 0 },
     Sphere = { Size = 30, Speed = 30, Height = 5, Back = 0 },
-    Rotate = { Size = 15, Speed = 6, Height = 7, Back = 0 },
+    Rotate = { Size = 15, Speed = 6, Height = 7, Back = 0, Wave = false, WaveSpeed = 2, WaveAmp = 2 },
     Pet = { Size = 8, Speed = 2, Height = 4, Back = 12, Count = 2, Joints = 3, Gap = 13 },
     Text = { Size = 10, Speed = 5, Height = 6, Back = 2, Content = "HELLO", Mirror = false },
     MagicCircle = { Size = 12, Speed = 2, Height = -3, Back = 0 },
@@ -863,7 +863,12 @@ local function getPositionForMode(mode, i, count, time)
     local rotX = p.X * math.cos(rotAngle) - p.Y * math.sin(rotAngle)
     local rotY = p.X * math.sin(rotAngle) + p.Y * math.cos(rotAngle)
     
-    return Vector3.new(rotX * c.Size, c.Height, rotY * c.Size + c.Back)
+    local waveY = 0
+    if c.Wave then
+        waveY = math.sin(time * (c.WaveSpeed or 2) + i * 0.5) * (c.WaveAmp or 2)
+    end
+    
+    return Vector3.new(rotX * c.Size, c.Height + waveY, rotY * c.Size + c.Back)
 
 elseif mode == "MagicCircle2" then
     -- 画像1のような放射状の魔法陣
@@ -1256,18 +1261,12 @@ elseif mode == "MagicCircle3" then
             local idx = i
             local total = outerLimit
             local r = c.Size
-            local angle = (idx / total) * math.pi * 2 + time * c.Speed * 0.5
+            local angle = (idx / total) * math.pi * 2 -- 回転させない
             
             local x = math.cos(angle) * r
             local y = math.sin(angle) * r
-            local z = 0
             
-            -- Y軸回転
-            local rot = time * c.Speed * 0.2
-            local rx = x * math.cos(rot) - z * math.sin(rot)
-            local rz = x * math.sin(rot) + z * math.cos(rot)
-            
-            return Vector3.new(rx, y + c.Height, rz + c.Back)
+            return Vector3.new(x, y + c.Height, c.Back)
             
         elseif i <= innerLimit then
             -- 内側の回転円 (水平)
@@ -2251,7 +2250,7 @@ local modeKeys = {}
 for k, v in pairs(modeNames) do modeKeys[v] = k end
 local function getModeList()
     local list = {}
-    local order = {"Wing","Heart","Star","Vortex","Sphere","Rotate","Pet","Text","MagicCircle","MagicCircle2","MagicCircle3","FloatStone","Merkaba","Cube","Pyramid","MirrorPlayer","Beam","BackGuard","Tornado","Gyro"}
+    local order = {"Wing","Heart","Star","Vortex","Sphere","Rotate","Pet","Text","MagicCircle","MagicCircle2","MagicCircle3","FloatStone","Merkaba","Cube","Pyramid","MirrorPlayer","Beam","BackGuard","Tornado"}
     for _, k in ipairs(order) do table.insert(list, modeNames[k]) end
     return list
 end
@@ -2814,7 +2813,7 @@ local CombineSec = ModeSetTab:AddSection({
 
 local function getModeListWithNone()
     local list = {"なし"}
-    local order = {"Wing","Heart","Star","Vortex","Sphere","Rotate","Pet","Text","MagicCircle","MagicCircle2","MagicCircle3","FloatStone","Merkaba","Cube","Pyramid","MirrorPlayer","Beam","BackGuard","Tornado","Gyro"}
+    local order = {"Wing","Heart","Star","Vortex","Sphere","Rotate","Pet","Text","MagicCircle","MagicCircle2","MagicCircle3","FloatStone","Merkaba","Cube","Pyramid","MirrorPlayer","Beam","BackGuard","Tornado"}
     for _, k in ipairs(order) do table.insert(list, modeNames[k]) end
     return list
 end
@@ -2919,7 +2918,7 @@ local AdvTab = Window:MakeTab({
 
 for _, m in ipairs(modes) do
     -- 固有設定があるモードのみセクションを作成
-    if m == "Wing" or m == "Pet" or m == "Text" or m == "MagicCircle2" or m == "MagicCircle3" or m == "Beam" or m == "FloatStone" or m == "Tornado" or m == "MirrorPlayer" or m == "Gyro" then
+    if m == "Wing" or m == "Pet" or m == "Text" or m == "MagicCircle2" or m == "MagicCircle3" or m == "Beam" or m == "FloatStone" or m == "Tornado" or m == "MirrorPlayer" or m == "Rotate" then
         local s = AdvTab:AddSection({ Name = modeNames[m] or m })
         
         if m == "Wing" then
@@ -2955,14 +2954,10 @@ for _, m in ipairs(modes) do
             s:AddSlider({ Name = "上部幅", Min = 0, Max = 50, Default = cfg.Tornado.TopRadius, Callback = function(v) cfg.Tornado.TopRadius = v end })
             s:AddToggle({ Name = "ピラミッド形状", Default = false, Callback = function(v) cfg.Tornado.Pyramid = v end })
 
-        elseif m == "Gyro" then
-            s:AddSlider({ Name = "内側の円サイズ", Min = 1, Max = 100, Default = cfg.Gyro.InnerSize or 12, Callback = function(v) cfg.Gyro.InnerSize = v end })
-            s:AddDropdown({
-                Name = "中心の回転物",
-                Default = cfg.Gyro.CenterType or "Sphere",
-                Options = {"Sphere", "Cube", "Vertical", "Random"},
-                Callback = function(v) cfg.Gyro.CenterType = v end
-            })
+        elseif m == "Rotate" then
+            s:AddToggle({ Name = "ウェーブ (くねくね)", Default = cfg.Rotate.Wave or false, Callback = function(v) cfg.Rotate.Wave = v end })
+            s:AddSlider({ Name = "ウェーブ速度", Min = 1, Max = 20, Default = cfg.Rotate.WaveSpeed or 2, Callback = function(v) cfg.Rotate.WaveSpeed = v end })
+            s:AddSlider({ Name = "ウェーブ振幅", Min = 1, Max = 20, Default = cfg.Rotate.WaveAmp or 2, Callback = function(v) cfg.Rotate.WaveAmp = v end })
         end
     end
 end
