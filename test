@@ -768,19 +768,16 @@ local function getPositionForMode(mode, i, count, time)
         flap = flap * distRatio
     end
     
-    -- カーブ（上下および後方）の計算
+    -- カーブ（上下のみ）の計算
     local y_curve = 0
-    local z_curve = 0
     if c.Curve then
         local curve_amount = c.CurveAmount or 10
-        -- 上下カーブ
-        y_curve = -(distRatio ^ 2) * curve_amount
-        -- 後方へのカーブ（常にマイナス方向、強さは上下カーブの絶対値に比例）
-        z_curve = -(distRatio ^ 2) * math.abs(curve_amount)
+        -- 上下カーブ (正の値で上に反り立つ)
+        y_curve = (distRatio ^ 2) * curve_amount
     end
 
     local horizontalOffset = c.Gap + (c.Size * distRatio)
-    local pos = Vector3.new(horizontalOffset * side, flap + y_curve, z_curve)
+    local pos = Vector3.new(horizontalOffset * side, flap + y_curve, 0)
     
     local rotCF = CFrame.Angles(
         math.rad(c.Tilt), 
@@ -2142,7 +2139,7 @@ local function StartHolonHUB()
     end)
 
     local Window = OrionLib:MakeWindow({
-        Name = "Holon HUB v1.4.2",
+        Name = "Holon HUB v1.4.0",
         HidePremium = false,
         SaveConfig = false, -- 初期化時の干渉を防ぐため無効化
         ConfigFolder = "HolonHUB",
@@ -2900,8 +2897,8 @@ for _, m in ipairs(modes) do
             s:AddSlider({ Name = "V字角度 (前後方向)", Min = -180, Max = 180, Default = 0, Callback = function(v) cfg.Wing.V_Angle = v end })
             s:AddSlider({ Name = "上下傾斜", Min = -90, Max = 90, Default = 0, Callback = function(v) cfg.Wing.Tilt = v end })
             s:AddSlider({ Name = "羽ばたき強度", Min = 0, Max = 50, Default = 15, Callback = function(v) cfg.Wing.Strength = v end })
-            s:AddToggle({ Name = "カーブ (上下/アーチ)", Default = cfg.Wing.Curve or false, Callback = function(v) cfg.Wing.Curve = v end })
-            s:AddSlider({ Name = "カーブ強度 (上下)", Min = -50, Max = 50, Default = cfg.Wing.CurveAmount or 10, Callback = function(v) cfg.Wing.CurveAmount = v end })
+            s:AddToggle({ Name = "カーブ (反り)", Default = cfg.Wing.Curve or false, Callback = function(v) cfg.Wing.Curve = v end })
+            s:AddSlider({ Name = "カーブ強度 (反り)", Min = -50, Max = 50, Default = cfg.Wing.CurveAmount or 10, Callback = function(v) cfg.Wing.CurveAmount = v end })
         
         elseif m == "Pet" then
             s:AddSlider({ Name = "個体数", Min = 1, Max = 10, Default = 2, Callback = function(v) cfg.Pet.Count = v end })
