@@ -768,22 +768,25 @@ local function getPositionForMode(mode, i, count, time)
         flap = flap * distRatio
     end
     
-    -- カーブ（上下のみ）の計算
-    local y_curve = 0
-    if c.Curve then
-        local curve_amount = c.CurveAmount or 10
-        -- 上下カーブ (正の値で上に反り立つ)
-        y_curve = (distRatio ^ 2) * curve_amount
-    end
-
     local horizontalOffset = c.Gap + (c.Size * distRatio)
-    local pos = Vector3.new(horizontalOffset * side, flap + y_curve, 0)
+    local pos = Vector3.new(horizontalOffset * side, flap, 0)
     
     local rotCF = CFrame.Angles(
         math.rad(c.Tilt), 
         math.rad(c.V_Angle * side), 
         0
     )
+
+    -- カーブ（反り）の計算：羽ばたきに連動させる
+    if c.Curve then
+        local curve_amount = c.CurveAmount or 10
+        -- 羽ばたきの現在の位相（-1から1）を取得
+        local flap_ratio = math.sin(flapPhase)
+        -- 上に羽ばたいている時だけ、先端にいくほど強く反る角度を計算
+        local soar_angle = (flap_ratio > 0) and math.rad(flap_ratio * curve_amount * distRatio) or 0
+        -- 翼の根元を軸に回転させることで「反り」を表現
+        rotCF = rotCF * CFrame.Angles(0, 0, soar_angle * -side)
+    end
     
     return (rotCF * pos) + Vector3.new(0, c.Height, c.Back)
         
