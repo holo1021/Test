@@ -41,6 +41,7 @@ _G.RemoteVoiceEnabled = false
 
 local ContextActionService = game:GetService("ContextActionService")
 local lastGrabbedPart = nil
+local forcedParts = {}
 local AnchorPart = nil -- For Remote Voice Camera Anchor
 
 -- --- 通知イベントの取得 ---
@@ -243,6 +244,20 @@ local function HookSilentAim()
     end)
 end
 
+-- --- CFrame Forcing Loop (Fixing/Anchoring Sync) ---
+RunService.Heartbeat:Connect(function()
+    for part, cf in pairs(forcedParts) do
+        if part and part.Parent then
+            part.CFrame = cf
+            part.Velocity = Vector3.zero
+            part.RotVelocity = Vector3.zero
+            part.Anchored = true
+        else
+            forcedParts[part] = nil
+        end
+    end
+end)
+
 -- --- メインロジック監視 ---
 if grabNotify then
     grabNotify.Event:Connect(function(isGrabbing)
@@ -265,12 +280,17 @@ if grabNotify then
             if lastGrabbedPart then
                 -- スーパースロー処理
                 -- 固定されていないオブジェクトのみスーパースローを適用します
-                if _G.SuperThrowEnabled then
-                    pcall(function()
-                        -- 物理演算の主導権があるうちに力を加える
-                        local force = Camera.CFrame.LookVector * _G.ThrowPower
-                        lastGrabbedPart:ApplyImpulse(force * lastGrabbedPart:GetMass())
-                    end)
+                -- 普通に離す（ドロップ）時は反応しないように左クリック判定を追加
+                if _G.SuperThrowEnabled and UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
+                    -- 固定されていたら解除して投げる
+                    if forcedParts[lastGrabbedPart] then
+                        forcedParts[lastGrabbedPart] = nil
+                        lastGrabbedPart.Anchored = false
+                    end
+                    
+                    -- 物理演算の主導権があるうちに力を加える
+                    local force = Camera.CFrame.LookVector * _G.ThrowPower
+                    lastGrabbedPart:ApplyImpulse(force * lastGrabbedPart:GetMass())
                 end
             end
         end
@@ -294,9 +314,14 @@ local function handleAnchorAction(actionName, inputState, inputObject)
                 table.insert(parts, lastGrabbedPart)
             end
 
-            local shouldAnchor = not lastGrabbedPart.Anchored
+            local shouldAnchor = not forcedParts[lastGrabbedPart]
             for _, p in pairs(parts) do
-                pcall(function() p.Anchored = shouldAnchor end)
+                if shouldAnchor then
+                    forcedParts[p] = p.CFrame
+                else
+                    forcedParts[p] = nil
+                    p.Anchored = false
+                end
             end
             
             local status = shouldAnchor and "固定しました" or "固定解除"
