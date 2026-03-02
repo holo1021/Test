@@ -768,15 +768,19 @@ local function getPositionForMode(mode, i, count, time)
         flap = flap * distRatio
     end
     
-    -- カーブ（上下方向）の計算
+    -- カーブ（上下および後方）の計算
     local y_curve = 0
+    local z_curve = 0
     if c.Curve then
-        -- 2乗カーブ (上下に曲げる)
-        y_curve = -(distRatio ^ 2) * (c.CurveAmount or 10)
+        local curve_amount = c.CurveAmount or 10
+        -- 上下カーブ
+        y_curve = -(distRatio ^ 2) * curve_amount
+        -- 後方へのカーブ（常にマイナス方向、強さは上下カーブの絶対値に比例）
+        z_curve = -(distRatio ^ 2) * math.abs(curve_amount)
     end
 
     local horizontalOffset = c.Gap + (c.Size * distRatio)
-    local pos = Vector3.new(horizontalOffset * side, flap + y_curve, 0)
+    local pos = Vector3.new(horizontalOffset * side, flap + y_curve, z_curve)
     
     local rotCF = CFrame.Angles(
         math.rad(c.Tilt), 
