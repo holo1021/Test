@@ -666,7 +666,7 @@ local Paths = {
 -- [コンフィグ & 変数管理]
 --------------------------------------------------------------------------------
 local defaultConfig = {
-    Wing = { Size = 30, Gap = 3.0, Speed = 6, Height = 0.5, Back = 0, Joints = 3, V_Angle = 0, Tilt = 0, Strength = 15, RootFixed = true }, -- RootFixedを追加
+    Wing = { Size = 30, Gap = 3.0, Speed = 6, Height = 0.5, Back = 0, Joints = 3, V_Angle = 0, Tilt = 0, Strength = 15, RootFixed = true, Curve = false, CurveAmount = 10 },
     Heart = { Size = 8, Speed = 2, Height = 5, Back = 2 },
     Star = { Size = 10, Speed = 2, Height = 5, Back = 0 },
     Vortex = { Size = 5, Speed = 3, Height = 0, Back = 0 },
@@ -767,9 +767,15 @@ local function getPositionForMode(mode, i, count, time)
     if c.RootFixed then
         flap = flap * distRatio
     end
+    
+    -- カーブ（半円状）の計算
+    local curveOffset = 0
+    if c.Curve then
+        curveOffset = (distRatio ^ 2) * (c.CurveAmount or 10)
+    end
 
     local horizontalOffset = c.Gap + (c.Size * distRatio)
-    local pos = Vector3.new(horizontalOffset * side, flap, 0)
+    local pos = Vector3.new(horizontalOffset * side, flap - curveOffset, 0)
     
     local rotCF = CFrame.Angles(
         math.rad(c.Tilt), 
@@ -1269,16 +1275,22 @@ elseif mode == "MagicCircle3" then
             return Vector3.new(x, y + c.Height, c.Back)
             
         elseif i <= innerLimit then
-            -- 内側の円 (向きを変更してYZ平面へ、サイズを外側と同じに、波を削除)
+            -- 内側の円 (斜めに回転)
             local idx = i - outerLimit
             local total = innerLimit - outerLimit
             local r = c.Size
             local angle = (idx / total) * math.pi * 2 + time * c.Speed
             
+            -- YZ平面の円をベースにする
             local y = math.cos(angle) * r
             local z = math.sin(angle) * r
             
-            return Vector3.new(0, y + c.Height, z + c.Back)
+            -- Z軸周りに45度回転させて斜めにする
+            local tilt = math.rad(45)
+            local tx = -y * math.sin(tilt) -- x(0) * cos - y * sin
+            local ty = y * math.cos(tilt)  -- x(0) * sin + y * cos
+            
+            return Vector3.new(tx, ty + c.Height, z + c.Back)
             
         else
             -- 中心オブジェクト (選択可能)
@@ -2883,6 +2895,8 @@ for _, m in ipairs(modes) do
             s:AddSlider({ Name = "V字角度 (前後方向)", Min = -180, Max = 180, Default = 0, Callback = function(v) cfg.Wing.V_Angle = v end })
             s:AddSlider({ Name = "上下傾斜", Min = -90, Max = 90, Default = 0, Callback = function(v) cfg.Wing.Tilt = v end })
             s:AddSlider({ Name = "羽ばたき強度", Min = 0, Max = 50, Default = 15, Callback = function(v) cfg.Wing.Strength = v end })
+            s:AddToggle({ Name = "カーブ (半円状)", Default = cfg.Wing.Curve or false, Callback = function(v) cfg.Wing.Curve = v end })
+            s:AddSlider({ Name = "カーブ強度", Min = 0, Max = 50, Default = cfg.Wing.CurveAmount or 10, Callback = function(v) cfg.Wing.CurveAmount = v end })
         
         elseif m == "Pet" then
             s:AddSlider({ Name = "個体数", Min = 1, Max = 10, Default = 2, Callback = function(v) cfg.Pet.Count = v end })
