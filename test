@@ -1261,7 +1261,7 @@ elseif mode == "MagicCircle3" then
             local idx = i
             local total = outerLimit
             local r = c.Size
-            local angle = (idx / total) * math.pi * 2 -- 回転させない
+            local angle = (idx / total) * math.pi * 2 + time * c.Speed -- 回転させる
             
             local x = math.cos(angle) * r
             local y = math.sin(angle) * r
@@ -1269,17 +1269,16 @@ elseif mode == "MagicCircle3" then
             return Vector3.new(x, y + c.Height, c.Back)
             
         elseif i <= innerLimit then
-            -- 内側の回転円 (水平)
+            -- 内側の円 (向きを変更してYZ平面へ、サイズを外側と同じに、波を削除)
             local idx = i - outerLimit
             local total = innerLimit - outerLimit
-            local r = c.InnerSize or (c.Size * 0.6)
-            local angle = (idx / total) * math.pi * 2 - time * c.Speed
+            local r = c.Size
+            local angle = (idx / total) * math.pi * 2 + time * c.Speed
             
-            local x = math.cos(angle) * r
+            local y = math.cos(angle) * r
             local z = math.sin(angle) * r
-            local y = math.sin(angle * 3 + time) * (r * 0.1)
             
-            return Vector3.new(x, y + c.Height, z + c.Back)
+            return Vector3.new(0, y + c.Height, z + c.Back)
             
         else
             -- 中心オブジェクト (選択可能)
