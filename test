@@ -2250,7 +2250,7 @@ local modeKeys = {}
 for k, v in pairs(modeNames) do modeKeys[v] = k end
 local function getModeList()
     local list = {}
-    local order = {"Wing","Heart","Star","Vortex","Sphere","Rotate","Pet","Text","MagicCircle","MagicCircle2","MagicCircle3","FloatStone","Merkaba","Cube","Pyramid","MirrorPlayer","Beam","BackGuard","Tornado"}
+    local order = {"Wing","Heart","Star","Vortex","Sphere","Rotate","Pet","Text","MagicCircle","MagicCircle2","MagicCircle3","FloatStone","Merkaba","Cube","Pyramid","MirrorPlayer","Beam","BackGuard","Tornado","Gyro"}
     for _, k in ipairs(order) do table.insert(list, modeNames[k]) end
     return list
 end
@@ -2751,56 +2751,6 @@ AnimSec:AddToggle({
 	end
 })
 
-local gyroAnimRunning = false
-AnimSec:AddToggle({
-    Name = "ジャイロ起動 (Gyro Activate)",
-    Default = false,
-    Callback = function(v)
-        gyroAnimRunning = v
-        if v then
-            task.spawn(function()
-                local s = 1 / cfg.AnimSpeed
-                
-                -- Phase 1: Charge up
-                currentMode = "MagicCircle"
-                cfg.MagicCircle.Size = 1
-                cfg.MagicCircle.Speed = 10
-                startEffect()
-                
-                for i = 1, 10, 0.5 do
-                    if not gyroAnimRunning then break end
-                    cfg.MagicCircle.Size = i
-                    task.wait(0.05 * s)
-                end
-                
-                if not gyroAnimRunning then return end
-                
-                -- Phase 2: Switch to Gyro and expand
-                currentMode = "Gyro"
-                cfg.Gyro.Size = 1
-                cfg.Gyro.InnerSize = 0.5
-                cfg.Gyro.Speed = 1
-                
-                for i = 1, 20, 0.5 do
-                    if not gyroAnimRunning then break end
-                    cfg.Gyro.Size = i
-                    cfg.Gyro.InnerSize = i * 0.6
-                    task.wait(0.03 * s)
-                end
-                
-                if not gyroAnimRunning then return end
-                
-                -- Phase 3: Speed up
-                for i = 1, 5, 0.1 do
-                    if not gyroAnimRunning then break end
-                    cfg.Gyro.Speed = i
-                    task.wait(0.1 * s)
-                end
-            end)
-        end
-    end
-})
-
 -- --- TAB: MODE SETTINGS ---
 local ModeSetTab = Window:MakeTab({
     Name = "モード設定",
@@ -2813,7 +2763,7 @@ local CombineSec = ModeSetTab:AddSection({
 
 local function getModeListWithNone()
     local list = {"なし"}
-    local order = {"Wing","Heart","Star","Vortex","Sphere","Rotate","Pet","Text","MagicCircle","MagicCircle2","MagicCircle3","FloatStone","Merkaba","Cube","Pyramid","MirrorPlayer","Beam","BackGuard","Tornado"}
+    local order = {"Wing","Heart","Star","Vortex","Sphere","Rotate","Pet","Text","MagicCircle","MagicCircle2","MagicCircle3","FloatStone","Merkaba","Cube","Pyramid","MirrorPlayer","Beam","BackGuard","Tornado","Gyro"}
     for _, k in ipairs(order) do table.insert(list, modeNames[k]) end
     return list
 end
