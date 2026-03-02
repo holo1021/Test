@@ -41,7 +41,6 @@ _G.RemoteVoiceEnabled = false
 
 local ContextActionService = game:GetService("ContextActionService")
 local lastGrabbedPart = nil
-local forcedParts = {}
 local AnchorPart = nil -- For Remote Voice Camera Anchor
 
 -- --- 通知イベントの取得 ---
@@ -244,18 +243,6 @@ local function HookSilentAim()
     end)
 end
 
--- --- CFrame Forcing Loop ---
-RunService.Heartbeat:Connect(function()
-    for part, data in pairs(forcedParts) do
-        if part and part.Parent then
-            -- 位置更新を停止 (Anchoredを使用するため)
-        else
-            if data.Gui then data.Gui:Destroy() end
-            forcedParts[part] = nil -- Cleanup
-        end
-    end
-end)
-
 -- --- メインロジック監視 ---
 if grabNotify then
     grabNotify.Event:Connect(function(isGrabbing)
@@ -278,10 +265,8 @@ if grabNotify then
             if lastGrabbedPart then
                 -- スーパースロー処理
                 -- 固定されていないオブジェクトのみスーパースローを適用します
-                if _G.SuperThrowEnabled and not forcedParts[lastGrabbedPart] then
+                if _G.SuperThrowEnabled then
                     pcall(function()
-                        -- 投げるためにアンカーを外します
-                        lastGrabbedPart.Anchored = false
                         -- 物理演算の主導権があるうちに力を加える
                         local force = Camera.CFrame.LookVector * _G.ThrowPower
                         lastGrabbedPart:ApplyImpulse(force * lastGrabbedPart:GetMass())
@@ -309,35 +294,13 @@ local function handleAnchorAction(actionName, inputState, inputObject)
                 table.insert(parts, lastGrabbedPart)
             end
 
-            if forcedParts[lastGrabbedPart] then
-                for _, p in pairs(parts) do
-                    if forcedParts[p] and forcedParts[p].Gui then forcedParts[p].Gui:Destroy() end
-                    forcedParts[p] = nil
-                    pcall(function() p.Anchored = false end)
-                end
-            else
-                local bg = Instance.new("BillboardGui")
-                bg.Name = "AnchorStatusGui"
-                bg.Adornee = lastGrabbedPart
-                bg.Size = UDim2.new(0, 100, 0, 50)
-                bg.StudsOffset = Vector3.new(0, 2, 0)
-                bg.AlwaysOnTop = true
-                bg.Parent = game:GetService("CoreGui")
-                local tl = Instance.new("TextLabel")
-                tl.Parent = bg
-                tl.Size = UDim2.new(1, 0, 1, 0)
-                tl.BackgroundTransparency = 1
-                tl.Text = "固定中"
-                tl.TextColor3 = Color3.new(1, 0, 0)
-                tl.TextStrokeTransparency = 0
-                tl.TextSize = 20
-                
-                for _, p in pairs(parts) do
-                    local gui = (p == lastGrabbedPart) and bg or nil
-                    forcedParts[p] = { CFrame = p.CFrame, Gui = gui }
-                    pcall(function() p.Anchored = true end)
-                end
+            local shouldAnchor = not lastGrabbedPart.Anchored
+            for _, p in pairs(parts) do
+                pcall(function() p.Anchored = shouldAnchor end)
             end
+            
+            local status = shouldAnchor and "固定しました" or "固定解除"
+            OrionLib:MakeNotification({Name="Info", Content=status, Time = 1})
         else
             OrionLib:MakeNotification({Name="Info", Content="対象なし", Time = 1})
         end
