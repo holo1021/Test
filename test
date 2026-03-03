@@ -2925,7 +2925,7 @@ local AdvTab = Window:MakeTab({
 
 for _, m in ipairs(modes) do
     -- 固有設定があるモードのみセクションを作成
-    if m == "Wing" or m == "Pet" or m == "Text" or m == "MagicCircle2" or m == "MagicCircle3" or m == "Beam" or m == "FloatStone" or m == "Tornado" or m == "MirrorPlayer" or m == "Rotate" then
+    if m == "Wing" or m == "Pet" or m == "Text" or m == "MagicCircle2" or m == "MagicCircle3" or m == "Beam" or m == "FloatStone" or m == "Tornado" or m == "Rotate" then
         local s = AdvTab:AddSection({ Name = modeNames[m] or m })
         
         if m == "Wing" then
