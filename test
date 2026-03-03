@@ -2073,9 +2073,9 @@ local function applyCustomStyle()
         }
     end
 
-    local gui = game:GetService("CoreGui"):FindFirstChild("OrionUI") or game:GetService("CoreGui"):FindFirstChild("Orion")
+    local gui = game:GetService("CoreGui"):FindFirstChild("HorionUI")
     if not gui then
-        gui = LocalPlayer:FindFirstChild("PlayerGui") and (LocalPlayer.PlayerGui:FindFirstChild("OrionUI") or LocalPlayer.PlayerGui:FindFirstChild("Orion"))
+        gui = LocalPlayer:FindFirstChild("PlayerGui") and LocalPlayer.PlayerGui:FindFirstChild("HorionUI")
     end
 
     if gui then
@@ -2177,7 +2177,7 @@ local function StartHolonHUB()
     end)
 
     local Window = OrionLib:MakeWindow({
-        Name = "Holon HUB v1.4.0",
+        Name = "Holon HUB v1.4.3",
         HidePremium = false,
         SaveConfig = false, -- 初期化時の干渉を防ぐため無効化
         ConfigFolder = "HolonHUB",
