@@ -1273,7 +1273,7 @@ elseif mode == "MagicCircle3" then
             local idx = i
             local total = outerLimit
             local r = c.Size
-            local angle = (idx / total) * math.pi * 2 + time * c.Speed -- 回転させる
+            local angle = (idx / total) * math.pi * 2 -- 回転させない
             
             local x = math.cos(angle) * r
             local y = math.sin(angle) * r
@@ -1332,12 +1332,8 @@ elseif mode == "MagicCircle3" then
         
         if not finalPos then return Vector3.zero end
 
-        -- エフェクト全体をY軸周りに回転させる
-        local overallRotAngle = time * c.Speed * 0.5
-        local rotatedX = finalPos.X * math.cos(overallRotAngle) - finalPos.Z * math.sin(overallRotAngle)
-        local rotatedZ = finalPos.X * math.sin(overallRotAngle) + finalPos.Z * math.cos(overallRotAngle)
-
-        return Vector3.new(rotatedX, finalPos.Y + c.Height, rotatedZ + c.Back)
+        -- エフェクト全体は回転させず、オフセットのみ適用
+        return Vector3.new(finalPos.X, finalPos.Y + c.Height, finalPos.Z + c.Back)
     end
     
     return Vector3.zero
