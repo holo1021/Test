@@ -782,8 +782,8 @@ local function getPositionForMode(mode, i, count, time)
         local curve_amount = c.CurveAmount or 10
         -- 羽ばたきの現在の位相（-1から1）を取得
         local flap_ratio = math.sin(flapPhase)
-        -- 上に羽ばたいている時だけ、先端にいくほど強く反る角度を計算
-        local soar_angle = (flap_ratio > 0) and math.rad(flap_ratio * curve_amount * distRatio) or 0
+        -- 羽ばたきの上下両方で、先端にいくほど強く反る角度を計算
+        local soar_angle = math.rad(flap_ratio * curve_amount * distRatio)
         -- 翼の根元を軸に回転させることで「反り」を表現
         rotCF = rotCF * CFrame.Angles(0, 0, soar_angle * side)
     end
