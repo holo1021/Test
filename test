@@ -1273,61 +1273,70 @@ elseif mode == "MagicCircle3" then
             local idx = i
             local total = outerLimit
             local r = c.Size
-            local angle = (idx / total) * math.pi * 2 -- 回転させない
+            local angle = (idx / total) * math.pi * 2 + time * c.Speed -- 外側も回転させる
             
             local x = math.cos(angle) * r
             local y = math.sin(angle) * r
             finalPos = Vector3.new(x, y, 0)
             
-        elseif i <= innerLimit then
-            -- 内側の円 (斜めに回転)
-            local idx = i - outerLimit
-            local total = innerLimit - outerLimit
-            local r = c.Size
-            local angle = (idx / total) * math.pi * 2 + time * c.Speed
-            
-            -- YZ平面の円をベースにする
-            local y = math.cos(angle) * r
-            local z = math.sin(angle) * r
-            
-            -- Z軸周りに45度回転させて斜めにする
-            local tilt = math.rad(45)
-            local tx = -y * math.sin(tilt) -- x(0) * cos - y * sin
-            local ty = y * math.cos(tilt)  -- x(0) * sin + y * cos
-            
-            finalPos = Vector3.new(tx, ty, z)
         else
-            -- 中心オブジェクト (選択可能)
-            local idx = i - innerLimit
-            local total = count - innerLimit
-            local r = (c.InnerSize or (c.Size * 0.6)) * 0.4
-            local cType = c.CenterType or "Sphere"
-            
-            if cType == "Sphere" then
-                local phi = math.acos(-1 + (2 * idx) / total)
-                local theta = math.sqrt(total * math.pi) * phi + time * c.Speed * 2
-                local x = r * math.cos(theta) * math.sin(phi)
-                local y = r * math.sin(theta) * math.sin(phi)
-                local z = r * math.cos(phi)
-                finalPos = Vector3.new(x, y, z)
-            elseif cType == "Cube" then
-                local t = time * c.Speed
-                local x = math.clamp(math.sin(t + idx) * r * 1.5, -r, r)
-                local y = math.clamp(math.cos(t * 1.1 + idx) * r * 1.5, -r, r)
-                local z = math.clamp(math.sin(t * 1.3 + idx) * r * 1.5, -r, r)
-                finalPos = Vector3.new(x, y, z)
-            elseif cType == "Vertical" then
-                local angle = (idx / total) * math.pi * 2 + time * c.Speed * 4
-                local x = math.cos(angle) * r
-                local y = math.sin(angle) * r
-                finalPos = Vector3.new(x, y, 0)
-            else -- Random
-                local seed = idx * 13.37
-                local x = math.sin(time * 2 + seed) * r
-                local y = math.cos(time * 2.5 + seed) * r
-                local z = math.sin(time * 1.5 + seed) * r
-                finalPos = Vector3.new(x, y, z)
+            -- 内側（内側の円 + 中心）
+            if i <= innerLimit then
+                -- 内側の円 (斜めに回転)
+                local idx = i - outerLimit
+                local total = innerLimit - outerLimit
+                local r = c.Size
+                local angle = (idx / total) * math.pi * 2 + time * c.Speed
+                
+                -- YZ平面の円をベースにする
+                local y = math.cos(angle) * r
+                local z = math.sin(angle) * r
+                
+                -- Z軸周りに45度回転させて斜めにする
+                local tilt = math.rad(45)
+                local tx = -y * math.sin(tilt) -- x(0) * cos - y * sin
+                local ty = y * math.cos(tilt)  -- x(0) * sin + y * cos
+                
+                finalPos = Vector3.new(tx, ty, z)
+            else
+                -- 中心オブジェクト (選択可能)
+                local idx = i - innerLimit
+                local total = count - innerLimit
+                local r = (c.InnerSize or (c.Size * 0.6)) * 0.4
+                local cType = c.CenterType or "Sphere"
+                
+                if cType == "Sphere" then
+                    local phi = math.acos(-1 + (2 * idx) / total)
+                    local theta = math.sqrt(total * math.pi) * phi + time * c.Speed * 2
+                    local x = r * math.cos(theta) * math.sin(phi)
+                    local y = r * math.sin(theta) * math.sin(phi)
+                    local z = r * math.cos(phi)
+                    finalPos = Vector3.new(x, y, z)
+                elseif cType == "Cube" then
+                    local t = time * c.Speed
+                    local x = math.clamp(math.sin(t + idx) * r * 1.5, -r, r)
+                    local y = math.clamp(math.cos(t * 1.1 + idx) * r * 1.5, -r, r)
+                    local z = math.clamp(math.sin(t * 1.3 + idx) * r * 1.5, -r, r)
+                    finalPos = Vector3.new(x, y, z)
+                elseif cType == "Vertical" then
+                    local angle = (idx / total) * math.pi * 2 + time * c.Speed * 4
+                    local x = math.cos(angle) * r
+                    local y = math.sin(angle) * r
+                    finalPos = Vector3.new(x, y, 0)
+                else -- Random
+                    local seed = idx * 13.37
+                    local x = math.sin(time * 2 + seed) * r
+                    local y = math.cos(time * 2.5 + seed) * r
+                    local z = math.sin(time * 1.5 + seed) * r
+                    finalPos = Vector3.new(x, y, z)
+                end
             end
+
+            -- 内側のみエフェクト全体（構造）を回転させる
+            local rotAngle = time * c.Speed * 0.5
+            local rx = finalPos.X * math.cos(rotAngle) - finalPos.Z * math.sin(rotAngle)
+            local rz = finalPos.X * math.sin(rotAngle) + finalPos.Z * math.cos(rotAngle)
+            finalPos = Vector3.new(rx, finalPos.Y, rz)
         end
         
         if not finalPos then return Vector3.zero end
