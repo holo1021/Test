@@ -688,7 +688,7 @@ local defaultConfig = {
     AnimSpeed = 1.0,
     PlotReturn = { Enabled = false, Interval = 30, PlotCFrame = nil},
     GrabMod = { Kill = false, Noclip = false, Spin = false, SuperThrow = false, ThrowPower = 500 },
-    Global = { MaxToys = 30 },
+    Global = { MaxToys = 30, EffectRotation = Vector3.new(0,0,0), IndividualRotation = Vector3.new(0, -90, 0) },
 }
 
 -- Deep Copy Helper
@@ -706,8 +706,8 @@ local useOtherToys = false
 local isEnabled, currentMode, combinedActive = false, "Wing", false
 local followPlayer = true
 local lastBaseCF = nil
-local targetMain, targetSub = LocalPlayer, LocalPlayer
-local GLOBAL_ANGLE, autoWidth = -90, true
+local targetMain, targetSub = LocalPlayer, LocalPlayer    
+local autoWidth = true
 local activeToys = {}        -- {A0, A1, AP, AO, Part}
 local originalCollisions = {} -- {Part: Boolean}
 local updateConnection = nil
@@ -1652,8 +1652,14 @@ local function startEffect()
                 if m == "BackGuard" then
                     fw.AO.CFrame = CFrame.lookAt(worldPos, rotatedBaseCF.Position) * individualRotation
                 elseif m == "Rotate" or m == "MagicCircle" or m == "FloatStone" or m == "Merkaba" or m == "Cube" or m == "Tornado" or m == "Pyramid" or m == "Gyro" then
+                    -- To prevent CFrame.lookAt from erroring and freezing with the same coordinates
                     local nextPos = rotatedBaseCF:PointToWorldSpace(getPositionForMode(m, relIdx, relTotal, t + 0.05))
-                    if (worldPos - nextPos).Magnitude > 0.001 then fw.AO.CFrame = CFrame.lookAt(worldPos, nextPos) * individualRotation else fw.AO.CFrame = rotatedBaseCF * individualRotation end
+                    if (worldPos - nextPos).Magnitude < 0.001 then
+                        -- If coordinates are the same, use default orientation to avoid errors
+                        fw.AO.CFrame = rotatedBaseCF * individualRotation
+                    else
+                        fw.AO.CFrame = CFrame.lookAt(worldPos, nextPos) * individualRotation
+                    end
                 else
                     fw.AO.CFrame = rotatedBaseCF * individualRotation
                 end
@@ -3127,6 +3133,20 @@ UIElements.IndividualRotationZ = IndivRotSec:AddSlider({
     Callback = function(v) cfg.Global.IndividualRotation = Vector3.new(cfg.Global.IndividualRotation.X, cfg.Global.IndividualRotation.Y, v) end
 })
 
+local IndivRotSec = ConfigTab:AddSection({ Name = "Individual Toy Rotation" })
+UIElements.IndividualRotationX = IndivRotSec:AddSlider({
+    Name = "X-Axis (Pitch)", Min = -180, Max = 180, Default = 0,
+    Callback = function(v) cfg.Global.IndividualRotation = Vector3.new(v, cfg.Global.IndividualRotation.Y, cfg.Global.IndividualRotation.Z) end
+})
+UIElements.IndividualRotationY = IndivRotSec:AddSlider({
+    Name = "Y-Axis (Yaw)", Min = -180, Max = 180, Default = -90,
+    Callback = function(v) cfg.Global.IndividualRotation = Vector3.new(cfg.Global.IndividualRotation.X, v, cfg.Global.IndividualRotation.Z) end
+})
+UIElements.IndividualRotationZ = IndivRotSec:AddSlider({
+    Name = "Z-Axis (Roll)", Min = -180, Max = 180, Default = 0,
+    Callback = function(v) cfg.Global.IndividualRotation = Vector3.new(cfg.Global.IndividualRotation.X, cfg.Global.IndividualRotation.Y, v) end
+})
+
 ----- Data Management ---
 local SaveSec = ConfigTab:AddSection({Name = "Data Management (Real-time Update)"})
 
@@ -3155,6 +3175,19 @@ SaveSec:AddButton({
                 
                 if success then
                     cfg = data
+
+                    -- Reconstruct Vector3s after loading from JSON
+                    if cfg.Global.EffectRotation and type(cfg.Global.EffectRotation) == "table" then
+                        cfg.Global.EffectRotation = Vector3.new(cfg.Global.EffectRotation.X, cfg.Global.EffectRotation.Y, cfg.Global.EffectRotation.Z)
+                    else
+                        cfg.Global.EffectRotation = Vector3.new(0,0,0)
+                    end
+                    if cfg.Global.IndividualRotation and type(cfg.Global.IndividualRotation) == "table" then
+                        cfg.Global.IndividualRotation = Vector3.new(cfg.Global.IndividualRotation.X, cfg.Global.IndividualRotation.Y, cfg.Global.IndividualRotation.Z)
+                    else
+                        cfg.Global.IndividualRotation = Vector3.new(0,-90,0)
+                    end
+
                     
                     -- Restore local variables from saved settings
                     if cfg.LocalSettings then
