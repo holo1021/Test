@@ -6,25 +6,26 @@ local HttpService = game:GetService("HttpService")
 local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
--- Event definitions from test.lua
+-- test.luaから持ってきたイベント定義
 local GrabEvents = ReplicatedStorage:WaitForChild("GrabEvents")
 local SetNetworkOwner = GrabEvents:WaitForChild("SetNetworkOwner")
 
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 
--- Author Information
+-- 作者情報の定義
 local AuthorName = "holon_calm"
 local RobloxID = "najayou777"
 local DetailIcon = "rbxassetid://7733964719"
 
+-- リンク集を表示する共通関数（認証画面とメイン画面で使い回せます）
 local function AddDetailContent(Tab)
     Tab:AddButton({
-        Name = "JP版コピー&起動",
+        Name = "نسخ وتشغيل النسخة الإنجليزية",
         Callback = function()
-            setclipboard("loadstring(game:HttpGet(\"https://raw.githubusercontent.com/hololove1021/HolonHUB/refs/heads/main/language/hub-jp.lua\"))()")
+            setclipboard("loadstring(game:HttpGet(\"https://raw.githubusercontent.com/hololove1021/HolonHUB/refs/heads/main/language/hub-en.lua\"))()")
             task.spawn(function()
-                loadstring(game:HttpGet("https://raw.githubusercontent.com/hololove1021/HolonHUB/refs/heads/main/language/hub-jp.lua"))()
+                loadstring(game:HttpGet("https://raw.githubusercontent.com/hololove1021/HolonHUB/refs/heads/main/language/hub-en.lua"))()
             end)
         end
     })
@@ -33,7 +34,7 @@ local function AddDetailContent(Tab)
         Name = "TikTok",
         Callback = function()
             setclipboard("https://www.tiktok.com/@holon_calm")
-            OrionLib:MakeNotification({Name = "Link", Content = "Copied TikTok link to clipboard", Time = 3})
+            OrionLib:MakeNotification({Name = "الرابط", Content = "تم نسخ رابط TikTok", Time = 3})
         end
     })
     
@@ -41,7 +42,7 @@ local function AddDetailContent(Tab)
         Name = "Discord",
         Callback = function()
             setclipboard("https://discord.gg/EHBXqgZZYN")
-            OrionLib:MakeNotification({Name = "Link", Content = "Copied Discord invite link to clipboard", Time = 3})
+            OrionLib:MakeNotification({Name = "الرابط", Content = "تم نسخ رابط دعوة Discord", Time = 3})
         end
     })
     
@@ -49,16 +50,16 @@ local function AddDetailContent(Tab)
         Name = "YouTube",
         Callback = function()
             setclipboard("https://www.youtube.com/@Holoncalm")
-            OrionLib:MakeNotification({Name = "Link", Content = "Copied YouTube link to clipboard", Time = 3})
+            OrionLib:MakeNotification({Name = "الرابط", Content = "تم نسخ رابط YouTube", Time = 3})
         end
     })
-    Tab:AddLabel("Author: " .. AuthorName)
+    Tab:AddLabel("المؤلف: " .. AuthorName)
     Tab:AddLabel("Roblox ID: " .. RobloxID)
 end
 
--- Create BodyMover function
+-- BodyMover作成関数
 local function createBodyMovers(part)
-    -- Delete existing Movers if any
+    -- 既存のMoverがあれば削除
     for _, child in ipairs(part:GetChildren()) do
         if child:IsA("BodyPosition") or child:IsA("BodyGyro") then
             child:Destroy()
@@ -83,52 +84,52 @@ end
 
 local function getActiveTargetMain()
     if targetMainName == "" then return LocalPlayer end
-    -- Find the "current" player by name again
+    -- 名前から「今現在」のプレイヤーを探し直す
     return Players:FindFirstChild(targetMainName) or LocalPlayer
 end
 
--- Function to automatically get plot CFrame
+-- プロット位置を自動取得する関数
 local function getMyPlotCFrame()
     local plots = Workspace:FindFirstChild("Plots")
     if not plots then 
-        warn("Holon HUB: Plots folder not found in Workspace")
+        warn("Holon HUB: لم يتم العثور على مجلد Plots في Workspace")
         return nil 
     end
 
     local myName = LocalPlayer.Name
 
     for _, plot in ipairs(plots:GetChildren()) do
-        -- Structure I was taught: Plot○ -> PlotSign -> ThisPlotsOwners -> Value -> Data -> Value
+        -- 教えていただいた構造: Plot○ -> PlotSign -> ThisPlotsOwners -> Value -> Data -> Value
         local plotSign = plot:FindFirstChild("PlotSign")
         local ownerValObj = plotSign and plotSign:FindFirstChild("ThisPlotsOwners")
         local valueFolder = ownerValObj and ownerValObj:FindFirstChild("Value")
         local dataObj = valueFolder and valueFolder:FindFirstChild("Data")
 
-        -- Check the content of Data.Value which is a StringValue
+        -- StringValue である Data.Value の中身をチェック
         if dataObj and dataObj:IsA("StringValue") then
             if dataObj.Value == myName then
-                print("Holon HUB: Plot found! Target:", plot.Name)
-                return plot:GetPivot() -- Return the plot's center CFrame
+                print("Holon HUB: تم العثور على الأرض! الهدف:", plot.Name)
+                return plot:GetPivot() -- プロットの中心座標を返す
             end
         end
     end
     
-    warn("Holon HUB: Your plot was not found.")
+    warn("Holon HUB: أرضك لم توجد.")
     return nil
 end
 
--- ■ 1. Fix getMusicKeyboard function (change to search logic similar to toy list)
+-- ■ 1. getMusicKeyboard 関数の修正 (おもちゃリスト同様の探索ロジックに変更)
 local function getMusicKeyboard()
     local myName = LocalPlayer.Name
     
-    -- 1. Search from SpawnedInToys
+    -- 1. SpawnedInToys から探す
     local spawnedToys = Workspace:FindFirstChild(myName .. "SpawnedInToys")
     if spawnedToys then
         local kb = spawnedToys:FindFirstChild("MusicKeyboard")
         if kb then return kb end
     end
 
-    -- 2. Search from Plots
+    -- 2. Plots から探す
     local plots = Workspace:FindFirstChild("Plots")
     local plotItems = Workspace:FindFirstChild("PlotItems")
 
@@ -140,13 +141,13 @@ local function getMusicKeyboard()
                 local val = ownerObj:FindFirstChild("Value") or ownerObj
                 local data = val:FindFirstChild("Data") or val
                 if (data:IsA("StringValue") and data.Value == myName) then
-                    -- Search inside PlotItems folder (referencing startEffect)
+                    -- PlotItemsフォルダ内を検索 (startEffectを参考)
                     local myPlotItems = plotItems:FindFirstChild(plot.Name)
                     if myPlotItems then
                         local kb = myPlotItems:FindFirstChild("MusicKeyboard")
                         if kb then return kb end
                     end
-                    -- Search inside Build just in case
+                    -- 念のためBuild内も検索
                     local build = plot:FindFirstChild("Build")
                     local kb = build and build:FindFirstChild("MusicKeyboard")
                     if kb then return kb end
@@ -155,7 +156,7 @@ local function getMusicKeyboard()
         end
     end
 
-    -- 3. Search for owned MusicKeyboard from the entire Workspace
+    -- 3. Workspace全体から所有権のある MusicKeyboard を探す
     for _, item in ipairs(Workspace:GetChildren()) do
         if item.Name == "MusicKeyboard" and item:IsA("Model") then
             local ownerValue = item:FindFirstChild("Owner") or item:FindFirstChild("PartOwner")
@@ -168,7 +169,7 @@ local function getMusicKeyboard()
     return nil
 end
 
--- Variables for piano function (defined before the function to be visible)
+-- ピアノ機能用の変数 (関数の前に定義して、関数から見えるようにする)
 local pianoEnabled = false
 local pianoFollowEnabled = true
 local selectedSongFile = nil
@@ -177,15 +178,13 @@ local pianoKeyboard = nil
 local isPlayingSong = false
 local pianoUpdateConnection = nil
 local lastPianoCF = nil
-local pianoOriginalCollisions = {}
-local manualPlayEnabled = false -- For managing manual play UI state
-
--- Recording function variables
+local pianoOriginalCollisions = {} 
+local manualPlayEnabled = false -- للتحكم في حالة واجهة المستخدم للعب اليدوي
 local isRecording = false
 local recordedNotes = {}
 local recordStartTime = 0
 
--- Piano manual play UI
+-- واجهة مستخدم العزف اليدوي على البيانو
 local pianoUIGui = nil
 local function createPianoUI()
     if pianoUIGui and pianoUIGui.Parent then return end
@@ -195,18 +194,18 @@ local function createPianoUI()
     pianoUIGui.Parent = game:GetService("CoreGui")
     pianoUIGui.Enabled = manualPlayEnabled
     pianoUIGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
-    pianoUIGui.DisplayOrder = 100 -- Show on top
+    pianoUIGui.DisplayOrder = 100 -- إظهار في المقدمة
     pianoUIGui.ResetOnSpawn = false
 
     local mainFrame = Instance.new("Frame")
     mainFrame.AnchorPoint = Vector2.new(0.5, 1)
     mainFrame.Position = UDim2.new(0.5, 0, 0.95, 0)
-    mainFrame.Size = UDim2.new(0, 500, 0, 140) -- Reduced size
+    mainFrame.Size = UDim2.new(0, 500, 0, 140) -- حجم مصغر
     mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
     mainFrame.BackgroundTransparency = 0.3
     mainFrame.Parent = pianoUIGui
     
-    -- Close button
+    -- زر الإغلاق
     local closeBtn = Instance.new("TextButton", mainFrame)
     closeBtn.Size = UDim2.new(0, 20, 0, 20)
     closeBtn.Position = UDim2.new(1, -25, 0, 5)
@@ -222,7 +221,7 @@ local function createPianoUI()
         end
     end)
 
-    -- Recording/Save UI
+    -- واجهة مستخدم التسجيل/الحفظ
     local recFrame = Instance.new("Frame", mainFrame)
     recFrame.Size = UDim2.new(1, -40, 0, 25)
     recFrame.Position = UDim2.new(0, 10, 0, 5)
@@ -230,7 +229,7 @@ local function createPianoUI()
     
     local recBtn = Instance.new("TextButton", recFrame)
     recBtn.Size = UDim2.new(0, 50, 1, 0)
-    recBtn.Text = "Record"
+    recBtn.Text = "تسجيل"
     recBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
     recBtn.TextColor3 = Color3.new(1,1,1)
     recBtn.MouseButton1Click:Connect(function()
@@ -238,18 +237,18 @@ local function createPianoUI()
         if isRecording then
             recordedNotes = {}
             recordStartTime = tick()
-            recBtn.Text = "Stop"
-            OrionLib:MakeNotification({Name="Record", Content="Recording started", Time=2})
+            recBtn.Text = "إيقاف"
+            OrionLib:MakeNotification({Name="تسجيل", Content="بدأ التسجيل", Time=2})
         else
-            recBtn.Text = "Record"
-            OrionLib:MakeNotification({Name="Record", Content="Recording stopped", Time=2})
+            recBtn.Text = "تسجيل"
+            OrionLib:MakeNotification({Name="تسجيل", Content="توقف التسجيل", Time=2})
         end
     end)
     
     local nameBox = Instance.new("TextBox", recFrame)
     nameBox.Size = UDim2.new(0, 120, 1, 0)
     nameBox.Position = UDim2.new(0, 60, 0, 0)
-    nameBox.PlaceholderText = "Filename"
+    nameBox.PlaceholderText = "اسم الملف"
     nameBox.Text = ""
     nameBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
     nameBox.TextColor3 = Color3.new(1,1,1)
@@ -257,7 +256,7 @@ local function createPianoUI()
     local saveBtn = Instance.new("TextButton", recFrame)
     saveBtn.Size = UDim2.new(0, 50, 1, 0)
     saveBtn.Position = UDim2.new(0, 190, 0, 0)
-    saveBtn.Text = "Save"
+    saveBtn.Text = "حفظ"
     saveBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
     saveBtn.TextColor3 = Color3.new(1,1,1)
     saveBtn.MouseButton1Click:Connect(function()
@@ -300,7 +299,6 @@ local function createPianoUI()
             task.spawn(pressPianoKey, keyName)
         end)
         
-        -- Key display
         if _G.HolonPianoKeyMapReverse then
             btn.Text = _G.HolonPianoKeyMapReverse[keyName] or ""
             btn.TextSize = 14
@@ -325,27 +323,27 @@ local function createPianoUI()
     end
 end
 
--- Function to make the piano follow in front of the waist
+-- ピアノを腰の前に追従させる関数
 local function setupPianoFollow()
-    -- if pianoKeyboard is nil, get it again
+    -- pianoKeyboardがnilなら再取得
     if not pianoKeyboard then pianoKeyboard = getMusicKeyboard() end
     if not pianoKeyboard then return end
     
-    -- If already running, do nothing
+    -- 既に実行中の場合は何もしない
     if pianoUpdateConnection then return end
 
-    -- ★Fix: Find Main part (or PrimaryPart if not found)
+    -- ★修正: Mainパーツを探す (なければPrimaryPart)
     local mainPart = pianoKeyboard:FindFirstChild("Main", true) or pianoKeyboard.PrimaryPart
     if not mainPart then 
-        warn("Holon HUB: Piano's Main part not found")
+        warn("Holon HUB: لم يتم العثور على الجزء الرئيسي للبيانو")
         return 
     end
-    print("Holon HUB: Starting piano setup:", pianoKeyboard.Name)
+    print("Holon HUB: بدء إعداد البيانو:", pianoKeyboard.Name)
     
-    -- Initial setup similar to startEffect
+    -- startEffect同様の初期設定
     for _, part in ipairs(pianoKeyboard:GetDescendants()) do
         if part:IsA("BasePart") then
-            -- ★Add: Save original collision properties
+            -- ★追加: 元の当たり判定を保存
             if pianoOriginalCollisions[part] == nil then
                 pianoOriginalCollisions[part] = part.CanCollide
             end
@@ -356,7 +354,7 @@ local function setupPianoFollow()
             part.Massless = true
             part.AssemblyLinearVelocity = Vector3.zero
             part.AssemblyAngularVelocity = Vector3.zero
-            -- Get network ownership (matching startEffect's method)
+            -- 所有権を取得 (startEffectの方式に合わせる)
             pcall(function() part:SetNetworkOwner(LocalPlayer) end)
         end
     end
@@ -390,7 +388,7 @@ local function setupPianoFollow()
             return 
         end
 
-        -- Maintain ownership (matching startEffect's method)
+        -- 所有権維持 (startEffectの方式に合わせる)
         if math.random() < 0.05 then
              pcall(function() pp:SetNetworkOwner(LocalPlayer) end)
         end
@@ -401,10 +399,10 @@ local function setupPianoFollow()
         ap.Position = targetCF.Position
         ao.CFrame = targetCF
     end)
-    print("Holon HUB: Started piano follow")
+    print("Holon HUB: بدأ تتبع البيانو")
 end
 
--- Function to stop/release the piano
+-- ピアノを停止・解放する関数
 local function stopPiano()
     if pianoUpdateConnection then
         pianoUpdateConnection:Disconnect()
@@ -413,7 +411,7 @@ local function stopPiano()
     if pianoKeyboard and pianoKeyboard.Parent then
         local pp = pianoKeyboard:FindFirstChild("Main", true) or pianoKeyboard.PrimaryPart
         if not pp then return end
-        -- Delete AlignPosition/Orientation
+        -- AlignPosition/Orientation を削除
         for _, child in ipairs(pp:GetChildren()) do
             if child:IsA("Attachment") or child:IsA("AlignPosition") or child:IsA("AlignOrientation") then
                 child:Destroy()
@@ -421,57 +419,55 @@ local function stopPiano()
         end
     end
     
-    -- ★Add: Restore collision properties
+    -- ★追加: 当たり判定を元に戻す
     for part, canCollide in pairs(pianoOriginalCollisions) do
         if part and part.Parent then
             part.CanCollide = canCollide
         end
     end
-    pianoOriginalCollisions = {} -- Clear the table
+    pianoOriginalCollisions = {} -- テーブルをクリア
 
-    print("Holon HUB: Stopped piano follow")
+    print("Holon HUB: تم إيقاف تتبع البيانو")
 end
 
--- Piano key mapping (corresponds to image layout)
+-- ピアノのキーマッピング（画像の配置に対応）
 local pianoKeyMap = {
-    -- White keys
+    -- 白鍵
     ["1"] = "Key1C", ["2"] = "Key1D", ["3"] = "Key1E", ["4"] = "Key1F", 
     ["5"] = "Key1G", ["6"] = "Key1A", ["7"] = "Key1B", ["8"] = "Key2C",
     ["9"] = "Key2D", ["0"] = "Key2E", ["q"] = "Key2F", ["w"] = "Key2G",
     ["e"] = "Key2A", ["r"] = "Key2B", ["t"] = "Key3C",
     
-    -- Black keys
+    -- 黒鍵
     ["f"] = "Key1Csharp", ["g"] = "Key1Dsharp", ["h"] = "Key1Fsharp",
     ["j"] = "Key1Gsharp", ["k"] = "Key1Asharp", ["l"] = "Key2Csharp",
     ["z"] = "Key2Dsharp", ["x"] = "Key2Fsharp", ["c"] = "Key2Gsharp",
     ["v"] = "Key2Asharp"
 }
 
--- Reverse map for UI display
 _G.HolonPianoKeyMapReverse = {}
 for k, v in pairs(pianoKeyMap) do
     _G.HolonPianoKeyMapReverse[v] = k:upper()
 end
 
--- 1. Function to press a piano key
-local function canPressPianoKey()
-    return pianoEnabled
-end
-local function pressPianoKey(keyName)
-    if not canPressPianoKey() then return end
+local function canPressPianoKey() return pianoEnabled end
 
-    -- Directly search for MusicKeyboard every time
+-- 1. 鍵盤を叩く関数
+local function pressPianoKey(keyName)
+    -- 毎回直接 MusicKeyboard を探しに行く
     local targetKeyboard = getMusicKeyboard()
     
-    -- If not found, exit
+    -- 見つからなければ終了
     if not targetKeyboard then return end
+
+    if not canPressPianoKey() then return end
 
     local key = targetKeyboard:FindFirstChild(keyName, true)
     if key and key:IsA("BasePart") then
-        -- Set Network Owner (notify server)
+        -- ネットワークオーナーの設定（サーバーへ通知）
         SetNetworkOwner:FireServer(key, key.CFrame)
         
-        -- Specified wait time
+        -- 指定の待機時間
         task.wait(0.15)
     end
 
@@ -481,13 +477,13 @@ local function pressPianoKey(keyName)
     end
 end
 
--- 2. Function to play from JSON
+-- 2. JSON再生関数
 local function playSongFromJSON(jsonData)
     if isPlayingSong then return end
     
     local songData
     local success, err = pcall(function()
-        -- If it's a string, decode it; if it's a table, use it as is
+        -- 文字列ならデコード、テーブルならそのまま使う
         if type(jsonData) == "string" then
             return HttpService:JSONDecode(jsonData)
         else
@@ -496,24 +492,24 @@ local function playSongFromJSON(jsonData)
     end)
     
     if not success or type(err) ~= "table" then
-        warn("Failed to load JSON data")
+        warn("فشل تحميل بيانات JSON")
         return
     end
     songData = err
 
     isPlayingSong = true
-    print("Starting performance: " .. #songData .. " notes")
+    print("بدء العزف: " .. #songData .. " نغمة")
     
     task.spawn(function()
-        -- Find the piano once before starting the performance
+        -- 演奏開始前に一度だけピアノを探す
         if not pianoKeyboard then pianoKeyboard = getMusicKeyboard() end
         
         for i, note in ipairs(songData) do
-            -- Stop only when the "Stop" button is pressed
+            -- ボタンで「停止」を押したときだけ止まるようにする
             if not isPlayingSong then break end
             
             local rawKey = tostring(note.key)
-            -- If the JSON key starts with "Key", use it as is without conversion (to prevent misconversion)
+            -- JSONのキーが "Key" で始まる場合は変換せずそのまま使う（誤変換防止）
             local keyName = rawKey
             if not string.match(rawKey, "^Key") then
                 keyName = pianoKeyMap[rawKey] or rawKey
@@ -521,21 +517,21 @@ local function playSongFromJSON(jsonData)
             
             local delayTime = note.delay or 0.1
             
-            -- Press using the same mechanism as the test
+            -- テストと同じ仕組みで叩く
             task.spawn(function()
                 pressPianoKey(keyName)
             end)
             
-            -- Wait until the next note
+            -- 次の音まで待機
             task.wait(delayTime)
         end
         
         isPlayingSong = false
-        print("Performance finished")
+        print("انتهى العزف")
     end)
 end
 
--- Stop song playback
+-- 曲の再生を停止
 local function stopSong()
     isPlayingSong = false
 end
@@ -543,7 +539,7 @@ end
 -- Recording save function (called from UI)
 _G.HolonSaveRecording = function(filename)
     if #recordedNotes == 0 then 
-        OrionLib:MakeNotification({Name="Save", Content="No recording data", Time=3})
+        OrionLib:MakeNotification({Name="حفظ", Content="لا توجد بيانات تسجيل", Time=3})
         return 
     end
     
@@ -574,7 +570,7 @@ _G.HolonSaveRecording = function(filename)
     local success, json = pcall(function() return HttpService:JSONEncode(finalData) end)
     if success then
         writefile("FTAP_Notes/" .. fname, json)
-        OrionLib:MakeNotification({Name="Save", Content="Saved " .. fname, Time=3})
+        OrionLib:MakeNotification({Name="حفظ", Content="تم حفظ " .. fname, Time=3})
         isRecording = false
     else
         warn("JSON Encode Error")
@@ -582,10 +578,10 @@ _G.HolonSaveRecording = function(filename)
 end
 
 --------------------------------------------------------------------------------
--- [Data Definition] Vector Paths / Shape Data
+-- [データ定義] ベクターパス / 形状データ
 --------------------------------------------------------------------------------
 local Paths = {
-    -- Simple stroke data for Alphabet (A-Z, Space)
+    -- アルファベット (A-Z, Space) の簡易ストロークデータ
     Alpha = {
         ["A"]={Vector2.new(0,0),Vector2.new(1,2),Vector2.new(2,0),Vector2.new(1.5,1),Vector2.new(0.5,1)},
         ["B"]={Vector2.new(0,0),Vector2.new(0,2),Vector2.new(1.5,2),Vector2.new(1.5,1),Vector2.new(0,1),Vector2.new(1.5,1),Vector2.new(1.5,0),Vector2.new(0,0)},
@@ -615,29 +611,29 @@ local Paths = {
         ["Z"]={Vector2.new(0,2),Vector2.new(2,2),Vector2.new(0,0),Vector2.new(2,0)},
         [" "]={Vector2.new(0,0), Vector2.new(0,0)}
     },
-    -- Merkaba solid vertices
+    -- マカバ (Merkaba) 立体頂点
     Merkaba = { 
         Vector3.new(1,1,1),Vector3.new(-1,-1,1),Vector3.new(-1,1,-1),Vector3.new(1,-1,-1),
         Vector3.new(1,1,1),Vector3.new(-1,-1,-1),Vector3.new(1,1,-1),Vector3.new(1,-1,1),
         Vector3.new(-1,1,1),Vector3.new(-1,-1,-1) 
     },
-    -- Pentagram
+    -- 五芒星
     Star = (function() local t={}; for i=0,5 do local a=math.rad(i*144+90); table.insert(t, Vector2.new(math.cos(a),math.sin(a))) end; return t end)(),
-    -- Circle
+    -- 円
     Circle = (function() local t={}; for i=0,20 do local a=math.rad(i*18); table.insert(t, Vector2.new(math.cos(a),math.sin(a))) end; return t end)(),
     MagicCircle2 = (function()
         local t = {}
-        -- Outer large circle
+        -- 外側の大きな円
         for i = 0, 36 do
             local a = math.rad(i * 10)
             table.insert(t, Vector2.new(math.cos(a) * 2, math.sin(a) * 2))
         end
-        -- Middle circle
+        -- 中間の円
         for i = 0, 24 do
             local a = math.rad(i * 15)
             table.insert(t, Vector2.new(math.cos(a) * 1.5, math.sin(a) * 1.5))
         end
-        -- Inner circle
+        -- 内側の円
         for i = 0, 18 do
             local a = math.rad(i * 20)
             table.insert(t, Vector2.new(math.cos(a), math.sin(a)))
@@ -647,7 +643,7 @@ local Paths = {
     
     MagicCircle3 = (function()
         local t = {}
-        -- Multi-layered circle structure
+        -- 多重円構造
         for layer = 1, 5 do
             local radius = 2.5 - (layer * 0.4)
             local points = 12 + (layer * 4)
@@ -661,7 +657,7 @@ local Paths = {
 }
 
 --------------------------------------------------------------------------------
--- [Config & Variable Management]
+-- [コンフィグ & 変数管理]
 --------------------------------------------------------------------------------
 local defaultConfig = {
     Wing = { Size = 30, Gap = 3.0, Speed = 6, Height = 0.5, Back = 0, Joints = 3, V_Angle = 0, Tilt = 0, Strength = 15, RootFixed = true, Curve = false, CurveAmount = 10 },
@@ -698,7 +694,7 @@ local function deepCopy(target)
     return copy
 end
 
-local selectedItemName = "All Toys" 
+local selectedItemName = "جميع الألعاب" 
 local detectedItems = {}
 
 local cfg = deepCopy(defaultConfig)
@@ -711,7 +707,7 @@ local autoWidth = true
 local activeToys = {}        -- {A0, A1, AP, AO, Part}
 local originalCollisions = {} -- {Part: Boolean}
 local updateConnection = nil
-local isReturningToPlot = false -- Flag for returning to plot (important)
+local isReturningToPlot = false -- Plot帰還中のフラグ（重要）
 
 -- Gyro physics variables
 local gyroInnerAngularVelocity = 0
@@ -721,7 +717,7 @@ local lastUpdateTick = 0
 local espCache = {}
 local espCfg = { Enabled = false, Names = true, Tracers = false, Hitbox = false, HitboxSize = 10, ESPColor = Color3.new(1, 0, 0), TargetOnly = false }
 
--- Player setting variables
+-- プレイヤー設定用変数
 local walkSpeed = 16
 local jumpPower = 25
 local infiniteJump = false
@@ -733,32 +729,32 @@ local antiFire = false
 local antiGrab = false
 
 --------------------------------------------------------------------------------
--- [Calculation Logic] Coordinate calculation for each mode
+-- [計算ロジック] 各モードの座標計算
 --------------------------------------------------------------------------------
 local function getPositionForMode(mode, i, count, time)
     local c = cfg[mode] or cfg.Wing
     
-    -- i is from 1 to count. Calculate the ratio.
+    -- iは1からcountまで。比率を計算
     local ratio = (i-1) / (count > 1 and count-1 or 1)
     
     if mode == "Wing" then
     local side, idx, totalSide
 
     if combinedActive then
-        -- [Combined Mode]
-        -- i is the overall serial number (1,2,3,4...), so just divide by odd/even
-        side = (i % 2 == 1) and -1 or 1 -- 1->left(-1), 2->right(1)
-        idx = math.ceil(i / 2)          -- 1st, 2nd are 1st tier, 3rd, 4th are 2nd tier...
+        -- 【合体モード】
+        -- i は全体の通し番号(1,2,3,4...)なので、そのまま奇数/偶数で分ける
+        side = (i % 2 == 1) and -1 or 1 -- 1->左(-1), 2->右(1)
+        idx = math.ceil(i / 2)          -- 1,2番目は1段目、3,4番目は2段目...
         totalSide = math.ceil(count / 2)
     else
-        -- [Single Mode]
-        -- Arrange in order within its own parts
+        -- 【単体モード】
+        -- 自分のパーツ内での順番通りに並べる
         side = (i % 2 == 1) and -1 or 1
         idx = math.ceil(i / 2)
         totalSide = math.ceil(count / 2)
     end
 
-    -- Subsequent calculations are common
+    -- 以降の計算は共通
     local distRatio = idx / math.max(1, totalSide)
     
     local flapPhase = time * c.Speed
@@ -780,16 +776,13 @@ local function getPositionForMode(mode, i, count, time)
         0
     )
     
-    -- Curve (soar) calculation: linked to flapping
     if c.Curve then
         local curve_amount = c.CurveAmount or 10
-        -- Get the current phase of the flap (-1 to 1)
         local flap_ratio = math.sin(flapPhase)
-        -- Calculate the angle that curves more towards the tip for both up and down flaps
         local soar_angle = math.rad(flap_ratio * curve_amount * distRatio)
-        -- Express the "soar" by rotating around the wing root
         rotCF = rotCF * CFrame.Angles(0, 0, soar_angle * side)
     end
+
     return (rotCF * pos) + Vector3.new(0, c.Height, c.Back)
         
     elseif mode == "Heart" then
@@ -799,38 +792,38 @@ local function getPositionForMode(mode, i, count, time)
         return Vector3.new(x * c.Size * 0.1, y * c.Size * 0.1 + c.Height, c.Back)
 
     elseif mode == "Star" then
-        -- Logic for drawing a beautiful pentagram (linear interpolation)
-        local totalPoints = 10 -- 5 vertices + 5 valleys
-        -- Animation progress
+        -- 綺麗な五芒星を描くためのロジック（直線補間）
+        local totalPoints = 10 -- 5つの頂点 + 5つの谷
+        -- アニメーション進行度
         local cycle = (time * c.Speed * 0.2 + ratio) % 1
         local currentStep = cycle * totalPoints
         
         local idx1 = math.floor(currentStep)
         local idx2 = (idx1 + 1) % totalPoints
-        local alpha = currentStep % 1 -- where it is between two points
+        local alpha = currentStep % 1 -- 2点間のどこにいるか
 
-        -- Local function to calculate star vertex coordinates
+        -- 星の頂点座標を計算するローカル関数
         local function getStarPoint(i)
-            -- Rotate by 36 degrees, +90 degrees to bring vertex to the top
+            -- 36度ずつ回転、+90度で頂点を真上に
             local theta = math.rad(i * 36 + 90) 
-            -- Even numbers are outer (Size), odd numbers are inner (Size * 0.382 -> sharpness close to golden ratio)
+            -- 偶数は外側(Size)、奇数は内側(Size * 0.382 -> 黄金比に近い鋭さ)
             local r = (i % 2 == 0) and c.Size or (c.Size * 0.382)
-            -- Inverting X can adjust clockwise/counter-clockwise rotation (here it's as is)
+            -- Xを反転させると時計回り/反時計回りが調整可能（ここではそのまま）
             return Vector2.new(-math.cos(theta) * r, math.sin(theta) * r)
         end
 
         local p1 = getStarPoint(idx1)
         local p2 = getStarPoint(idx2)
         
-        -- To remove roundness, connect the two calculated points with a straight line (Lerp)
+        -- 丸みを消すため、計算した2点間を直線で結ぶ(Lerp)
         local p = p1:Lerp(p2, alpha)
 
-        -- Make it the same orientation as Heart mode (vertical)
-        -- X=width, Y=height, Z=depth(fixed)
+        -- Heartモードと同じ向き（垂直）にする
+        -- X=横幅, Y=高さ(縦幅), Z=奥行き(固定)
         return Vector3.new(p.X, p.Y + c.Height, c.Back)
         
     elseif mode == "Vortex" then
-        -- Flat vortex
+        -- 平らな渦
         local spiral = (i / count) * math.pi * 4 + time * c.Speed
         local dist = (i / count) * c.Size
         
@@ -840,7 +833,7 @@ local function getPositionForMode(mode, i, count, time)
         return Vector3.new(x, c.Height, z + c.Back)
         
     elseif mode == "Sphere" then
-        -- Sphere placement
+        -- 球体配置
         local phi = math.acos(-1 + (2 * i) / count)
         local theta = math.sqrt(count * math.pi) * phi + time * c.Speed
         
@@ -851,12 +844,12 @@ local function getPositionForMode(mode, i, count, time)
         return Vector3.new(x, y + c.Height, z + c.Back)
 
     elseif mode == "Rotate" or mode == "MagicCircle" then
-    -- Rotate/Bagua: Star or Circle
+    -- 回転・八卦：星形または円
     local shape = (mode == "MagicCircle" and (i % 2 == 0)) and Paths.Star or Paths.Circle
     local speed = c.Speed
     local totalPoints = #shape
     
-    -- ★Complete rewrite
+    -- ★完全に書き直し
     local cycle = (time * speed * 0.1 + ratio) % 1
     local currentStep = cycle * totalPoints
     
@@ -864,14 +857,14 @@ local function getPositionForMode(mode, i, count, time)
     local idx2 = (math.floor(currentStep) + 1) % totalPoints + 1
     local alpha = currentStep % 1
     
-    -- Safe Lerp
+    -- 安全なLerp
     local p1 = shape[idx1]
     local p2 = shape[idx2]
     if not p1 or not p2 then return Vector3.zero end
     
     local p = p1:Lerp(p2, alpha)
     
-    -- Add Y-axis rotation
+    -- Y軸回転を追加
     local rotAngle = time * speed * 0.3
     local rotX = p.X * math.cos(rotAngle) - p.Y * math.sin(rotAngle)
     local rotY = p.X * math.sin(rotAngle) + p.Y * math.cos(rotAngle)
@@ -884,7 +877,7 @@ local function getPositionForMode(mode, i, count, time)
     return Vector3.new(rotX * c.Size, c.Height + waveY, rotY * c.Size + c.Back)
 
 elseif mode == "MagicCircle2" then
-    -- Radial magic circle like in image 1
+    -- 画像1のような放射状の魔法陣
     local totalPoints = #Paths.MagicCircle2
     local cycle = (time * c.Speed * 0.05 + ratio) % 1
     local currentStep = cycle * totalPoints
@@ -899,18 +892,18 @@ elseif mode == "MagicCircle2" then
     
     local p = p1:Lerp(p2, alpha)
     
-    -- Y-axis rotation
+    -- Y軸回転
     local rotAngle = time * c.Speed * 0.2
     local rotX = p.X * math.cos(rotAngle) - p.Y * math.sin(rotAngle)
     local rotZ = p.X * math.sin(rotAngle) + p.Y * math.cos(rotAngle)
     
-    -- Up and down wave
+    -- 上下の波動
     local wave = math.sin(time * c.Speed + i * 0.5) * 0.5
     
     return Vector3.new(rotX * c.Size, c.Height + wave, rotZ * c.Size + c.Back)
 
 elseif mode == "MagicCircle3" then
-    -- Vertical beam-style magic circle like in image 2
+    -- 画像2のような垂直ビーム風の魔法陣
     local totalPoints = #Paths.MagicCircle3
     local cycle = (time * c.Speed * 0.03 + ratio) % 1
     local currentStep = cycle * totalPoints
@@ -925,7 +918,7 @@ elseif mode == "MagicCircle3" then
     
     local p = p1:Lerp(p2, alpha)
     
-    -- Slow rotation
+    -- ゆっくり回転
     local rotAngle = time * c.Speed * 0.1
     local rotX = p.X * math.cos(rotAngle) - p.Y * math.sin(rotAngle)
     local rotZ = p.X * math.sin(rotAngle) + p.Y * math.cos(rotAngle)
@@ -933,41 +926,41 @@ elseif mode == "MagicCircle3" then
     return Vector3.new(rotX * c.Size, c.Height, rotZ * c.Size + c.Back)
 
     elseif mode == "Pet" then
-        -- Get various parameters from settings
+        -- 設定から各種パラメータを取得
         local petCountSetting = cfg.Pet.Count or 2
-        local totalFws = count -- Total available fireworks
+        local totalFws = count -- 使用可能な全花火数
         
-        -- Calculate fireworks per pet
+        -- 1体あたりの花火数を計算
         local fwsPerPet = math.floor(totalFws / petCountSetting)
         if fwsPerPet < 1 then fwsPerPet = 1 end
 
-        -- Which pet and which part number the current firework (i) is
+        -- 現在の花火(i)が、何体目のペットの、何番目のパーツか
         local petIndex = math.ceil(i / fwsPerPet)
         local partIndexInPet = (i - 1) % fwsPerPet 
         
-        -- Hide surplus fireworks exceeding the specified number of pets
+        -- 指定したペット数を超える余り花火は非表示
         if petIndex > petCountSetting then
             return Vector3.new(0, -1000, 0)
         end
 
-        -- Part role assignment (0:body, 1:left wing, 2:right wing)
+        -- パーツの役割分担 (0:体, 1:左羽, 2:右羽)
         local role = 0 
         local sideIndex = 0
         if partIndexInPet == 0 then
-            role = 0 -- First one is the body
+            role = 0 -- 最初の1個は体
         elseif partIndexInPet <= math.ceil((fwsPerPet - 1) / 2) then
-            role = 1 -- Left wing
+            role = 1 -- 左羽
             sideIndex = partIndexInPet
         else
-            role = 2 -- Right wing
+            role = 2 -- 右羽
             sideIndex = partIndexInPet - math.ceil((fwsPerPet - 1) / 2)
         end
 
-        -- Pet placement itself (use Gap to adjust spacing)
+        -- ペット自体の配置（Gapを使用して間隔を調整）
         local petSide = (petIndex % 2 == 0) and 1 or -1
         local horizontalOffset = (c.Gap or 5) + (math.floor((petIndex - 1) / 2) * 8)
         
-        -- Common floating move
+        -- 共通の浮遊ムーブ
         local hover = math.sin(time * c.Speed) * 1.2
         local bob = math.cos(time * c.Speed * 0.5) * 1
         
@@ -980,11 +973,11 @@ elseif mode == "MagicCircle3" then
         if role == 0 then
             return basePos
         else
-            -- Wing calculation
+            -- 羽の計算
             local wingSide = (role == 1) and -1 or 1
             
-            -- ★Fix here: Directly reflect c.Size to wing spread (width)
-            -- Spreads out by c.Size in proportion to sideIndex (part number within the wing)
+            -- ★ここを修正：c.Size を羽の広がり（幅）に直接反映
+            -- sideIndex（羽の中のパーツ番号）に比例して、c.Sizeの分だけ外に広がります
             local wingSpread = (sideIndex * (c.Size * 0.1)) 
             
             local flapPhase = time * c.Speed * 3 - (sideIndex * 0.3)
@@ -993,25 +986,25 @@ elseif mode == "MagicCircle3" then
             local jointFactor = (c.Joints or 3) * 0.2
             
             return basePos + Vector3.new(
-                wingSide * (1 + jointFactor + wingSpread), -- c.Size is applied here
+                wingSide * (1 + jointFactor + wingSpread), -- c.Sizeがここにかかる
                 flap * (1 + jointFactor),
                 -0.5 + (sideIndex * 0.1)
             )
         end
 
     elseif mode == "FloatStone" then
-        -- Introduce "chaos deployment" movement from animation into calculation
+        -- アニメーションの「カオス展開」の動きを計算に導入
         local rTime = time * cfg[mode].Speed
         local spread = cfg[mode].Size
         
-        -- Generate irregular trajectory by combining multiple sine waves
+        -- 複数の正弦波を組み合わせて不規則な軌道を生成
         local x = math.cos(rTime + i * 1.5) * spread
         local y = math.sin(rTime * 0.7 + i) * (spread * 0.5) + cfg[mode].Height
         local z = math.sin(rTime * 1.2 + i * 2.2) * spread + cfg[mode].Back
         
         return Vector3.new(x, y, z)
 
--- [Text Mode Calculation Logic Excerpt] 
+-- [Textモードの計算ロジック抜粋] 
 
     elseif mode == "Text" then
         local str = cfg.Text.Content
@@ -1028,7 +1021,7 @@ elseif mode == "MagicCircle3" then
         local charStr = chars[charIndex]
         local path = Paths.Alpha[charStr:upper()] or Paths.Alpha[" "]
         
-        -- Animation calculation
+        -- アニメーション計算
         local totalPoints = #path
         local speed = math.max(1, math.floor(c.Speed)) * 0.5
         local cycle = (time * speed + (i % fwsPerChar) * 0.1) % 2 
@@ -1037,21 +1030,21 @@ elseif mode == "MagicCircle3" then
         local idx2 = math.min(idx1 + 1, totalPoints)
         local p = path[idx1]:Lerp(path[idx2] or path[idx1], tP % 1)
         
-        -- ★ Automatic character spacing adjustment
-        -- Set so that as size (c.Size) increases, spacing also increases
+        -- ★ 文字間隔の自動調節
+        -- サイズ(c.Size)が大きくなれば間隔(spacing)も広がるように設定
         local charSizeScale = c.Size * 0.4
-        local spacing = c.Size * 1.2 -- Automatic adjustment with 1.2x spacing
+        local spacing = c.Size * 1.2 -- 1.2倍の間隔で自動調整
         local totalWidth = (numChars - 1) * spacing
         
-        -- Placement calculation (no inversion, always facing front)
-        local xPos = p.X * charSizeScale * -1 -- Orientation where the character shape looks correct
+        -- 配置計算 (反転なし、常に正面)
+        local xPos = p.X * charSizeScale * -1 -- 文字の形が正しく見える向き
         local yPos = p.Y * charSizeScale
         local xOffset = ((charIndex - 1) * spacing - (totalWidth / 2)) * -1
         
         return Vector3.new(xOffset + xPos, yPos + c.Height, -c.Back)
 
     elseif mode == "Merkaba" then
-        -- Merkaba: 3D rotation
+        -- マカバ：3D回転
         local totalP = #Paths.Merkaba
         local tP = (time * c.Speed + ratio * totalP) % totalP
         local p1 = Paths.Merkaba[math.floor(tP) + 1]
@@ -1059,76 +1052,19 @@ elseif mode == "MagicCircle3" then
         
         local p = p1:Lerp(p2, tP % 1) * c.Size
         
-        -- Complex 3-axis rotation
+        -- 複雑な3軸回転
         local rot = CFrame.Angles(time, time * 1.5, 0)
         return (rot * p) + Vector3.new(0, c.Height + math.sin(time * 2), c.Back)
 
-    elseif mode == "Cube" then
-        -- Cube vertex definition
-        local size = c.Size
-        local v = {
-            Vector3.new(size, size, size),      -- 1: Top-front-right
-            Vector3.new(-size, size, size),     -- 2: Top-front-left
-            Vector3.new(size, -size, size),     -- 3: Bottom-front-right
-            Vector3.new(-size, -size, size),    -- 4: Bottom-front-left
-            Vector3.new(size, size, -size),     -- 5: Top-back-right
-            Vector3.new(-size, size, -size),    -- 6: Top-back-left
-            Vector3.new(size, -size, -size),    -- 7: Bottom-back-right
-            Vector3.new(-size, -size, -size)    -- 8: Bottom-back-left
-        }
-
-        -- ■ Change: Define "faces (4-vertex loops)" instead of "edges"
-        local faces = {
-            {v[1], v[2], v[4], v[3]}, -- Front loop
-            {v[5], v[6], v[8], v[7]}, -- Back loop
-            {v[1], v[5], v[6], v[2]}, -- Top loop
-            {v[3], v[7], v[8], v[4]}, -- Bottom loop
-            {v[1], v[5], v[7], v[3]}, -- Right loop
-            {v[2], v[6], v[8], v[4]}  -- Left loop
-        }
-
-        local numFaces = #faces
-        
-        -- 1. Assign toys to the 6 faces in order
-        local faceIdx = ((i - 1) % numFaces) + 1
-        local currentFace = faces[faceIdx]
-
-        -- 2. Progress calculation (looping)
-        local speed = c.Speed * 0.5 
-        -- Prevent overlapping by shifting position for each toy (i * 0.25)
-        local totalProgress = (time * speed) + (i * 0.25)
-        
-        -- 3. Which edge (0-3) it's on, and where on that edge (0.0-1.0)
-        local edgeIndex = math.floor(totalProgress) % 4 + 1
-        local nextEdgeIndex = (edgeIndex % 4) + 1 -- Next vertex
-        local alpha = totalProgress % 1 -- Progress on the edge (0.0 -> 1.0)
-
-        -- 4. Calculate coordinates
-        local p1 = currentFace[edgeIndex]
-        local p2 = currentFace[nextEdgeIndex]
-        
-        local pos = p1:Lerp(p2, alpha)
-        
-        return pos + Vector3.new(0, c.Height, c.Back)
-
     elseif mode == "Pyramid" then
         local s = c.Size
-        -- Pyramid vertex definition
         local top = Vector3.new(0, s, 0)
-        local fl = Vector3.new(-s, -s, s)  -- Front-left
-        local fr = Vector3.new(s, -s, s)   -- Front-right
-        local br = Vector3.new(s, -s, -s)  -- Back-right
-        local bl = Vector3.new(-s, -s, -s) -- Back-left
+        local fl = Vector3.new(-s, -s, s)
+        local fr = Vector3.new(s, -s, s)
+        local br = Vector3.new(s, -s, -s)
+        local bl = Vector3.new(-s, -s, -s)
         
-        -- Define faces (vertex loops)
-        local faces = {
-            {top, fl, fr}, -- Front
-            {top, fr, br}, -- Right
-            {top, br, bl}, -- Back
-            {top, bl, fl}, -- Left
-            {fl, fr, br, bl} -- Bottom
-        }
-        
+        local faces = {{top, fl, fr}, {top, fr, br}, {top, br, bl}, {top, bl, fl}, {fl, fr, br, bl}}
         local numFaces = #faces
         local faceIdx = ((i - 1) % numFaces) + 1
         local currentFace = faces[faceIdx]
@@ -1136,15 +1072,60 @@ elseif mode == "MagicCircle3" then
         
         local speed = c.Speed * 0.5
         local totalProgress = (time * speed) + (i * 0.25)
-        
         local edgeIndex = math.floor(totalProgress) % numVerts + 1
         local nextEdgeIndex = (edgeIndex % numVerts) + 1
         local alpha = totalProgress % 1
+        local p1 = currentFace[edgeIndex]
+        local p2 = currentFace[nextEdgeIndex]
+        return p1:Lerp(p2, alpha) + Vector3.new(0, c.Height, c.Back)
+
+    elseif mode == "Cube" then
+        -- 立方体の頂点定義
+        local size = c.Size
+        local v = {
+            Vector3.new(size, size, size),      -- 1: 右上前
+            Vector3.new(-size, size, size),     -- 2: 左上前
+            Vector3.new(size, -size, size),     -- 3: 右下前
+            Vector3.new(-size, -size, size),    -- 4: 左下前
+            Vector3.new(size, size, -size),     -- 5: 右上後
+            Vector3.new(-size, size, -size),    -- 6: 左上後
+            Vector3.new(size, -size, -size),    -- 7: 右下後
+            Vector3.new(-size, -size, -size)    -- 8: 左下後
+        }
+
+        -- ■ 変更点: 「辺」ではなく「面（4頂点のループ）」を定義
+        local faces = {
+            {v[1], v[2], v[4], v[3]}, -- 前面ループ
+            {v[5], v[6], v[8], v[7]}, -- 背面ループ
+            {v[1], v[5], v[6], v[2]}, -- 上面ループ
+            {v[3], v[7], v[8], v[4]}, -- 底面ループ
+            {v[1], v[5], v[7], v[3]}, -- 右面ループ
+            {v[2], v[6], v[8], v[4]}  -- 左面ループ
+        }
+
+        local numFaces = #faces
         
+        -- 1. おもちゃを6つの面に順番に割り振る
+        local faceIdx = ((i - 1) % numFaces) + 1
+        local currentFace = faces[faceIdx]
+
+        -- 2. 進行具合の計算 (周回ループ)
+        local speed = c.Speed * 0.5 
+        -- おもちゃごとに位置をずらす (i * 0.25) ことで重なりを防ぐ
+        local totalProgress = (time * speed) + (i * 0.25)
+        
+        -- 3. 現在どの辺(0~3)にいるか、その辺のどこ(0.0~1.0)にいるか
+        local edgeIndex = math.floor(totalProgress) % 4 + 1
+        local nextEdgeIndex = (edgeIndex % 4) + 1 -- 次の頂点
+        local alpha = totalProgress % 1 -- 辺の上の進捗 (0.0 -> 1.0)
+
+        -- 4. 座標を計算
         local p1 = currentFace[edgeIndex]
         local p2 = currentFace[nextEdgeIndex]
         
-        return p1:Lerp(p2, alpha) + Vector3.new(0, c.Height, c.Back)
+        local pos = p1:Lerp(p2, alpha)
+        
+        return pos + Vector3.new(0, c.Height, c.Back)
 
     elseif mode == "MirrorPlayer" then
         local char = targetMain.Character
@@ -1152,7 +1133,7 @@ elseif mode == "MagicCircle3" then
         local root = char:FindFirstChild("HumanoidRootPart")
         if not root then return Vector3.new(0,0,0) end
 
-        -- 1. R6 part definition (set size and name)
+        -- 1. R6パーツ定義（サイズと名前をセット）
         local bodyParts = {
             { name = "Head",      size = Vector3.new(1.2, 1.2, 1.2) },
             { name = "Torso",     size = Vector3.new(2, 2, 1) },
@@ -1167,10 +1148,10 @@ elseif mode == "MagicCircle3" then
         local localIdx = ((i - 1) % toysPerPart) + 1
         local data = bodyParts[partIdx]
         
-        -- Identify the target part
+        -- 対象の部位を特定
         local targetPart = char:FindFirstChild(data.name) or root
 
-        -- 2. Size and shape calculation (this is where the toy's shape is made)
+        -- 2. サイズと形状の計算（ここはおもちゃの形を作る）
         local s = data.size * c.Size * 0.5
         local t = (time * c.Speed) % 4
         local step = t % 1
@@ -1183,33 +1164,33 @@ elseif mode == "MagicCircle3" then
         elseif faceIdx == 2 then p = (edge==0 and Vector3.new(s.X,-s.Y,-s.Z+s.Z*2*step) or edge==1 and Vector3.new(s.X,-s.Y+s.Y*2*step,s.Z) or edge==2 and Vector3.new(s.X,s.Y,s.Z-s.Z*2*step) or Vector3.new(s.X,s.Y-s.Y*2*step,-s.Z))
         elseif faceIdx == 3 then p = (edge==0 and Vector3.new(-s.X,-s.Y,-s.Z+s.Z*2*step) or edge==1 and Vector3.new(-s.X,-s.Y+s.Y*2*step,s.Z) or edge==2 and Vector3.new(-s.X,s.Y,s.Z-s.Z*2*step) or Vector3.new(-s.X,s.Y-s.Y*2*step,-s.Z))
         elseif faceIdx == 4 then p = (edge==0 and Vector3.new(-s.X+s.X*2*step,s.Y,-s.Z) or edge==1 and Vector3.new(s.X,s.Y,-s.Z+s.Z*2*step) or edge==2 and Vector3.new(s.X-s.X*2*step,s.Y,s.Z) or Vector3.new(-s.X,s.Y,s.Z-s.Z*2*step))
-        else p = (edge==0 and Vector3.new(-s.X+s.X*2*step,-s.Y,-s.Z) or edge==1 and Vector3.new(s.X,-s.Y,-s.Z+s.Z*2*step) or edge==2 and Vector3.new(s.X-s.X*2*step,-s.Y,s.Z) or Vector3.new(-s.X,s.Y,s.Z-s.Z*2*step)) end
+        else p = (edge==0 and Vector3.new(-s.X+s.X*2*step,-s.Y,-s.Z) or edge==1 and Vector3.new(s.X,-s.Y,-s.Z+s.Z*2*step) or edge==2 and Vector3.new(s.X-s.X*2*step,-s.Y,s.Z) or Vector3.new(-s.X,-s.Y,s.Z-s.Z*2*step)) end
 
-        -- 3. 【This is the magic formula to fix the position】
-        -- Calculate the offset of where each of my parts are relative to the RootPart
-        -- Using PointToObjectSpace, positions shifted by emotes etc. are also automatically calculated
+        -- 3. 【これが「位置」を直す魔法の式】
+        -- 自分の各部位が「RootPartから見てどこにいるか」というオフセットを計算
+        -- PointToObjectSpace を使うことで、エモート等でズレた位置も自動計算されます
         local partRelativePos = root.CFrame:PointToObjectSpace(targetPart.Position)
         
-        -- Back distance and Height offset
+        -- 背後距離(Back)と高さ(Height)のオフセット
         local extraOffset = Vector3.new(0, c.Height, -c.Back)
         
-        -- Apply rotation information (if the part tilts, the toy's frame also tilts)
+        -- 回転情報を適用（部位が傾けばおもちゃの枠も傾く）
         local rotatedBoxPoint = (root.CFrame:Inverse() * targetPart.CFrame).Rotation * p
 
-        -- Add them all up and return
-        -- [Part Relative Position] + [Stroke Vertex] + [User Setting Offset]
+        -- 全部を足して返す
+        -- [部位の相対位置] + [一筆書きの頂点] + [ユーザー設定のズレ]
         return partRelativePos + rotatedBoxPoint + extraOffset
 
     elseif mode == "Beam" then
-        -- Y-direction pillar of light
+        -- Y方向の光の柱
         local ang = (i % c.Count) * (math.pi * 2 / c.Count)
         local radius = c.Size * 0.3
         
-        -- Circular placement
+        -- 円周配置
         local x = math.cos(ang) * radius
         local z = math.sin(ang) * radius
         
-        -- Y-axis high-speed reciprocation
+        -- Y軸高速往復
         local yOsc = math.sin(time * c.Speed + (i / count) * math.pi * 2)
         local y = yOsc * c.Size
         
@@ -1218,15 +1199,15 @@ elseif mode == "MagicCircle3" then
     elseif mode == "BackGuard" then
         local spread = c.Size
     
-         -- Random position for each stone (ensure reproducibility with a fixed seed)
+         -- 各石のランダム位置(固定シードで再現性確保)
         local seed = i * 123.456
-        local randomX = (math.sin(seed) * 2 - 1) * spread  -- Scattered left and right
-        local randomY = (math.cos(seed * 1.3) * 2 - 1) * (spread * 0.3) + c.Height  -- Scattered up and down
+        local randomX = (math.sin(seed) * 2 - 1) * spread  -- 左右にバラバラ
+        local randomY = (math.cos(seed * 1.3) * 2 - 1) * (spread * 0.3) + c.Height  -- 上下にバラバラ
     
-        -- Placed at the back
+        -- 後ろ側に配置
         local backDistance = c.Back + math.abs(math.sin(seed * 0.7)) * spread * 0.5
     
-        -- Subtle floating motion
+        -- 微妙な浮遊動作
         local hover = math.sin(time * c.Speed + i * 0.5) * 0.5
     
         return Vector3.new(randomX, randomY + hover, -backDistance)
@@ -1241,25 +1222,14 @@ elseif mode == "MagicCircle3" then
         local currentH = h * ratio
 
         if c.Pyramid then
-            -- Square path
             local totalProgress = (time * c.Speed * 0.2) + (ratio * 4)
             local side = math.floor(totalProgress) % 4
             local progressOnSide = totalProgress % 1
-            
             local x, z
-            if side == 0 then -- Top
-                x = -currentR + (currentR * 2 * progressOnSide)
-                z = currentR
-            elseif side == 1 then -- Right
-                x = currentR
-                z = currentR - (currentR * 2 * progressOnSide)
-            elseif side == 2 then -- Bottom
-                x = currentR - (currentR * 2 * progressOnSide)
-                z = -currentR
-            else -- Left
-                x = -currentR
-                z = -currentR + (currentR * 2 * progressOnSide)
-            end
+            if side == 0 then x = -currentR + (currentR * 2 * progressOnSide); z = currentR
+            elseif side == 1 then x = currentR; z = currentR - (currentR * 2 * progressOnSide)
+            elseif side == 2 then x = currentR - (currentR * 2 * progressOnSide); z = -currentR
+            else x = -currentR; z = -currentR + (currentR * 2 * progressOnSide) end
             return Vector3.new(x, currentH + c.Height, z + c.Back)
         else
             local theta = time * c.Speed + ratio * math.pi * 4
@@ -1272,42 +1242,30 @@ elseif mode == "MagicCircle3" then
         local finalPos
         
         if i <= outerLimit then
-            -- Outer vertical circle (XY plane)
             local idx = i
             local total = outerLimit
             local r = c.Size
-            local angle = (idx / total) * math.pi * 2 + time * c.Speed -- Outer also rotates
-            
+            local angle = (idx / total) * math.pi * 2 + time * c.Speed
             local x = math.cos(angle) * r
             local y = math.sin(angle) * r
             finalPos = Vector3.new(x, y, 0)
-            
         else
-            -- Inner (inner circle + center)
             if i <= innerLimit then
-                -- Inner circle (tilted rotation)
                 local idx = i - outerLimit
                 local total = innerLimit - outerLimit
                 local r = c.Size
                 local angle = (idx / total) * math.pi * 2 + time * c.Speed
-                
-                -- Base on YZ plane circle
                 local y = math.cos(angle) * r
                 local z = math.sin(angle) * r
-                
-                -- Tilt by 45 degrees around Z-axis
                 local tilt = math.rad(45)
-                local tx = -y * math.sin(tilt) -- x(0) * cos - y * sin
-                local ty = y * math.cos(tilt)  -- x(0) * sin + y * cos
-                
+                local tx = -y * math.sin(tilt)
+                local ty = y * math.cos(tilt)
                 finalPos = Vector3.new(tx, ty, z)
             else
-                -- Center object (selectable)
                 local idx = i - innerLimit
                 local total = count - innerLimit
                 local r = (c.InnerSize or (c.Size * 0.6)) * 0.4
                 local cType = c.CenterType or "Sphere"
-                
                 if cType == "Sphere" then
                     local phi = math.acos(-1 + (2 * idx) / total)
                     local theta = math.sqrt(total * math.pi) * phi + time * c.Speed * 2
@@ -1326,7 +1284,7 @@ elseif mode == "MagicCircle3" then
                     local x = math.cos(angle) * r
                     local y = math.sin(angle) * r
                     finalPos = Vector3.new(x, y, 0)
-                else -- Random
+                else 
                     local seed = idx * 13.37
                     local x = math.sin(time * 2 + seed) * r
                     local y = math.cos(time * 2.5 + seed) * r
@@ -1334,17 +1292,12 @@ elseif mode == "MagicCircle3" then
                     finalPos = Vector3.new(x, y, z)
                 end
             end
-
-            -- Only rotate the inner effect structure
-            local rotAngle = gyroInnerAngle -- Use physics-based angle
+            local rotAngle = gyroInnerAngle
             local rx = finalPos.X * math.cos(rotAngle) - finalPos.Z * math.sin(rotAngle)
             local rz = finalPos.X * math.sin(rotAngle) + finalPos.Z * math.cos(rotAngle)
             finalPos = Vector3.new(rx, finalPos.Y, rz)
         end
-        
         if not finalPos then return Vector3.zero end
-
-        -- Do not rotate the entire effect, only apply offset
         return Vector3.new(finalPos.X, finalPos.Y + c.Height, finalPos.Z + c.Back)
     end
     
@@ -1352,7 +1305,7 @@ elseif mode == "MagicCircle3" then
 end
 
 --------------------------------------------------------------------------------
--- [Main Function] Effect Control (Start / Stop / Update)
+-- [メイン機能] エフェクト制御 (Start / Stop / Update)
 --------------------------------------------------------------------------------
 local function stopEffect()
     isEnabled = false
@@ -1365,7 +1318,7 @@ local function stopEffect()
     gyroInnerAngularVelocity = 0
     gyroInnerAngle = 0
     
-    -- Delete attachments & anchor
+    -- アタッチメント削除 & 固定化
     for _, v in ipairs(activeToys) do
         pcall(function() 
             v.Part.Anchored = false 
@@ -1377,7 +1330,7 @@ local function stopEffect()
     end
     activeToys = {}
     
-    -- Restore collision properties
+    -- 当たり判定復元
     for part, val in pairs(originalCollisions) do
         if part and part.Parent then 
             part.CanCollide = val 
@@ -1389,8 +1342,8 @@ end
 local function startEffect()
     stopEffect()
     activeToys = {}
-    lastUpdateTick = tick() -- Reset time for physics calculation
-
+    lastUpdateTick = tick()
+    
     if not targetMain or not targetMain.Character then return end
     local root = targetMain.Character:FindFirstChild("HumanoidRootPart")
     if not root then return end
@@ -1413,20 +1366,10 @@ local function startEffect()
     local plotItemsFolder = Workspace:FindFirstChild("PlotItems")
 
     -- 0. Get items from SpawnedInToys (Cosmic style)
-    if useOtherToys then
-        for _, folder in ipairs(Workspace:GetChildren()) do
-            if folder.Name:match("SpawnedInToys$") then
-                for _, item in ipairs(folder:GetChildren()) do
-                    table.insert(allMyItems, item)
-                end
-            end
-        end
-    else
-        local spawnedToys = Workspace:FindFirstChild(myName .. "SpawnedInToys")
-        if spawnedToys then
-            for _, item in ipairs(spawnedToys:GetChildren()) do
-                table.insert(allMyItems, item)
-            end
+    local spawnedToys = Workspace:FindFirstChild(myName .. "SpawnedInToys")
+    if spawnedToys then
+        for _, item in ipairs(spawnedToys:GetChildren()) do
+            table.insert(allMyItems, item)
         end
     end
 
@@ -1438,23 +1381,15 @@ local function startEffect()
             if ownerObj then
                 local val = ownerObj:FindFirstChild("Value") or ownerObj
                 local data = val:FindFirstChild("Data") or val
-                local isMine = (data:IsA("StringValue") and data.Value == myName)
-                
-                if isMine or useOtherToys then
+                if (data:IsA("StringValue") and data.Value == myName) then
                     local myPlotName = plot.Name
                     local targetFolder = plotItemsFolder:FindFirstChild(myPlotName)
                     if targetFolder then
                         for _, item in ipairs(targetFolder:GetChildren()) do
                             table.insert(allMyItems, item)
                         end
-                        -- ★Start monitoring this folder for changes (first time only)
-                        if isMine and not _G.ToyWatcher then
-                            _G.ToyWatcher = true
-                            targetFolder.ChildAdded:Connect(function() task.wait(0.1) refreshToyList() end)
-                            targetFolder.ChildRemoved:Connect(function() task.wait(0.1) refreshToyList() end)
-                        end
                     end
-                    if isMine and not useOtherToys then break end
+                    break
                 end
             end
         end
@@ -1463,17 +1398,15 @@ local function startEffect()
     -- 2. Get items directly from Workspace that I own
     for _, item in ipairs(Workspace:GetChildren()) do
         local ownerValue = item:FindFirstChild("Owner") or item:FindFirstChild("PartOwner")
-        if item:IsA("Model") and ownerValue and ownerValue:IsA("StringValue") then
-            if (ownerValue.Value == myName or useOtherToys) and not table.find(allMyItems, item) then
-                 table.insert(allMyItems, item)
-            end
+        if item:IsA("Model") and ownerValue and ownerValue:IsA("StringValue") and ownerValue.Value == myName and not table.find(allMyItems, item) then
+             table.insert(allMyItems, item)
         end
     end
 
     -- 3. Filter items based on selection and add to fws
     for _, item in ipairs(allMyItems) do
         if #fws >= maxCount then break end
-        if item:IsA("Model") and item.PrimaryPart and (selectedItemName == "All Toys" or item.Name == selectedItemName) then
+        if item:IsA("Model") and item.PrimaryPart and (selectedItemName == "جميع الألعاب" or item.Name == selectedItemName) then
             table.insert(fws, item)
         end
     end
@@ -1488,17 +1421,17 @@ local function startEffect()
     end
 
     if #fws == 0 then
-        warn("No toys found.")
+        warn("لم يتم العثور على ألعاب.")
         return
     end
 
-        print(#fws .. " toys captured. (Target: " .. maxCount .. ")")
+        print("تم التقاط " .. #fws .. " لعبة. (الهدف: " .. maxCount .. ")")
 
-   -- Forcefully get network ownership
+   -- ネットワークオーナーシップを強制的に取得
     for i, model in ipairs(fws) do
         local pp = model.PrimaryPart
         
-        -- Kill momentum of all parts
+        -- 全パーツの勢いを殺す
         for _, d in ipairs(model:GetDescendants()) do 
             if d:IsA("BasePart") then
                 d.AssemblyLinearVelocity = Vector3.zero
@@ -1507,41 +1440,29 @@ local function startEffect()
             end
         end
         
-        -- To prevent explosion at start, place directly at the calculated initial position
+        -- スタート時の爆発を防ぐため、計算上の初期位置に直接配置する
         if root then
             local m, relIdx, relTotal
             if combinedActive then
                 local c1 = (cfg.Combined.Mode1 ~= "None") and (cfg.Combined.Mode1Count or 15) or 0
                 local c2 = (cfg.Combined.Mode2 ~= "None") and (cfg.Combined.Mode2Count or 15) or 0
-                
-                if i <= c1 then
-                    m = cfg.Combined.Mode1
-                    relIdx = i
-                    relTotal = c1
-                elseif i <= c1 + c2 then
-                    m = cfg.Combined.Mode2
-                    relIdx = i - c1
-                    relTotal = c2
-                else
-                    m = cfg.Combined.Mode3
-                    relIdx = i - c1 - c2
-                    relTotal = cfg.Combined.Mode3Count or 0
-                end
+                if i <= c1 then m = cfg.Combined.Mode1; relIdx = i; relTotal = c1
+                elseif i <= c1 + c2 then m = cfg.Combined.Mode2; relIdx = i - c1; relTotal = c2
+                else m = cfg.Combined.Mode3; relIdx = i - c1 - c2; relTotal = cfg.Combined.Mode3Count or 0 end
             else
                 m = currentMode
                 relIdx = i
                 relTotal = #fws
             end
-            if m and m ~= "None" then
-                local relativePos = getPositionForMode(m, relIdx, relTotal, tick())
-                pp.CFrame = root.CFrame:ToWorldSpace(CFrame.new(relativePos))
-            end
+            
+            local relativePos = getPositionForMode(m, relIdx, relTotal, tick())
+            pp.CFrame = root.CFrame:ToWorldSpace(CFrame.new(relativePos))
         end
         
-        pp.Anchored = false -- Enable physics after placement is finished
+        pp.Anchored = false -- 配置が終わってから物理を有効化
         pcall(function() pp:SetNetworkOwner(LocalPlayer) end)
 
-        -- Disable collision
+        -- 当たり判定無効化
         for _, d in ipairs(model:GetDescendants()) do 
             if d:IsA("BasePart") then 
                 if originalCollisions[d] == nil then originalCollisions[d] = d.CanCollide end
@@ -1551,7 +1472,7 @@ local function startEffect()
             end 
         end
         
-        -- (Attachment and AlignPosition settings remain as is...)
+        -- (AttachmentやAlignPositionの設定はそのまま...)
         local a0 = Instance.new("Attachment", pp)
         local ap = Instance.new("AlignPosition", pp)
         ap.Attachment0 = a0
@@ -1579,21 +1500,20 @@ local function startEffect()
     local now = tick()
     local deltaTime = now - lastUpdateTick
     lastUpdateTick = now
-
     local playerVelocity = rootPart.AssemblyLinearVelocity * Vector3.new(1, 0, 1)
     local playerSpeed = playerVelocity.Magnitude
-    local targetAngularVelocity = playerSpeed * 0.1 -- Set target rotation speed based on velocity
-    local damping = 0.97 -- Inertia strength (closer to 1 is stronger)
+    local targetAngularVelocity = playerSpeed * 0.1
+    local damping = 0.97
     gyroInnerAngularVelocity = gyroInnerAngularVelocity * damping + targetAngularVelocity * (1 - damping)
     gyroInnerAngle = gyroInnerAngle + gyroInnerAngularVelocity * deltaTime
 
     local baseCF
     if followPlayer and not isReturningToPlot then
-        -- Follow ON: Always use the player's latest coordinates as the base
+        -- 追従ON：常にプレイヤーの最新座標を基準にする
         baseCF = rootPart.CFrame
         lastBaseCF = baseCF
     else
-        -- Follow OFF: If lastBaseCF exists, "absolutely" use it
+        -- 追従OFF：lastBaseCF があればそれを「絶対」に使う
         if not lastBaseCF then
             lastBaseCF = rootPart.CFrame
         end
@@ -1612,33 +1532,22 @@ local function startEffect()
     local individualRotation = CFrame.Angles(math.rad(indivRot.X), math.rad(indivRot.Y), math.rad(indivRot.Z))
 
     for i, fw in ipairs(activeToys) do
-        -- Abyss check
+        -- 奈落判定
         if fw.Part.Position.Y <= -90 then
-            -- If fallen into the abyss, anchor it and do nothing
+            -- 奈落に落ちている場合は固定して何もしない
             fw.Part.Anchored = true
         else
-            -- Only perform normal processing if not in the abyss (instead of continue)
+            -- 奈落に落ちていない場合のみ、通常処理を行う (continueの代わり)
             fw.Part.Anchored = false
 
-            -- Position calculation
+            -- 位置計算
             local m, relIdx, relTotal
             if combinedActive then
                 local c1 = (cfg.Combined.Mode1 ~= "None") and (cfg.Combined.Mode1Count or 15) or 0
                 local c2 = (cfg.Combined.Mode2 ~= "None") and (cfg.Combined.Mode2Count or 15) or 0
-
-                if i <= c1 then
-                    m = cfg.Combined.Mode1
-                    relIdx = i
-                    relTotal = c1
-                elseif i <= c1 + c2 then
-                    m = cfg.Combined.Mode2
-                    relIdx = i - c1
-                    relTotal = c2
-                else
-                    m = cfg.Combined.Mode3
-                    relIdx = i - c1 - c2
-                    relTotal = cfg.Combined.Mode3Count or 0
-                end
+                if i <= c1 then m = cfg.Combined.Mode1; relIdx = i; relTotal = c1
+                elseif i <= c1 + c2 then m = cfg.Combined.Mode2; relIdx = i - c1; relTotal = c2
+                else m = cfg.Combined.Mode3; relIdx = i - c1 - c2; relTotal = cfg.Combined.Mode3Count or 0 end
             else
                 m = currentMode
                 relIdx = i
@@ -1652,10 +1561,8 @@ local function startEffect()
                 if m == "BackGuard" then
                     fw.AO.CFrame = CFrame.lookAt(worldPos, rotatedBaseCF.Position) * individualRotation
                 elseif m == "Rotate" or m == "MagicCircle" or m == "FloatStone" or m == "Merkaba" or m == "Cube" or m == "Tornado" or m == "Pyramid" or m == "Gyro" then
-                    -- To prevent CFrame.lookAt from erroring and freezing with the same coordinates
                     local nextPos = rotatedBaseCF:PointToWorldSpace(getPositionForMode(m, relIdx, relTotal, t + 0.05))
                     if (worldPos - nextPos).Magnitude < 0.001 then
-                        -- If coordinates are the same, use default orientation to avoid errors
                         fw.AO.CFrame = rotatedBaseCF * individualRotation
                     else
                         fw.AO.CFrame = CFrame.lookAt(worldPos, nextPos) * individualRotation
@@ -1666,26 +1573,26 @@ local function startEffect()
             else
                 fw.AP.Position = Vector3.new(0, -10000, 0)
             end
-        end -- end of abyss check
-    end -- end of for loop
+        end -- if 奈落判定の閉じ
+    end -- for ループの閉じ
 end)
 end
 
 --------------------------------------------------------------------------------
--- [General Base Point Return Function]
+-- [汎用ベースポイント帰還機能]
 --------------------------------------------------------------------------------
 local selectedHouseCF = nil 
 local houseCoords = {
-    ["Cherry Blossom House"] = CFrame.new(548, 123, -73),
-    ["Light Blue House"] = CFrame.new(509, 83, -338),
-    ["Purple House"] = CFrame.new(255, -7, 449),
-    ["Green House"] = CFrame.new(-534, -7, 89),
-    ["Pink House"] = CFrame.new(-485, -7, -163)
+    ["منزل زهر الكرز"] = CFrame.new(548, 123, -73),
+    ["منزل أزرق فاتح"] = CFrame.new(509, 83, -338),
+    ["منزل أرجواني"] = CFrame.new(255, -7, 449),
+    ["منزل أخضر"] = CFrame.new(-534, -7, 89),
+    ["منزل وردي"] = CFrame.new(-485, -7, -163)
 }
 local plotNames = {
-    [1] = "Green House", [2] = "Pink House", [3] = "Purple House", [4] = "Light Blue House", [5] = "Cherry Blossom House"
+    [1] = "منزل أخضر", [2] = "منزل وردي", [3] = "منزل أرجواني", [4] = "منزل أزرق فاتح", [5] = "منزل زهر الكرز"
 }
-local HomeStatus = nil -- For UI access
+local HomeStatus = nil -- للوصول إلى واجهة المستخدم
 
 task.spawn(function()
     while true do
@@ -1724,7 +1631,7 @@ task.spawn(function()
                                         found = true
                                         local houseName = plotNames[i] or "Unknown"
                                         if HomeStatus then
-                                            HomeStatus:Set("House: " .. houseName .. "\nTime Remaining: " .. tostring(timeVal) .. "s")
+                                            HomeStatus:Set("المنزل: " .. houseName .. "\nالوقت المتبقي: " .. tostring(timeVal) .. " ثانية")
                                         end
                                         
                                         if timeVal <= 5 and timeVal > 0 then
@@ -1733,10 +1640,10 @@ task.spawn(function()
                                                 isReturningToPlot = true
                                                 local oldCF = root.CFrame
                                                 root.CFrame = targetCF
-                                                task.wait(0.15) -- Shortened
+                                                task.wait(0.15) -- تقصير
                                                 root.CFrame = oldCF
                                                 isReturningToPlot = false
-                                                task.wait(2) -- Prevent continuous teleport
+                                                task.wait(2) -- منع النقل الآني المستمر
                                             end
                                         end
                                         break
@@ -1748,21 +1655,21 @@ task.spawn(function()
                 end)
                 
                 if not found and HomeStatus then
-                    HomeStatus:Set("House not found (Please enter a Plot)")
+                    HomeStatus:Set("لم يتم العثور على المنزل (يرجى الدخول إلى قطعة أرض)")
                 end
             end
         else
             if HomeStatus then
-                HomeStatus:Set("Auto-Reset Disabled")
+                HomeStatus:Set("إعادة التعيين التلقائي معطل")
             end
         end
     end
 end)
 
 --------------------------------------------------------------------------------
--- [ESP & Sub-features] Update Loop (Prometheus compatible version)
+-- [ESP & サブ機能] 更新ループ (Prometheus対応版)
 --------------------------------------------------------------------------------
--- Common cleanup function (used on exit or when hidden)
+-- 共通のクリーンアップ関数（退出時や非表示時に使用）
 local function removeESP(p)
     local esp = espCache[p]
     if esp then
@@ -1771,14 +1678,14 @@ local function removeESP(p)
         if esp.T then 
             pcall(function() 
                 esp.T.Visible = false 
-                esp.T:Remove() -- Drawing objects are completely deleted with Remove()
+                esp.T:Remove() -- DrawingオブジェクトはRemove()で完全に消去
             end) 
         end
         espCache[p] = nil
     end
 end
 
--- Execute immediately when a player leaves the server
+-- プレイヤーがサーバーを抜けた時に即座に実行
 Players.PlayerRemoving:Connect(removeESP)
 
 local function updateSubFeatures()
@@ -1791,7 +1698,7 @@ local function updateSubFeatures()
             local shouldShow = false
             local isTarget = (not espCfg.TargetOnly) or (espCfg.TargetOnly and p == targetSub)
             
-            -- If setting is enabled, target matches, and is alive
+            -- 設定が有効、かつターゲット一致、かつ生存している場合
             if espCfg.Enabled and isTarget and root and hum and hum.Health > 0 then
                 shouldShow = true
             end
@@ -1799,7 +1706,7 @@ local function updateSubFeatures()
             local esp = espCache[p] or {}
             
             if shouldShow then
-                -- 1. Highlight processing
+                -- 1. ハイライト処理
                 if not esp.H or esp.H.Parent ~= char then 
                     esp.H = Instance.new("Highlight")
                     esp.H.Parent = char
@@ -1808,7 +1715,7 @@ local function updateSubFeatures()
                 esp.H.Enabled = true
                 esp.H.FillColor = espCfg.ESPColor
 
-                -- 2. Name display with icon (URL format that works reliably)
+                -- 2. アイコン付き名前表示 (確実に動くURL形式)
                 if not esp.B or esp.B.Parent ~= root then
                     esp.B = Instance.new("BillboardGui")
                     esp.B.Parent = root
@@ -1825,7 +1732,7 @@ local function updateSubFeatures()
                     icon.Size = UDim2.new(0, 30, 0, 30)
                     icon.Position = UDim2.new(0, 0, 0.5, -15)
                     icon.BackgroundTransparency = 1
-                    -- Use the URL format where the icon was displayed
+                    -- アイコンが表示されていた形式のURLを使用
                     icon.Image = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. p.UserId .. "&width=420&height=420&format=png"
 
                     local l = Instance.new("TextLabel", frame)
@@ -1845,7 +1752,7 @@ local function updateSubFeatures()
                 esp.L.Text = p.DisplayName .. " (@" .. p.Name .. ")"
                 esp.L.TextColor3 = espCfg.ESPColor
 
-                -- 3. Tracer (improved version)
+                -- 3. トレーサー (改善版)
                 if espCfg.Tracers then
                     if not esp.T then
                         esp.T = Drawing.new("Line")
@@ -1861,14 +1768,14 @@ local function updateSubFeatures()
                         esp.T.To = Vector2.new(screenPos.X, screenPos.Y)
                         esp.T.Visible = true
                     else
-                        -- Off-screen tracer processing (set visible = false if not needed)
+                        -- 画面外のトレーサー処理（不要な場合は visible = false に）
                         esp.T.Visible = false 
                     end
                 elseif esp.T then
                     esp.T.Visible = false
                 end
 
-                -- 4. Hitbox
+                -- 4. ヒットボックス
                 if espCfg.Hitbox then
                     root.Size = Vector3.new(espCfg.HitboxSize, espCfg.HitboxSize, espCfg.HitboxSize)
                     root.Transparency = 0.5
@@ -1880,9 +1787,9 @@ local function updateSubFeatures()
                 end
                 espCache[p] = esp
             else
-                -- Clean up immediately when no longer needed (exit, death, setting OFF)
+                -- 表示不要（退出・死亡・設定OFF）になったら即座にクリーンアップ
                 removeESP(p)
-                -- Also restore hitbox size
+                -- ヒットボックスのサイズも元に戻す
                 if root and root.Parent then
                     root.Size = Vector3.new(2, 2, 1)
                     root.Transparency = 1
@@ -1894,7 +1801,7 @@ end
 
 RunService.Heartbeat:Connect(updateSubFeatures)
 
--- Player function loop
+-- プレイヤー機能ループ
 UserInputService.JumpRequest:Connect(function()
     if infiniteJump and LocalPlayer.Character then
         local hum = LocalPlayer.Character:FindFirstChild("Humanoid")
@@ -1909,16 +1816,16 @@ RunService.Stepped:Connect(function(time, deltaTime)
 
     if hum then
         if useWalkSpeed and root and hum.MoveDirection.Magnitude > 0 then
-            -- Movement by CFrame (referencing Cosmic Hub)
+            -- CFrameによる移動 (Cosmic Hub参考)
             local extraSpeed = math.max(0, walkSpeed - 16)
             root.CFrame = root.CFrame + (hum.MoveDirection * (extraSpeed * deltaTime))
         end
         if useJumpPower then 
             hum.UseJumpPower = true
             hum.JumpPower = jumpPower
-            -- Countermeasure for when UseJumpPower is forcibly set to false (use JumpHeight)
+            -- UseJumpPowerが強制的にfalseにされる場合への対策 (JumpHeightを使用)
             if not hum.UseJumpPower then
-                hum.JumpHeight = jumpPower * 0.2 -- Approximate
+                hum.JumpHeight = jumpPower * 0.2 -- 概算
             end
         end
     end
@@ -1939,16 +1846,16 @@ RunService.Stepped:Connect(function(time, deltaTime)
             local struggleEvt = ReplicatedStorage:FindFirstChild("CharacterEvents") and ReplicatedStorage.CharacterEvents:FindFirstChild("Struggle")
 
             if isHeld then
-                -- While being held, anchor and keep resisting
+                -- 掴まれている間、固定して抵抗し続ける
                 for _, p in ipairs(char:GetChildren()) do
                     if p:IsA("BasePart") then p.Anchored = true end
                 end
                 
                 if struggleEvt then
-                    struggleEvt:FireServer(LocalPlayer) -- Add argument
+                    struggleEvt:FireServer(LocalPlayer) -- 引数追加
                 end
             else
-                -- If not held, and not in anti-explosion (ragdoll) state, unanchor
+                -- 掴まれていない、かつアンチ爆発(ラグドール)中でなければ固定解除
                 local isRagdolled = antiExplosion and char:FindFirstChild("Humanoid") and char.Humanoid:FindFirstChild("Ragdolled") and char.Humanoid.Ragdolled.Value
                 if not isRagdolled then
                     for _, p in ipairs(char:GetChildren()) do
@@ -1979,7 +1886,7 @@ Workspace.DescendantAdded:Connect(function(v)
     end
 end)
 
--- Anti-Explosion (Ragdoll Anchor) & Anti-Fire (Extinguish) Loop Fixed Version
+-- Anti-Explosion (Ragdoll Anchor) & Anti-Fire (Extinguish) Loop 修正版
 local extOriginalCFrame = nil
 local extPart = nil
 
@@ -1988,18 +1895,18 @@ task.spawn(function()
         task.wait(0.1)
         local char = LocalPlayer.Character
         if char then
-            -- Anti-Explosion: Ragdoll Anchor (Fix: Add release process)
+            -- Anti-Explosion: Ragdoll Anchor (修正: 解除処理を追加)
             if antiExplosion then
                 local hum = char:FindFirstChild("Humanoid")
                 if hum then
                     local rag = hum:FindFirstChild("Ragdolled")
                     if rag and rag.Value then
-                        -- Anchor while ragdolled
+                        -- ラグドール中は固定
                         for _, p in ipairs(char:GetChildren()) do
                             if p:IsA("BasePart") then p.Anchored = true end
                         end
                     else
-                        -- Unanchor after ragdoll is released (to allow movement)
+                        -- ラグドール解除後は固定解除 (動けるようにする)
                         for _, p in ipairs(char:GetChildren()) do
                             if p:IsA("BasePart") then p.Anchored = false end
                         end
@@ -2007,12 +1914,12 @@ task.spawn(function()
                 end
             end
 
-            -- Anti-Fire: Extinguish Part (Fix: Return the purple object to its original position)
+            -- Anti-Fire: Extinguish Part (修正: 紫の物体を元の位置に戻す)
             if antiFire then
                 local hrp = char:FindFirstChild("HumanoidRootPart")
                 local hasFire = hrp and (hrp:FindFirstChild("FireLight") or hrp:FindFirstChild("FireParticleEmitter"))
                 
-                -- Get and save the part only once
+                -- パーツを一度だけ取得・保存
                 if not extPart then
                     local map = Workspace:FindFirstChild("Map")
                     local hole = map and map:FindFirstChild("Hole")
@@ -2023,10 +1930,10 @@ task.spawn(function()
                 
                 if extPart then
                     if hasFire then
-                        -- If there's fire, bring the extinguish part to self
+                        -- 炎があるなら消火パーツを自分に持ってくる
                         extPart.CFrame = hrp.CFrame
                     elseif extOriginalCFrame then
-                        -- When the fire is out, return it to its original position (hide the purple object)
+                        -- 炎が消えたら元の位置に戻す (紫の物体を隠す)
                         extPart.CFrame = extOriginalCFrame
                     end
                 end
@@ -2037,26 +1944,26 @@ end)
 
 
 --------------------------------------------------------------------------------
--- [Settings] Save, Appearance
+-- [設定]保存、見た目 
 --------------------------------------------------------------------------------
--- --- Settings Load Function ---
--- Function to get the list of config files in real-time
+-- --- 設定読み込み用関数 ---
+-- 設定ファイルのリストをリアルタイムに取得する関数
 local function getConfigFileList()
     local files = {}
     if not isfolder("holon_config") then makefolder("holon_config") end
     
     for _, file in ipairs(listfiles("holon_config")) do
         if file:sub(-5) == ".json" then
-            -- Remove the path to get just the filename
+            -- パスを除去してファイル名だけにする
             local name = file:gsub("holon_config\\", ""):gsub("holon_config/", "")
             table.insert(files, name)
         end
     end
-    if #files == 0 then table.insert(files, "No files") end
+    if #files == 0 then table.insert(files, "لا توجد ملفات") end
     return files
 end
 
--- 1. Prevent errors if UI items are not in cfg
+-- 1. cfgの中にUIの項目がない場合のエラーを防止する
 if not cfg.UI then
     cfg.UI = {
         Transparency = 0.1,
@@ -2066,9 +1973,9 @@ if not cfg.UI then
     }
 end
 
--- Engine to apply UI appearance in real-time
+-- UI外観をリアルタイムに反映させるエンジン
 local function applyCustomStyle()
-    -- Safety check: Ensure cfg.UI exists (for post-load)
+    -- 安全策: cfg.UIが存在しない場合の初期化（ロード直後対策）
     if not cfg.UI then
         cfg.UI = {
             Transparency = 0.1,
@@ -2102,39 +2009,39 @@ local function applyCustomStyle()
             main.BackgroundColor3 = bgColor
             main.BackgroundTransparency = trans
             
-            -- Recursively apply styles to all descendants
+            -- 子要素を再帰的に探索してスタイル適用
             for _, desc in ipairs(main:GetDescendants()) do
-                -- 1. Borders (UIStroke)
+                -- 1. 枠線 (UIStroke)
                 if desc:IsA("UIStroke") then
                     desc.Color = accent
                 end
-                -- 2. Separator Lines (Frame named "Line")
+                -- 2. 区切り線 (Lineという名前のFrame)
                 if desc:IsA("Frame") and desc.Name == "Line" then
                     desc.BackgroundColor3 = accent
                 end
-                -- 3. SideBar and TopBar
+                -- 3. サイドバーとトップバー
                 if desc:IsA("Frame") and (desc.Name == "SideBar" or desc.Name == "TopBar") then
                     desc.BackgroundColor3 = bgColor
                     desc.BackgroundTransparency = trans
-                    -- Round the header corners
+                    -- ヘッダーの角を丸くする
                     if desc.Name == "TopBar" then
                         local corner = desc:FindFirstChild("UICorner") or Instance.new("UICorner", desc)
                         corner.CornerRadius = UDim.new(0, 9)
                     end
                 end
-                -- 4. Buttons and Tabs (TextButton)
-                -- Only apply if it's not fully transparent (to avoid showing invisible hitboxes)
+                -- 4. ボタンとタブ (TextButton)
+                -- 透明でないものだけ適用（見えないヒットボックスが表示されるのを防ぐ）
                 if desc:IsA("TextButton") and desc.BackgroundTransparency < 1 then
                     desc.BackgroundColor3 = bgColor
                     desc.BackgroundTransparency = trans
                 end
             end
             
-            -- Ensure Main frame also has rounded corners
+            -- メインフレーム自体の角も確実に丸くする
             local mainCorner = main:FindFirstChild("UICorner") or Instance.new("UICorner", main)
             mainCorner.CornerRadius = UDim.new(0, 9)
         
-        -- Real-time processing of background image
+        -- 背景画像のリアルタイム処理
         local bgImage = main:FindFirstChild("CustomBG")
         if cfg.UI.BackgroundImage and cfg.UI.BackgroundImage ~= "" then
             if not bgImage then
@@ -2163,18 +2070,18 @@ local function applyCustomStyle()
 end
 
 --------------------------------------------------------------------------------
--- [UI Construction] orion lib
+-- [UI 構築] orion lib
 --------------------------------------------------------------------------------
 local KeyFileName = "HolonHub_Key.txt"
 local CorrectKey = "holox"
 local OrionUrl = "https://raw.githubusercontent.com/hololove1021/HolonHUB/refs/heads/main/source.txt"
 
--- [[ 1. Main Screen Function ]]
+-- [[ 1. メイン画面の関数 ]]
 local function StartHolonHUB()
-    -- Mobile fix: Reload OrionLib inside the function
+    -- スマホ対策：OrionLibを関数内で読み込み直す
     local OrionLib = loadstring(game:HttpGet(OrionUrl))()
     
-    -- Force delete existing UI (to prevent double display)
+    -- 既存のUIを強制削除（二重表示防止）
     pcall(function()
         if game:GetService("CoreGui"):FindFirstChild("Orion") then 
             game:GetService("CoreGui").Orion:Destroy() 
@@ -2182,12 +2089,12 @@ local function StartHolonHUB()
     end)
 
     local Window = OrionLib:MakeWindow({
-        Name = "Holon HUB v1.4.3",
+        Name = "Holon HUB v1.4.3 (AR)",
         HidePremium = false,
-        SaveConfig = false, -- Disable to prevent interference on init
+        SaveConfig = false, -- 初期化時の干渉を防ぐため無効化
         ConfigFolder = "HolonHUB",
         IntroEnabled = true,
-        IntroText = "Holon HUB Loaded!"
+        IntroText = "تم تحميل Holon HUB!"
     })
 
     -- [Grab Mod Logic Integration]
@@ -2268,12 +2175,10 @@ local function StartHolonHUB()
             else
                 if lastGrabbedPart then
                     if cfg.GrabMod.SuperThrow then
-                        if UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) then
-                            pcall(function()
-                                local force = Camera.CFrame.LookVector * cfg.GrabMod.ThrowPower
-                                lastGrabbedPart:ApplyImpulse(force * lastGrabbedPart:GetMass())
-                            end)
-                        end
+                        pcall(function()
+                            local force = Camera.CFrame.LookVector * cfg.GrabMod.ThrowPower
+                            lastGrabbedPart:ApplyImpulse(force * lastGrabbedPart:GetMass())
+                        end)
                     end
                     task.delay(0.1, function() lastGrabbedPart = nil end)
                 end
@@ -2287,74 +2192,56 @@ local function StartHolonHUB()
         end)
     end
 
--- Get Player List Function
+-- プレイヤーリスト取得関数
 local function getPList()
     local plist = {}
     for _, p in ipairs(Players:GetPlayers()) do
-        -- Put into table in "DisplayName (@Username)" format
+        -- 「表示名 (@ユーザー名)」の形式でテーブルに入れる
         table.insert(plist, p.DisplayName .. " (@" .. p.Name .. ")")
     end
     return plist
 end
 
--- Table to manage UI elements
+-- UI要素を管理するテーブル
 local UIElements = {}
-
--- Translation table
-local modeNames = {
-    ["Wing"] = "Wing", ["Heart"] = "Heart", ["Star"] = "Star", ["Vortex"] = "Vortex",
-    ["Sphere"] = "Sphere", ["Rotate"] = "Rotate", ["Pet"] = "Pet", ["Text"] = "Text",
-    ["MagicCircle"] = "MagicCircle", ["MagicCircle2"] = "MagicCircle2", ["MagicCircle3"] = "MagicCircle3",
-    ["FloatStone"] = "FloatStone", ["Merkaba"] = "Merkaba", ["Cube"] = "Cube",
-    ["Pyramid"] = "Pyramid", ["MirrorPlayer"] = "MirrorPlayer", ["Beam"] = "Beam",
-    ["BackGuard"] = "BackGuard", ["Tornado"] = "Tornado", ["Gyro"] = "Gyro", ["None"] = "None"
-}
-local modeKeys = {}
-for k, v in pairs(modeNames) do modeKeys[v] = k end
-local function getModeList()
-    local list = {}
-    local order = {"Wing","Heart","Star","Vortex","Sphere","Rotate","Pet","Text","MagicCircle","MagicCircle2","MagicCircle3","FloatStone","Merkaba","Cube","Pyramid","MirrorPlayer","Beam","BackGuard","Tornado","Gyro"}
-    for _, k in ipairs(order) do table.insert(list, modeNames[k]) end
-    return list
-end
 
 -- --- TAB: MAIN ---
 local MainTab = Window:MakeTab({
-	Name = "Main",
-	Icon = "rbxassetid://7733960981"
+    Name = "الرئيسية",
+    Icon = "rbxassetid://7733960981" -- 適当なアイコンIDに差し替えてください
 })
 
 -- --- TAB: PLAYER ---
 local PlayerTab = Window:MakeTab({
-    Name = "Player",
+    Name = "اللاعب",
     Icon = "rbxassetid://7743875962"
 })
 
-local MoveSec = PlayerTab:AddSection({ Name = "Movement" })
+local MoveSec = PlayerTab:AddSection({ Name = "إعدادات الحركة" })
 
--- Set current status as default
+-- 現在のステータスを初期値にする
 local currentWS = (LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid")) and LocalPlayer.Character.Humanoid.WalkSpeed or 16
 walkSpeed = currentWS
 
 UIElements.WalkSpeedSlider = MoveSec:AddSlider({
-    Name = "WalkSpeed", Min = 16, Max = 300, Default = currentWS, Increment = 1,
+    Name = "سرعة المشي", Min = 16, Max = 300, Default = currentWS, Increment = 1,
     Callback = function(v) walkSpeed = v end
 })
 
 UIElements.WalkSpeedToggle = MoveSec:AddToggle({
-    Name = "Enable WalkSpeed", Default = false,
+    Name = "تفعيل سرعة المشي", Default = false,
     Callback = function(v) 
         useWalkSpeed = v 
     end
 })
 
 UIElements.JumpPowerSlider = MoveSec:AddSlider({
-    Name = "JumpPower", Min = 16, Max = 300, Default = 25, Increment = 1,
+    Name = "قوة القفز", Min = 16, Max = 300, Default = 25, Increment = 1,
     Callback = function(v) jumpPower = v end
 })
 
 UIElements.JumpPowerToggle = MoveSec:AddToggle({
-    Name = "Enable JumpPower", Default = false,
+    Name = "تفعيل قوة القفز", Default = false,
     Callback = function(v) 
         useJumpPower = v 
         if not v and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
@@ -2368,7 +2255,7 @@ UIElements.NoclipToggle = MoveSec:AddToggle({
     Callback = function(v) 
         noclip = v 
         if not v and LocalPlayer.Character then
-            -- Fix: Setting all parts to CanCollide=true causes issues, so only revert main parts
+            -- 修正: 全パーツをCanCollide=trueにすると荒ぶるため、主要パーツのみ戻す
             local char = LocalPlayer.Character
             local partsToCollide = {"HumanoidRootPart", "Head", "Torso", "UpperTorso", "LowerTorso"}
             for _, name in ipairs(partsToCollide) do
@@ -2380,7 +2267,7 @@ UIElements.NoclipToggle = MoveSec:AddToggle({
 })
 
 UIElements.InfiniteJumpToggle = MoveSec:AddToggle({
-    Name = "Infinite Jump", Default = false,
+    Name = "قفز لا نهائي", Default = false,
     Callback = function(v) infiniteJump = v end
 })
 
@@ -2462,20 +2349,20 @@ UIElements.VFlyToggle = MoveSec:AddToggle({
 })
 
 UIElements.VFlySpeedSlider = MoveSec:AddSlider({
-    Name = "VFly Speed",
+    Name = "سرعة VFly",
     Min = 1, Max = 10, Default = 1,
     Callback = function(v) vflySpeed = v end
 })
 
-local ProtectSec = PlayerTab:AddSection({ Name = "Protection" })
+local ProtectSec = PlayerTab:AddSection({ Name = "الحماية" })
 
-UIElements.AntiExplosionToggle = ProtectSec:AddToggle({ Name = "Anti-Explosion", Default = false, Callback = function(v) antiExplosion = v end })
-UIElements.AntiFireToggle = ProtectSec:AddToggle({ Name = "Anti-Fire", Default = false, Callback = function(v) antiFire = v end })
-UIElements.AntiGrabToggle = ProtectSec:AddToggle({ Name = "Anti-Grab", Default = false, Callback = function(v) antiGrab = v end })
+UIElements.AntiExplosionToggle = ProtectSec:AddToggle({ Name = "ضد الانفجار", Default = false, Callback = function(v) antiExplosion = v end })
+UIElements.AntiFireToggle = ProtectSec:AddToggle({ Name = "ضد النار", Default = false, Callback = function(v) antiFire = v end })
+UIElements.AntiGrabToggle = ProtectSec:AddToggle({ Name = "ضد الإمساك", Default = false, Callback = function(v) antiGrab = v end })
 
 local gucciConn = nil
 UIElements.AntiGucciToggle = ProtectSec:AddToggle({ 
-    Name = "Anti Gucci", 
+    Name = "ضد غوتشي", 
     Default = false, 
     Callback = function(v) 
         if v then
@@ -2513,10 +2400,10 @@ UIElements.AntiGucciToggle = ProtectSec:AddToggle({
     end 
 })
 
-local PlayerViewSec = PlayerTab:AddSection({ Name = "View/Camera" })
+local PlayerViewSec = PlayerTab:AddSection({ Name = "المنظور/الكاميرا" })
 
 UIElements.ThirdPersonToggle = PlayerViewSec:AddToggle({
-    Name = "Third Person",
+    Name = "منظور الشخص الثالث",
     Default = false,
     Callback = function(v) 
         if v then
@@ -2533,7 +2420,7 @@ UIElements.ThirdPersonToggle = PlayerViewSec:AddToggle({
 
 local currentFOV = Camera.FieldOfView
 UIElements.FOVSlider = PlayerViewSec:AddSlider({
-    Name = "FOV",
+    Name = "تعديل FOV",
     Min = 30,
     Max = 120,
     Default = currentFOV,
@@ -2546,20 +2433,20 @@ UIElements.FOVSlider = PlayerViewSec:AddSlider({
 -- --- MAIN SECTION ---
 
 local MainSec = MainTab:AddSection({
-	Name = "Effect Control"
+    Name = "التحكم بالتأثيرات"
 })
 
--- Main target dropdown (defined as a variable)
-local targetMainName = "" -- New variable to store the name
+-- メイン対象ドロップダウン（変数として定義）
+local targetMainName = "" -- 名前を保存する変数を新しく用意
 local tpDropdown = nil
 
 local pDropMain
 UIElements.MainTargetDropdown = MainSec:AddDropdown({
-    Name = "Main Target",
+    Name = "الهدف الرئيسي",
     Default = LocalPlayer.DisplayName .. " (@" .. LocalPlayer.Name .. ")",
     Options = getPList(),
     Callback = function(v)
-        -- Accurately extract the username after @ (handles underscores, etc.)
+        -- @以降を正確に切り出す (アンダーバー等にも対応)
         local name = v:match("@([^)]+)")
         targetMainName = name or LocalPlayer.Name
         targetMain = Players:FindFirstChild(targetMainName) or LocalPlayer
@@ -2579,40 +2466,40 @@ Players.PlayerRemoving:Connect(function()
     if tpDropdown then tpDropdown:Refresh(getPList(), true) end
 end)
 
--- Effect enable toggle
+-- エフェクト有効化トグル
 UIElements.EffectToggle = MainSec:AddToggle({
-	Name = "Enable Effect",
-	Default = false,
-	Callback = function(v)
-		if v then startEffect() else stopEffect() end
-	end    
+    Name = "تفعيل التأثير",
+    Default = false,
+    Callback = function(v)
+        if v then startEffect() else stopEffect() end
+    end    
 })
 
--- Mode selection dropdown
+-- モード選択ドロップダウン
 UIElements.ModeDropdown = MainSec:AddDropdown({
-	Name = "Select Mode",
-	Default = modeNames["Wing"],
-	Options = getModeList(),
-	Callback = function(v)
-		currentMode = modeKeys[v]
-		combinedActive = false
-	end    
+    Name = "اختيار الوضع",
+    Default = "Wing",
+    Options = getModeList(),
+    Callback = function(v)
+        currentMode = modeKeys[v]
+        combinedActive = false
+    end    
 })
 
--- Control target dropdown
+-- 制御対象ドロップダウン
 local itemDropdown
 
 UIElements.ItemDropdown = MainSec:AddDropdown({
-    Name = "Select Target Item",
-    Default = "None",
-    Options = {"None"},
+    Name = "اختيار العنصر المتحكم به",
+    Default = "لا شيء",
+    Options = {"لا شيء"},
     Callback = function(v)
         selectedItemName = v
     end    
 })
 itemDropdown = UIElements.ItemDropdown
 
--- Common function to scan toy list and update dropdown
+-- おもちゃリストをスキャンしてドロップダウンを更新する共通関数
 local function refreshToyList()
     detectedItems = {}
     local myName = LocalPlayer.Name
@@ -2620,11 +2507,21 @@ local function refreshToyList()
     local plotsFolder = Workspace:FindFirstChild("Plots")
     local plotItemsFolder = Workspace:FindFirstChild("PlotItems")
 
-    -- 0. Get items from SpawnedInToys (Cosmic style)
-    local spawnedToys = Workspace:FindFirstChild(myName .. "SpawnedInToys")
-    if spawnedToys then
-        for _, item in ipairs(spawnedToys:GetChildren()) do
-            table.insert(allMyItems, item)
+    -- 0. Get items from SpawnedInToys
+    if useOtherToys then
+        for _, folder in ipairs(Workspace:GetChildren()) do
+            if folder.Name:match("SpawnedInToys$") then
+                for _, item in ipairs(folder:GetChildren()) do
+                    table.insert(allMyItems, item)
+                end
+            end
+        end
+    else
+        local spawnedToys = Workspace:FindFirstChild(myName .. "SpawnedInToys")
+        if spawnedToys then
+            for _, item in ipairs(spawnedToys:GetChildren()) do
+                table.insert(allMyItems, item)
+            end
         end
     end
 
@@ -2636,21 +2533,23 @@ local function refreshToyList()
             if ownerObj then
                 local val = ownerObj:FindFirstChild("Value") or ownerObj
                 local data = val:FindFirstChild("Data") or val
-                if (data:IsA("StringValue") and data.Value == myName) then
+                local isMine = (data:IsA("StringValue") and data.Value == myName)
+                
+                if isMine or useOtherToys then
                     local myPlotName = plot.Name
                     local targetFolder = plotItemsFolder:FindFirstChild(myPlotName)
                     if targetFolder then
                         for _, item in ipairs(targetFolder:GetChildren()) do
                             table.insert(allMyItems, item)
                         end
-                        -- ★Start monitoring this folder for changes (first time only)
-                        if not _G.ToyWatcher then
+                        -- ★このフォルダの増減を監視開始 (初回のみ)
+                        if isMine and not _G.ToyWatcher then
                             _G.ToyWatcher = true
                             targetFolder.ChildAdded:Connect(function() task.wait(0.1) refreshToyList() end)
                             targetFolder.ChildRemoved:Connect(function() task.wait(0.1) refreshToyList() end)
                         end
                     end
-                    break
+                    if isMine and not useOtherToys then break end
                 end
             end
         end
@@ -2677,16 +2576,16 @@ local function refreshToyList()
     end
     
     -- 4. Update dropdown
-    local newValues = {"All Toys"}
+    local newValues = {"جميع الألعاب"}
     for _, name in ipairs(detectedItems) do table.insert(newValues, name) end
     itemDropdown:Refresh(newValues, true)
 end
 
 MainSec:AddButton({
-    Name = "Refresh Toy List",
+    Name = "تحديث قائمة الألعاب",
     Callback = function()
         refreshToyList()
-        OrionLib:MakeNotification({ Name = "Update", Content = "Rescanned toy list", Time = 3 })
+        OrionLib:MakeNotification({ Name = "تحديث", Content = "تم إعادة فحص قائمة الألعاب", Time = 3 })
     end
 })
 
@@ -2699,117 +2598,94 @@ UIElements.OtherToysToggle = MainSec:AddToggle({
     end
 })
 
--- Run once on startup
+-- 起動時に一度実行
 task.spawn(refreshToyList)
 
--- Combined mode toggle
+-- 合体モードトグル
 UIElements.CombinedToggle = MainSec:AddToggle({
-	Name = "Use Combined Mode",
-	Default = false,
-	Callback = function(v)
-		combinedActive = v
-	end    
+    Name = "استخدام الوضع المدمج",
+    Default = false,
+    Callback = function(v)
+        combinedActive = v
+    end    
 })
 
--- --- Animation Section ---
+-- --- アニメーションセクション ---
 local AnimSec = MainTab:AddSection({
-	Name = "Animation"
+    Name = "الرسوم المتحركة"
 })
 
-local seqRunning = false
-AnimSec:AddToggle({
-	Name = "Transform Sequence",
-    Default = false,
-	Callback = function(v)
-        seqRunning = v
-        if v then
-            task.spawn(function()
-                local s = 1 / cfg.AnimSpeed
-                currentMode = "MagicCircle"
-                cfg.MagicCircle.Height = -10
-                startEffect()
-                for i = -10, 5, 0.5 do 
-                    if not seqRunning then break end
-                    cfg.MagicCircle.Height = i
-                    task.wait(0.2 * s) 
-                end
-                if not seqRunning then return end
-                currentMode = "Merkaba"
-                task.wait(6 * s)
-                if not seqRunning then return end
-                currentMode = "FloatStone"
-                cfg.FloatStone.Chaos = true
-                cfg.FloatStone.Size = 2
-                for i = 2, 15, 0.5 do
-                    if not seqRunning then break end
-                    cfg.FloatStone.Size = i
-                    task.wait(0.05 * s)
-                end
-            end)
-        end
-	end
+AnimSec:AddButton({
+    Name = "تسلسل التحول",
+    Callback = function()
+        task.spawn(function()
+            local s = 1 / cfg.AnimSpeed
+            currentMode = "MagicCircle"
+            cfg.MagicCircle.Height = -10
+            startEffect()
+            for i = -10, 5, 0.5 do 
+                cfg.MagicCircle.Height = i
+                task.wait(0.2 * s) 
+            end
+            currentMode = "Merkaba"
+            task.wait(6 * s)
+            currentMode = "FloatStone"
+            cfg.FloatStone.Chaos = true
+            cfg.FloatStone.Size = 2
+            for i = 2, 15, 0.5 do
+                cfg.FloatStone.Size = i
+                task.wait(0.05 * s)
+            end
+        end)
+    end
 })
 
-local surgeRunning = false
-AnimSec:AddToggle({
-	Name = "Surge",
-    Default = false,
-	Callback = function(v)
-        surgeRunning = v
-        if v then
-            task.spawn(function()
-                local s = 1 / cfg.AnimSpeed
-                currentMode = "MagicCircle"
-                cfg.MagicCircle.Height = -3
-                cfg.MagicCircle.Size = 5
-                cfg.MagicCircle.Speed = 10
-                startEffect()
-                for i = 5, 30, 2 do
-                    if not surgeRunning then break end
-                    cfg.MagicCircle.Size = i
-                    task.wait(0.09 * s)
-                end
-                if not surgeRunning then return end
-                currentMode = "Sphere"
-                cfg.Sphere.Size = 30
-                task.wait(1 * s)
-                if not surgeRunning then return end
-                for i = 30, 3, 2 do
-                    if not surgeRunning then break end
-                    cfg.Sphere.Size = i
-                    cfg.Sphere.Speed = (cfg.Sphere.Speed or 1) + 0.5
-                    task.wait(0.05 * s)
-                end
-                if not surgeRunning then return end
-                task.wait(0.9 * s)
-                if not surgeRunning then return end
-                cfg.Sphere.Speed = 20
-                for i = 3, 25, 3 do
-                    if not surgeRunning then break end
-                    cfg.Sphere.Size = i
-                    task.wait(0.04 * s)
-                end
-                if not surgeRunning then return end
-                task.wait(1.5 * s)
-                if not surgeRunning then return end
-                currentMode = "BackGuard"
-                cfg.BackGuard.Back = 15
-                cfg.BackGuard.Height = 5
-                cfg.BackGuard.Size = 20
-                cfg.BackGuard.Speed = 1
-            end)
-        end
-	end
+AnimSec:AddButton({
+    Name = "Surge",
+    Callback = function()
+        task.spawn(function()
+            local s = 1 / cfg.AnimSpeed
+            currentMode = "MagicCircle"
+            cfg.MagicCircle.Height = -3
+            cfg.MagicCircle.Size = 5
+            cfg.MagicCircle.Speed = 10
+            startEffect()
+            for i = 5, 30, 2 do
+                cfg.MagicCircle.Size = i
+                task.wait(0.09 * s)
+            end
+            currentMode = "Sphere"
+            cfg.Sphere.Size = 30
+            task.wait(1 * s)
+            for i = 30, 3, 2 do
+                cfg.Sphere.Size = i
+                cfg.Sphere.Speed = (cfg.Sphere.Speed or 1) + 0.5
+                task.wait(0.05 * s)
+            end
+            task.wait(0.9 * s)
+            cfg.Sphere.Speed = 20
+            for i = 3, 25, 3 do
+                cfg.Sphere.Size = i
+                task.wait(0.04 * s)
+            end
+            task.wait(1.5 * s)
+            currentMode = "BackGuard"
+            cfg.BackGuard.Back = 15
+            cfg.BackGuard.Height = 5
+            cfg.BackGuard.Size = 20
+            cfg.BackGuard.Speed = 1
+        end)
+    end
 })
 
 -- --- TAB: MODE SETTINGS ---
 local ModeSetTab = Window:MakeTab({
-    Name = "Mode Settings",
+    Name = "إعدادات الوضع",
     Icon = "rbxassetid://8997386997"
 })
 
 local CombineSec = ModeSetTab:AddSection({
-    Name = "Combine Settings"
+    Name = "إعدادات الدمج"
 })
 
 local function getModeListWithNone()
@@ -2819,169 +2695,182 @@ local function getModeListWithNone()
 end
 
 UIElements.CombineMode1 = CombineSec:AddDropdown({
-    Name = "Combine: Mode 1",
-    Default = modeNames["Wing"],
+    Name = "دمج: الوضع 1",
+    Default = "Wing",
     Options = getModeListWithNone(),
     Callback = function(v) cfg.Combined.Mode1 = modeKeys[v] end
 })
 
 UIElements.CombineMode1Count = CombineSec:AddSlider({
-    Name = "Mode 1 Count",
+    Name = "عدد الوضع 1",
     Min = 1,
     Max = 200,
     Default = 20,
     Increment = 1,
-    ValueName = "items",
+    ValueName = "عنصر",
     Callback = function(v) cfg.Combined.Mode1Count = v end    
 })
 
 UIElements.CombineMode2 = CombineSec:AddDropdown({
-    Name = "Combine: Mode 2",
-    Default = modeNames["Rotate"],
+    Name = "دمج: الوضع 2",
+    Default = "Rotate",
     Options = getModeListWithNone(),
-    Callback = function(v) cfg.Combined.Mode2 = v end
+    Callback = function(v) cfg.Combined.Mode2 = modeKeys[v] end
 })
 
 UIElements.CombineMode2Count = CombineSec:AddSlider({
-    Name = "Mode 2 Count",
+    Name = "عدد الوضع 2",
     Min = 1,
     Max = 200,
     Default = 10,
     Increment = 1,
-    ValueName = "items",
+    ValueName = "عنصر",
     Callback = function(v) cfg.Combined.Mode2Count = v end    
 })
 
 UIElements.CombineMode3 = CombineSec:AddDropdown({
-    Name = "Combine: Mode 3",
+    Name = "دمج: الوضع 3",
     Default = "None",
     Options = getModeListWithNone(),
     Callback = function(v) cfg.Combined.Mode3 = modeKeys[v] end
 })
 
 UIElements.CombineMode3Count = CombineSec:AddSlider({
-    Name = "Mode 3 Count",
+    Name = "عدد الوضع 3",
     Min = 0,
     Max = 200,
     Default = 0,
     Increment = 1,
-    ValueName = "items",
+    ValueName = "عنصر",
     Callback = function(v) cfg.Combined.Mode3Count = v end    
 })
 
--- --- Common Settings Editor (switch with dropdown) ---
+-- --- 共通設定エディタ (ドロップダウンで切り替え) ---
 local EditSec = ModeSetTab:AddSection({
-    Name = "Common Settings Editor"
+    Name = "محرر الإعدادات المشتركة"
 })
 
 local currentEditMode = "Wing"
 local sl_Speed, sl_Size, sl_Height, sl_Back
 
 EditSec:AddDropdown({
-    Name = "Edit Target Mode",
-    Default = modeNames["Wing"],
+    Name = "وضع التحرير",
+    Default = "Wing",
     Options = getModeList(),
     Callback = function(v)
-        currentEditMode = v
-        -- Update slider values
-        if sl_Speed then sl_Speed:Set(cfg[v].Speed or 10) end
-        if sl_Size then sl_Size:Set(cfg[v].Size or 10) end
-        if sl_Height then sl_Height:Set(cfg[v].Height or 0) end
-        if sl_Back then sl_Back:Set(cfg[v].Back or 0) end
+        currentEditMode = modeKeys[v]
+        -- スライダーの値を更新
+        if sl_Speed then sl_Speed:Set(cfg[currentEditMode].Speed or 10) end
+        if sl_Size then sl_Size:Set(cfg[currentEditMode].Size or 10) end
+        if sl_Height then sl_Height:Set(cfg[currentEditMode].Height or 0) end
+        if sl_Back then sl_Back:Set(cfg[currentEditMode].Back or 0) end
     end
 })
 
 sl_Speed = EditSec:AddSlider({
-    Name = "Speed", Min = 0, Max = 100, Default = cfg.Wing.Speed or 10,
+    Name = "السرعة", Min = 0, Max = 100, Default = cfg.Wing.Speed or 10,
     Callback = function(v) cfg[currentEditMode].Speed = v end
 })
 sl_Size = EditSec:AddSlider({
-    Name = "Size/Width", Min = 1, Max = 150, Default = cfg.Wing.Size or 10,
+    Name = "الحجم/العرض", Min = 1, Max = 150, Default = cfg.Wing.Size or 10,
     Callback = function(v) cfg[currentEditMode].Size = v end
 })
 sl_Height = EditSec:AddSlider({
-    Name = "Height", Min = -50, Max = 50, Default = cfg.Wing.Height or 0,
+    Name = "الارتفاع", Min = -50, Max = 50, Default = cfg.Wing.Height or 0,
     Callback = function(v) cfg[currentEditMode].Height = v end
 })
 sl_Back = EditSec:AddSlider({
-    Name = "Depth", Min = -50, Max = 50, Default = cfg.Wing.Back or 0,
+    Name = "العمق", Min = -50, Max = 50, Default = cfg.Wing.Back or 0,
     Callback = function(v) cfg[currentEditMode].Back = v end
 })
 
--- --- Advanced Settings Tab (unique settings only) ---
+-- --- 詳細設定タブ (固有設定のみ) ---
 local AdvTab = Window:MakeTab({
-    Name = "Advanced",
+    Name = "إعدادات متقدمة",
     Icon = "rbxassetid://7733771472"
 })
 
 for _, m in ipairs(getModeList()) do
     local modeKey = modeKeys[m]
-    -- Create sections only for modes with unique settings
-    if modeKey == "Wing" or modeKey == "Pet" or modeKey == "Text" or modeKey == "MagicCircle2" or modeKey == "MagicCircle3" or modeKey == "Beam" or modeKey == "FloatStone" or modeKey == "Tornado" or modeKey == "Rotate" then
+    -- 固有設定があるモードのみセクションを作成
+    if modeKey == "Wing" or modeKey == "Pet" or modeKey == "Text" or modeKey == "MagicCircle2" or modeKey == "MagicCircle3" or modeKey == "MirrorPlayer" or modeKey == "Beam" or modeKey == "FloatStone" or modeKey == "Tornado" or modeKey == "Rotate" or modeKey == "Gyro" then
         local s = AdvTab:AddSection({ Name = m })
         
         if modeKey == "Wing" then
-            s:AddToggle({ Name = "Anchor Root (Root Fixed)", Default = cfg.Wing.RootFixed, Callback = function(v) cfg.Wing.RootFixed = v end })
-            s:AddSlider({ Name = "Distance from Body (Gap)", Min = 0, Max = 50, Default = cfg.Wing.Gap or 10, Callback = function(v) cfg.Wing.Gap = v end })
-            s:AddSlider({ Name = "Joints", Min = 0, Max = 10, Default = 3, Callback = function(v) cfg.Wing.Joints = v end })
-            s:AddSlider({ Name = "V-Angle (Forward/Back)", Min = -180, Max = 180, Default = 0, Callback = function(v) cfg.Wing.V_Angle = v end })
-            s:AddSlider({ Name = "Vertical Tilt", Min = -90, Max = 90, Default = 0, Callback = function(v) cfg.Wing.Tilt = v end })
-            s:AddSlider({ Name = "Flap Strength", Min = 0, Max = 50, Default = 15, Callback = function(v) cfg.Wing.Strength = v end })
+            s:AddToggle({ Name = "تثبيت الجذر (Root Fixed)", Default = cfg.Wing.RootFixed, Callback = function(v) cfg.Wing.RootFixed = v end })
+            s:AddSlider({ Name = "المسافة من الجسم (Gap)", Min = 0, Max = 50, Default = cfg.Wing.Gap or 10, Callback = function(v) cfg.Wing.Gap = v end })
+            s:AddSlider({ Name = "عدد المفاصل", Min = 0, Max = 10, Default = 3, Callback = function(v) cfg.Wing.Joints = v end })
+            s:AddSlider({ Name = "زاوية V (أمام/خلف)", Min = -180, Max = 180, Default = 0, Callback = function(v) cfg.Wing.V_Angle = v end })
+            s:AddSlider({ Name = "الميل الرأسي", Min = -90, Max = 90, Default = 0, Callback = function(v) cfg.Wing.Tilt = v end })
+            s:AddSlider({ Name = "قوة الرفرفة", Min = 0, Max = 50, Default = 15, Callback = function(v) cfg.Wing.Strength = v end })
+            s:AddToggle({ Name = "انحناء", Default = cfg.Wing.Curve or false, Callback = function(v) cfg.Wing.Curve = v end })
+            s:AddSlider({ Name = "مقدار الانحناء", Min = -50, Max = 50, Default = cfg.Wing.CurveAmount or 10, Callback = function(v) cfg.Wing.CurveAmount = v end })
         
         elseif modeKey == "Pet" then
-            s:AddSlider({ Name = "Count", Min = 1, Max = 10, Default = 2, Callback = function(v) cfg.Pet.Count = v end })
-            s:AddSlider({ Name = "Joints (Wiggle)", Min = 0, Max = 10, Default = 3, Callback = function(v) cfg.Pet.Joints = v end })
-            s:AddSlider({ Name = "Horizontal Spread (Gap)", Min = 1, Max = 20, Default = 13, Callback = function(v) cfg.Pet.Gap = v end })
+            s:AddSlider({ Name = "العدد", Min = 1, Max = 10, Default = 2, Callback = function(v) cfg.Pet.Count = v end })
+            s:AddSlider({ Name = "المفاصل (تموج)", Min = 0, Max = 10, Default = 3, Callback = function(v) cfg.Pet.Joints = v end })
+            s:AddSlider({ Name = "الانتشار الأفقي (Gap)", Min = 1, Max = 20, Default = 13, Callback = function(v) cfg.Pet.Gap = v end })
         
         elseif modeKey == "Text" then
-            s:AddTextbox({ Name = "Display Text", Default = "HELLO", TextDisappear = false, Callback = function(v) cfg.Text.Content = v end })
+            s:AddTextbox({ Name = "عرض النص", Default = "HELLO", TextDisappear = false, Callback = function(v) cfg.Text.Content = v end })
         
         elseif modeKey == "MagicCircle2" then
-            s:AddSlider({ Name = "Layers", Min = 1, Max = 5, Default = 3, Callback = function(v) cfg.MagicCircle2.Layers = v end })
+            s:AddSlider({ Name = "عدد الطبقات", Min = 1, Max = 5, Default = 3, Callback = function(v) cfg.MagicCircle2.Layers = v end })
         
         elseif modeKey == "MagicCircle3" then
-            s:AddSlider({ Name = "Complexity", Min = 1, Max = 10, Default = 5, Callback = function(v) cfg.MagicCircle3.Complexity = v end })
+            s:AddSlider({ Name = "التعقيد", Min = 1, Max = 10, Default = 5, Callback = function(v) cfg.MagicCircle3.Complexity = v end })
+        
+        elseif modeKey == "MirrorPlayer" then
+            -- Orionは小数が苦手なので10倍で表示
+            s:AddSlider({ Name = "مقياس التكبير (x10)", Min = 1, Max = 100, Default = 10, Callback = function(v) cfg.MirrorPlayer.Scale = v/10 end })
+            s:AddSlider({ Name = "حجم الصندوق (x10)", Min = 5, Max = 100, Default = 20, Callback = function(v) cfg.MirrorPlayer.Size = v/10 end })
+            s:AddSlider({ Name = "كثافة تباعد الحواف (x10)", Min = 5, Max = 30, Default = 10, Callback = function(v) cfg.MirrorPlayer.EdgeSpacing = v/10 end })
         
         elseif modeKey == "Beam" then
-            s:AddSlider({ Name = "Beam Count", Min = 1, Max = 20, Default = 8, Callback = function(v) cfg.Beam.Count = v end })
+            s:AddSlider({ Name = "عدد الأشعة", Min = 1, Max = 20, Default = 8, Callback = function(v) cfg.Beam.Count = v end })
         
         elseif modeKey == "FloatStone" then
-            s:AddToggle({ Name = "Chaos Movement", Default = false, Callback = function(v) cfg.FloatStone.Chaos = v end })
-
-        elseif modeKey == "Rotate" then
-            s:AddToggle({ Name = "Wave", Default = cfg.Rotate.Wave or false, Callback = function(v) cfg.Rotate.Wave = v end })
-            s:AddSlider({ Name = "Wave Speed", Min = 1, Max = 20, Default = cfg.Rotate.WaveSpeed or 2, Callback = function(v) cfg.Rotate.WaveSpeed = v end })
-            s:AddSlider({ Name = "Wave Amplitude", Min = 1, Max = 20, Default = cfg.Rotate.WaveAmp or 2, Callback = function(v) cfg.Rotate.WaveAmp = v end })
+            s:AddToggle({ Name = "حركة الفوضى", Default = false, Callback = function(v) cfg.FloatStone.Chaos = v end })
 
         elseif modeKey == "Tornado" then
             s:AddSlider({ Name = "Bottom Radius", Min = 0, Max = 50, Default = cfg.Tornado.Radius, Callback = function(v) cfg.Tornado.Radius = v end })
             s:AddSlider({ Name = "Top Radius", Min = 0, Max = 50, Default = cfg.Tornado.TopRadius, Callback = function(v) cfg.Tornado.TopRadius = v end })
+            s:AddToggle({ Name = "شكل هرمي", Default = false, Callback = function(v) cfg.Tornado.Pyramid = v end })
+
+        elseif modeKey == "Rotate" then
+            s:AddToggle({ Name = "موجة", Default = cfg.Rotate.Wave or false, Callback = function(v) cfg.Rotate.Wave = v end })
+            s:AddSlider({ Name = "سرعة الموجة", Min = 1, Max = 20, Default = cfg.Rotate.WaveSpeed or 2, Callback = function(v) cfg.Rotate.WaveSpeed = v end })
+            s:AddSlider({ Name = "سعة الموجة", Min = 1, Max = 20, Default = cfg.Rotate.WaveAmp or 2, Callback = function(v) cfg.Rotate.WaveAmp = v end })
+
+        elseif modeKey == "Gyro" then
+            s:AddSlider({ Name = "الحجم الداخلي", Min = 1, Max = 50, Default = cfg.Gyro.InnerSize, Callback = function(v) cfg.Gyro.InnerSize = v end })
+            s:AddDropdown({ Name = "نوع المركز", Default = cfg.Gyro.CenterType, Options = {"Sphere", "Cube", "Vertical", "Random"}, Callback = function(v) cfg.Gyro.CenterType = v end })
         end
     end
 end
 
 -- --- TAB: CONFIG / SETTINGS ---
 local ConfigTab = Window:MakeTab({
-    Name = "Global/Save",
+    Name = "عام/حفظ",
     Icon = "rbxassetid://10734950309"
 })
 
 local GlobalSec = ConfigTab:AddSection({
-    Name = "System"
+    Name = "النظام"
 })
 
--- 1. Follow toggle
+-- 1. 追従切り替え
 UIElements.FollowToggle = GlobalSec:AddToggle({
-    Name = "Follow Player",
+    Name = "تتبع اللاعب",
     Default = true,
     Callback = function(v)
         followPlayer = v
     end
 })
 
--- 0,0,0 reset button
+-- 0,0,0リセットボタン
 GlobalSec:AddButton({
-    Name = "Reset Effect to World 0,0,0",
+    Name = "إعادة تعيين التأثير إلى العالم 0,0,0",
     Callback = function()
         if not isEnabled then return end
         followPlayer = false 
@@ -3005,50 +2894,78 @@ GlobalSec:AddButton({
 })
 
 UIElements.MaxToysSlider = GlobalSec:AddSlider({
-    Name = "Max Toys to Use",
+    Name = "الحد الأقصى للألعاب المستخدمة",
     Min = 1, Max = 200, Default = cfg.Global.MaxToys or 100,
     Callback = function(v) cfg.Global.MaxToys = v end
 })
 
 UIElements.AutoWidthToggle = GlobalSec:AddToggle({
-    Name = "Auto-Width",
+    Name = "عرض تلقائي",
     Default = true,
     Callback = function(v) autoWidth = v end
 })
 
--- Animation speed multiplier (processed as 10x for decimals)
+-- アニメ速度倍率 (小数のため10倍で処理)
 UIElements.AnimSpeedSlider = GlobalSec:AddSlider({
-    Name = "Animation Speed",
+    Name = "مضاعف سرعة الرسوم المتحركة",
     Min = 1, Max = 50, Default = 10,
     Callback = function(v) cfg.AnimSpeed = v/10 end
 })
 
--- --- Home Time Limit Reset Settings ---
-local ResetSec = ConfigTab:AddSection({
-    Name = "Home Time Limit Reset"
+local EffectRotSec = ConfigTab:AddSection({ Name = "دوران التأثير الكلي" })
+UIElements.EffectRotationX = EffectRotSec:AddSlider({
+    Name = "المحور X (ميل)", Min = -180, Max = 180, Default = 0,
+    Callback = function(v) cfg.Global.EffectRotation = Vector3.new(v, cfg.Global.EffectRotation.Y, cfg.Global.EffectRotation.Z) end
+})
+UIElements.EffectRotationY = EffectRotSec:AddSlider({
+    Name = "المحور Y (انحراف)", Min = -180, Max = 180, Default = 0,
+    Callback = function(v) cfg.Global.EffectRotation = Vector3.new(cfg.Global.EffectRotation.X, v, cfg.Global.EffectRotation.Z) end
+})
+UIElements.EffectRotationZ = EffectRotSec:AddSlider({
+    Name = "المحور Z (دوران)", Min = -180, Max = 180, Default = 0,
+    Callback = function(v) cfg.Global.EffectRotation = Vector3.new(cfg.Global.EffectRotation.X, cfg.Global.EffectRotation.Y, v) end
 })
 
-HomeStatus = ResetSec:AddParagraph("House Status", "Waiting...")
+local IndivRotSec = ConfigTab:AddSection({ Name = "دوران اللعبة الفردي" })
+UIElements.IndividualRotationX = IndivRotSec:AddSlider({
+    Name = "المحور X (ميل)", Min = -180, Max = 180, Default = 0,
+    Callback = function(v) cfg.Global.IndividualRotation = Vector3.new(v, cfg.Global.IndividualRotation.Y, cfg.Global.IndividualRotation.Z) end
+})
+UIElements.IndividualRotationY = IndivRotSec:AddSlider({
+    Name = "المحور Y (انحراف)", Min = -180, Max = 180, Default = -90,
+    Callback = function(v) cfg.Global.IndividualRotation = Vector3.new(cfg.Global.IndividualRotation.X, v, cfg.Global.IndividualRotation.Z) end
+})
+UIElements.IndividualRotationZ = IndivRotSec:AddSlider({
+    Name = "المحور Z (دوران)", Min = -180, Max = 180, Default = 0,
+    Callback = function(v) cfg.Global.IndividualRotation = Vector3.new(cfg.Global.IndividualRotation.X, cfg.Global.IndividualRotation.Y, v) end
+})
+
+-- --- 家制限時間リセット設定 ---
+local ResetSec = ConfigTab:AddSection({
+    Name = "إعادة تعيين وقت المنزل"
+})
+
+HomeStatus = ResetSec:AddParagraph("حالة المنزل", "انتظار...")
 
 UIElements.PlotReturnToggle = ResetSec:AddToggle({
-    Name = "Auto House Detection & Reset",
+    Name = "الكشف التلقائي عن المنزل وإعادة التعيين",
     Default = cfg.PlotReturn.Enabled,
     Callback = function(v)
         cfg.PlotReturn.Enabled = v
-        if not v and HomeStatus then HomeStatus:Set("Disabled") end
+        if not v and HomeStatus then HomeStatus:Set("معطل") end
     end
 })
 
--- --- Coordinate Management System ---
+-- --- 座標管理システム ---
 local CoordSec = ConfigTab:AddSection({
-    Name = "Coordinate/Position Management"
+    Name = "إدارة الإحداثيات/الموقع"
 })
 
 local CoordHUD = nil
 local HUDLabel = nil
 
 CoordSec:AddToggle({
-    Name = "Always display coordinates in a separate window",
+    Name = "عرض الإحداثيات دائماً في نافذة منفصلة",
     Default = false,
     Callback = function(state)
         if state then
@@ -3088,7 +3005,7 @@ CoordSec:AddToggle({
 })
 
 CoordSec:AddButton({
-    Name = "Copy Current Coordinates",
+    Name = "نسخ الإحداثيات الحالية",
     Callback = function()
         local char = game.Players.LocalPlayer.Character
         local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -3097,7 +3014,7 @@ CoordSec:AddButton({
             local posString = string.format("%d, %d, %d", math.round(p.X), math.round(p.Y), math.round(p.Z))
             setclipboard(posString)
             OrionLib:MakeNotification({
-                Name = "Copy Complete",
+                Name = "تم النسخ",
                 Content = posString,
                 Time = 5
             })
@@ -3105,68 +3022,26 @@ CoordSec:AddButton({
     end
 })
 
-local EffectRotSec = ConfigTab:AddSection({ Name = "Effect Rotation" })
-UIElements.EffectRotationX = EffectRotSec:AddSlider({
-    Name = "X-Axis (Pitch)", Min = -180, Max = 180, Default = 0,
-    Callback = function(v) cfg.Global.EffectRotation = Vector3.new(v, cfg.Global.EffectRotation.Y, cfg.Global.EffectRotation.Z) end
-})
-UIElements.EffectRotationY = EffectRotSec:AddSlider({
-    Name = "Y-Axis (Yaw)", Min = -180, Max = 180, Default = 0,
-    Callback = function(v) cfg.Global.EffectRotation = Vector3.new(cfg.Global.EffectRotation.X, v, cfg.Global.EffectRotation.Z) end
-})
-UIElements.EffectRotationZ = EffectRotSec:AddSlider({
-    Name = "Z-Axis (Roll)", Min = -180, Max = 180, Default = 0,
-    Callback = function(v) cfg.Global.EffectRotation = Vector3.new(cfg.Global.EffectRotation.X, cfg.Global.EffectRotation.Y, v) end
-})
+----- データ管理 ---
+local SaveSec = ConfigTab:AddSection({Name = "إدارة البيانات (تحديث فوري)"})
 
-local IndivRotSec = ConfigTab:AddSection({ Name = "Individual Toy Rotation" })
-UIElements.IndividualRotationX = IndivRotSec:AddSlider({
-    Name = "X-Axis (Pitch)", Min = -180, Max = 180, Default = 0,
-    Callback = function(v) cfg.Global.IndividualRotation = Vector3.new(v, cfg.Global.IndividualRotation.Y, cfg.Global.IndividualRotation.Z) end
-})
-UIElements.IndividualRotationY = IndivRotSec:AddSlider({
-    Name = "Y-Axis (Yaw)", Min = -180, Max = 180, Default = -90,
-    Callback = function(v) cfg.Global.IndividualRotation = Vector3.new(cfg.Global.IndividualRotation.X, v, cfg.Global.IndividualRotation.Z) end
-})
-UIElements.IndividualRotationZ = IndivRotSec:AddSlider({
-    Name = "Z-Axis (Roll)", Min = -180, Max = 180, Default = 0,
-    Callback = function(v) cfg.Global.IndividualRotation = Vector3.new(cfg.Global.IndividualRotation.X, cfg.Global.IndividualRotation.Y, v) end
-})
-
-local IndivRotSec = ConfigTab:AddSection({ Name = "Individual Toy Rotation" })
-UIElements.IndividualRotationX = IndivRotSec:AddSlider({
-    Name = "X-Axis (Pitch)", Min = -180, Max = 180, Default = 0,
-    Callback = function(v) cfg.Global.IndividualRotation = Vector3.new(v, cfg.Global.IndividualRotation.Y, cfg.Global.IndividualRotation.Z) end
-})
-UIElements.IndividualRotationY = IndivRotSec:AddSlider({
-    Name = "Y-Axis (Yaw)", Min = -180, Max = 180, Default = -90,
-    Callback = function(v) cfg.Global.IndividualRotation = Vector3.new(cfg.Global.IndividualRotation.X, v, cfg.Global.IndividualRotation.Z) end
-})
-UIElements.IndividualRotationZ = IndivRotSec:AddSlider({
-    Name = "Z-Axis (Roll)", Min = -180, Max = 180, Default = 0,
-    Callback = function(v) cfg.Global.IndividualRotation = Vector3.new(cfg.Global.IndividualRotation.X, cfg.Global.IndividualRotation.Y, v) end
-})
-
------ Data Management ---
-local SaveSec = ConfigTab:AddSection({Name = "Data Management (Real-time Update)"})
-
--- 1. Define dropdown as a variable (to change its content later)
+-- 1. ドロップダウンを変数として定義（後で中身を書き換えるため）
 local fileDropdown
 
 fileDropdown = SaveSec:AddDropdown({
-    Name = "Select Saved File",
-    Default = "Please select",
+    Name = "اختر ملفاً محفوظاً",
+    Default = "يرجى الاختيار",
     Options = getConfigFileList(),
     Callback = function(v) 
         selectedFile = v 
     end
 })
 
--- 2. Load button (updates appearance instantly on load)
+-- 2. 読み込みボタン（読み込んだ瞬間に見た目を更新）
 SaveSec:AddButton({
-    Name = "Load Selected File",
+    Name = "تحميل الملف المختار",
     Callback = function()
-        if selectedFile and selectedFile ~= "No files" then
+        if selectedFile and selectedFile ~= "لا توجد ملفات" then
             local path = "holon_config/" .. selectedFile
             if isfile(path) then
                 local success, data = pcall(function() 
@@ -3175,21 +3050,20 @@ SaveSec:AddButton({
                 
                 if success then
                     cfg = data
-
+                    
                     -- Reconstruct Vector3s after loading from JSON
                     if cfg.Global.EffectRotation and type(cfg.Global.EffectRotation) == "table" then
-                        cfg.Global.EffectRotation = Vector3.new(cfg.Global.EffectRotation.X, cfg.Global.EffectRotation.Y, cfg.Global.EffectRotation.Z)
+                        cfg.Global.EffectRotation = Vector3.new(cfg.Global.EffectRotation.X or 0, cfg.Global.EffectRotation.Y or 0, cfg.Global.EffectRotation.Z or 0)
                     else
                         cfg.Global.EffectRotation = Vector3.new(0,0,0)
                     end
                     if cfg.Global.IndividualRotation and type(cfg.Global.IndividualRotation) == "table" then
-                        cfg.Global.IndividualRotation = Vector3.new(cfg.Global.IndividualRotation.X, cfg.Global.IndividualRotation.Y, cfg.Global.IndividualRotation.Z)
+                        cfg.Global.IndividualRotation = Vector3.new(cfg.Global.IndividualRotation.X or 0, cfg.Global.IndividualRotation.Y or -90, cfg.Global.IndividualRotation.Z or 0)
                     else
                         cfg.Global.IndividualRotation = Vector3.new(0,-90,0)
                     end
 
-                    
-                    -- Restore local variables from saved settings
+                    -- 保存された設定をローカル変数に反映
                     if cfg.LocalSettings then
                         local s = cfg.LocalSettings
                         walkSpeed = s.WalkSpeed or 16
@@ -3204,24 +3078,11 @@ SaveSec:AddButton({
                         currentMode = s.CurrentMode or "Wing"
                         combinedActive = s.CombinedActive or false
                         followPlayer = s.FollowPlayer or true
-                        
-                        local effectRot = s.EffectRotation
-                        if effectRot and type(effectRot) == "table" then
-                            cfg.Global.EffectRotation = Vector3.new(effectRot.X or 0, effectRot.Y or 0, effectRot.Z or 0)
-                        else
-                            cfg.Global.EffectRotation = Vector3.new(0,0,0)
-                        end
-                        local indivRot = s.IndividualRotation
-                        if indivRot and type(indivRot) == "table" then
-                            cfg.Global.IndividualRotation = Vector3.new(indivRot.X or 0, indivRot.Y or -90, indivRot.Z or 0)
-                        else
-                            cfg.Global.IndividualRotation = Vector3.new(0,-90,0)
-                        end
                         useOtherToys = s.UseOtherToys or false
                         autoWidth = s.AutoWidth or true
                         if s.Esp then espCfg = s.Esp end
                         
-                        -- ★Update UI appearance (Use Set method)
+                        -- ★UI要素の見た目を更新 (Setメソッドを使用)
                         if UIElements.WalkSpeedSlider then UIElements.WalkSpeedSlider:Set(walkSpeed) end
                         if UIElements.WalkSpeedToggle then UIElements.WalkSpeedToggle:Set(useWalkSpeed) end
                         if UIElements.JumpPowerSlider then UIElements.JumpPowerSlider:Set(jumpPower) end
@@ -3231,7 +3092,7 @@ SaveSec:AddButton({
                         if UIElements.AntiExplosionToggle then UIElements.AntiExplosionToggle:Set(antiExplosion) end
                         if UIElements.AntiFireToggle then UIElements.AntiFireToggle:Set(antiFire) end
                         if UIElements.AntiGrabToggle then UIElements.AntiGrabToggle:Set(antiGrab) end
-                        if UIElements.AntiGucciToggle then UIElements.AntiGucciToggle:Set(false) end -- Off for safety
+                        if UIElements.AntiGucciToggle then UIElements.AntiGucciToggle:Set(false) end -- 安全のためOFF
                         if UIElements.EffectToggle then UIElements.EffectToggle:Set(isEnabled) end
                         if UIElements.ModeDropdown then UIElements.ModeDropdown:Set(currentMode) end
                         if UIElements.CombinedToggle then UIElements.CombinedToggle:Set(combinedActive) end
@@ -3249,7 +3110,7 @@ SaveSec:AddButton({
                         if UIElements.PlotReturnToggle then UIElements.PlotReturnToggle:Set(cfg.PlotReturn.Enabled) end
                         if UIElements.PlotReturnInterval then UIElements.PlotReturnInterval:Set(cfg.PlotReturn.Interval) end
                         
-                        -- ESP Settings
+                        -- ESP設定の反映
                         if UIElements.EspEnabled then UIElements.EspEnabled:Set(espCfg.Enabled) end
                         if UIElements.EspTargetOnly then UIElements.EspTargetOnly:Set(espCfg.TargetOnly) end
                         if UIElements.EspNames then UIElements.EspNames:Set(espCfg.Names) end
@@ -3258,20 +3119,22 @@ SaveSec:AddButton({
                         if UIElements.EspHitboxSize then UIElements.EspHitboxSize:Set(espCfg.HitboxSize) end
                         if UIElements.EspColor then UIElements.EspColor:Set(espCfg.ESPColor) end
                         
-                        -- Combined Settings
+                        -- 合体設定の反映
                         if UIElements.CombineMode1 then UIElements.CombineMode1:Set(cfg.Combined.Mode1) end
                         if UIElements.CombineMode1Count then UIElements.CombineMode1Count:Set(cfg.Combined.Mode1Count) end
                         if UIElements.CombineMode2 then UIElements.CombineMode2:Set(cfg.Combined.Mode2) end
                         if UIElements.CombineMode2Count then UIElements.CombineMode2Count:Set(cfg.Combined.Mode2Count) end
+                        if UIElements.CombineMode3 then UIElements.CombineMode3:Set(modeNames[cfg.Combined.Mode3] or cfg.Combined.Mode3) end
+                        if UIElements.CombineMode3Count then UIElements.CombineMode3Count:Set(cfg.Combined.Mode3Count) end
                         
-                        -- Restore additional items
+                        -- 追加項目の反映
                         vflyEnabled = s.VFlyEnabled or false
                         vflySpeed = s.VFlySpeed or 1
                         local isThirdPerson = s.ThirdPerson or false
                         local savedFOV = s.FOV or 70
                         targetMainName = s.TargetMainName or ""
                         targetSubName = s.TargetSubName or ""
-                        selectedItemName = s.SelectedItemName or "All Toys"
+                        selectedItemName = s.SelectedItemName or "جميع الألعاب"
                         pianoEnabled = s.PianoEnabled or false
                         pianoFollowEnabled = s.PianoFollowEnabled or true
 
@@ -3283,7 +3146,7 @@ SaveSec:AddButton({
                         if UIElements.PianoEnabled then UIElements.PianoEnabled:Set(pianoEnabled) end
                         if UIElements.PianoFollow then UIElements.PianoFollow:Set(pianoFollowEnabled) end
 
-                        -- Restore target dropdowns (search from list)
+                        -- ターゲットドロップダウンの復元（リストから検索）
                         local function restoreDropdown(dd, name)
                             if dd and name ~= "" then
                                 for _, opt in ipairs(getPList()) do
@@ -3294,7 +3157,7 @@ SaveSec:AddButton({
                         restoreDropdown(UIElements.MainTargetDropdown, targetMainName)
                         restoreDropdown(UIElements.SubTargetDropdown, targetSubName)
                         
-                        -- ★Restore UI Settings
+                        -- ★UI設定の復元
                         if not cfg.UI then
                             cfg.UI = {
                                 Transparency = 0.1,
@@ -3310,11 +3173,11 @@ SaveSec:AddButton({
                         if UIElements.UIBackgroundImage then UIElements.UIBackgroundImage:Set(cfg.UI.BackgroundImage or "") end
                     end
 
-                    -- ★Update UI appearance (color, transparency, image) in real-time here
+                    -- ★ここでリアルタイムにUIの見た目（カラー・透明度・画像）を更新
                     applyCustomStyle() 
-                    OrionLib:MakeNotification({Name = "Success", Content = "Applied " .. selectedFile, Time = 3})
+                    OrionLib:MakeNotification({Name = "نجاح", Content = selectedFile .. " تم تطبيق", Time = 3})
                 else
-                    OrionLib:MakeNotification({Name = "Error", Content = "Failed to load file", Time = 3})
+                    OrionLib:MakeNotification({Name = "خطأ", Content = "فشل تحميل الملف", Time = 3})
                 end
             end
         end
@@ -3322,21 +3185,21 @@ SaveSec:AddButton({
 })
 
 SaveSec:AddTextbox({
-    Name = "New Save File Name",
+    Name = "اسم ملف حفظ جديد",
     Default = "config1",
     TextDisappear = false,
     Callback = function(v) saveName = v end
 })
 
--- 3. Save button (updates dropdown instantly on save)
+-- 3. 保存ボタン（保存した瞬間にドロップダウンを更新）
 SaveSec:AddButton({
-    Name = "Save Current Settings",
+    Name = "حفظ الإعدادات الحالية",
     Callback = function()
         if saveName and saveName ~= "" then
             if not isfolder("holon_config") then makefolder("holon_config") end
             local path = "holon_config/" .. saveName .. ".json"
             
-            -- Sync local variables to cfg before saving
+            -- ローカル変数の状態をcfgに同期させてから保存
             cfg.LocalSettings = {
                 WalkSpeed = walkSpeed,
                 JumpPower = jumpPower,
@@ -3354,8 +3217,8 @@ SaveSec:AddButton({
                 IndividualRotation = cfg.Global.IndividualRotation,
                 UseOtherToys = useOtherToys,
                 AutoWidth = autoWidth,
-                Esp = espCfg, -- Save ESP settings table
-                -- Additional save items
+                Esp = espCfg, -- ESP設定(テーブル)も保存
+                -- 追加保存項目
                 VFlyEnabled = vflyEnabled,
                 VFlySpeed = vflySpeed,
                 ThirdPerson = (LocalPlayer.CameraMode == Enum.CameraMode.Classic),
@@ -3370,23 +3233,23 @@ SaveSec:AddButton({
 
             writefile(path, HttpService:JSONEncode(cfg))
             
-            -- ★This is the key: update the dropdown list immediately after saving
+            -- ★ここがポイント：保存した直後にドロップダウンのリストを最新にする
             fileDropdown:Refresh(getConfigFileList(), true)
             
             OrionLib:MakeNotification({
-                Name = "Save Complete", 
-                Content = "Saved " .. saveName .. ".json and updated the list", 
+                Name = "تم الحفظ", 
+                Content = "تم حفظ " .. saveName .. ".json وتحديث القائمة", 
                 Time = 3
             })
         end
     end
 })
 
--- --- UI Appearance Settings ---
-local UISec = ConfigTab:AddSection({Name = "UI Appearance/Color Settings"})
+-- --- UI外観設定 ---
+local UISec = ConfigTab:AddSection({Name = "إعدادات مظهر/ألوان واجهة المستخدم"})
 
 UIElements.UITransparency = UISec:AddSlider({
-    Name = "UI Transparency",
+    Name = "شفافية واجهة المستخدم",
     Min = 0, Max = 100, Default = 0,
     Callback = function(v)
         cfg.UI.Transparency = v / 100
@@ -3394,9 +3257,9 @@ UIElements.UITransparency = UISec:AddSlider({
     end
 })
 
--- From here on, cfg.UI exists, so it will be displayed without disappearing
+-- 以降、cfg.UI が存在するので消えずに表示されます
 UIElements.UIBackgroundColor = UISec:AddColorpicker({
-    Name = "Background Color",
+    Name = "لون الخلفية",
     Default = cfg.UI.BackgroundColor,
     Callback = function(v)
         cfg.UI.BackgroundColor = v
@@ -3405,7 +3268,7 @@ UIElements.UIBackgroundColor = UISec:AddColorpicker({
 })
 
 UIElements.UIAccentColor = UISec:AddColorpicker({
-    Name = "Border Color (Accent)",
+    Name = "لون الإطار (التمييز)",
     Default = cfg.UI.AccentColor,
     Callback = function(v)
         cfg.UI.AccentColor = v
@@ -3414,14 +3277,16 @@ UIElements.UIAccentColor = UISec:AddColorpicker({
 })
 
 UIElements.UIBackgroundImage = UISec:AddTextbox({
-    Name = "Background Image ID (Numbers Only)",
+    Name = "معرف صورة الخلفية (أرقام فقط)",
     Default = cfg.UI.BackgroundImage,
     TextDisappear = false,
     Callback = function(v)
-        local numericId = v:match("%d+")
-        
-        if numericId then
-            cfg.UI.BackgroundImage = "rbxassetid://" .. numericId
+        -- 数字以外の文字を除去して、数値のみ取り出す
+        local id = v:match("%d+") 
+        if id then
+            -- Decal IDをImage IDとして読み込ませるためのURL形式
+            -- ※Robloxの内部処理で自動変換を促す書き方です
+            cfg.UI.BackgroundImage = "rbxassetid://" .. id
         else
             cfg.UI.BackgroundImage = ""
         end
@@ -3432,28 +3297,28 @@ UIElements.UIBackgroundImage = UISec:AddTextbox({
 
 -- --- TAB: SUB FEATURES ---
 local SubTab = Window:MakeTab({
-    Name = "Sub-Features",
+    Name = "ميزات فرعية",
     Icon = "rbxassetid://10747372167"
 })
 
--- Sub-Target Section
+-- サブターゲットセクション
 local SubTargetSec = SubTab:AddSection({
-    Name = "Sub-Target"
+    Name = "هدف فرعي"
 })
 
--- 1. Create dropdown
+-- 1. ドロップダウンの作成
 local targetSubName = "" 
 
 UIElements.SubTargetDropdown = SubTargetSec:AddDropdown({
-    Name = "Select Target",
+    Name = "تحديد الهدف",
     Default = LocalPlayer.DisplayName .. " (@" .. LocalPlayer.Name .. ")",
     Options = getPList(),
     Callback = function(v)
-        -- Accurately extract the username after @
+        -- @以降のユーザー名を正確に切り出す
         local name = v:match("@([^)]+)")
         targetSubName = name or LocalPlayer.Name
         
-        -- Immediately get the latest object as well (for compatibility with existing code)
+        -- 即座に最新のオブジェクトも一度取得しておく（既存コードとの互換性のため）
         targetSub = Players:FindFirstChild(targetSubName) or LocalPlayer
     end    
 })
@@ -3470,20 +3335,20 @@ Players.PlayerRemoving:Connect(function()
 end)
 
 SubTargetSec:AddButton({
-    Name = "Refresh Player List",
+    Name = "تحديث قائمة اللاعبين",
     Callback = function()
         pDropSub:Refresh(getPList(), true)
-        OrionLib:MakeNotification({ Name = "Update", Content = "Player list updated", Time = 3 })
+        OrionLib:MakeNotification({ Name = "تحديث", Content = "تم تحديث قائمة اللاعبين", Time = 3 })
     end
 })
 
--- View/Camera Section
+-- 視点・カメラセクション
 local ViewSec = SubTab:AddSection({
-    Name = "View/Camera"
+    Name = "المنظور/الكاميرا"
 })
 
 ViewSec:AddToggle({
-    Name = "Spectate",
+    Name = "مشاهدة (Spectate)",
     Default = false,
     Callback = function(v) 
         if v then 
@@ -3501,43 +3366,43 @@ ViewSec:AddToggle({
     end 
 })
 
--- ESP Settings Section
+-- ESP設定セクション
 local EspSec = SubTab:AddSection({
-    Name = "ESP Settings"
+    Name = "إعدادات ESP"
 })
 
 UIElements.EspEnabled = EspSec:AddToggle({
-    Name = "Enable ESP",
+    Name = "تفعيل ESP",
     Default = false,
     Callback = function(v) espCfg.Enabled = v end 
 })
 
 UIElements.EspTargetOnly = EspSec:AddToggle({
-    Name = "Target Only",
+    Name = "الهدف فقط",
     Default = false,
     Callback = function(v) espCfg.TargetOnly = v end 
 })
 
 UIElements.EspNames = EspSec:AddToggle({
-    Name = "Show Names",
+    Name = "عرض الأسماء",
     Default = true,
     Callback = function(v) espCfg.Names = v end 
 })
 
 UIElements.EspTracers = EspSec:AddToggle({
-    Name = "Show Tracers",
+    Name = "عرض التتبع",
     Default = false,
     Callback = function(v) espCfg.Tracers = v end 
 })
 
 UIElements.EspHitbox = EspSec:AddToggle({
-    Name = "Hitbox",
+    Name = "صندوق الاصطدام (Hitbox)",
     Default = false,
     Callback = function(v) espCfg.Hitbox = v end 
 })
 
 UIElements.EspHitboxSize = EspSec:AddSlider({
-    Name = "Hitbox Size",
+    Name = "حجم صندوق الاصطدام",
     Min = 2,
     Max = 20,
     Default = 10,
@@ -3545,64 +3410,119 @@ UIElements.EspHitboxSize = EspSec:AddSlider({
 })
 
 UIElements.EspColor = EspSec:AddColorpicker({
-    Name = "ESP Color",
+    Name = "لون ESP",
     Default = Color3.new(1,0,0),
     Callback = function(v)
         espCfg.ESPColor = v
     end	  
 })
 
--- --- TAB: GRAB MOD ---
-local GrabTab = Window:MakeTab({
-    Name = "Grab Mod",
-    Icon = "rbxassetid://4483345998"
+local BarrierSec = SubTab:AddSection({
+    Name = "كسر الحاجز"
 })
 
-GrabTab:AddToggle({
-    Name = "Kill on Grab",
-    Default = cfg.GrabMod.Kill,
-    Callback = function(v) cfg.GrabMod.Kill = v end
+BarrierSec:AddButton({
+    Name = "كسر الحاجز (Barrier Break)",
+    Callback = function()
+        local player = game:GetService("Players").LocalPlayer
+        if not player then
+            OrionLib:MakeNotification({Name="خطأ", Content="لم يتم العثور على اللاعب", Time = 4})
+            return
+        end
+
+        if not (player.Character and player.Character:FindFirstChild("HumanoidRootPart")) then
+            OrionLib:MakeNotification({Name="خطأ", Content="الشخصية ليست جاهزة", Time = 4})
+            return
+        end
+
+        local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+        local originalWalkSpeed, originalJumpPower
+        if humanoid then
+            originalWalkSpeed = humanoid.WalkSpeed
+            originalJumpPower = humanoid.JumpPower
+            pcall(function() humanoid.WalkSpeed = 0 humanoid.JumpPower = 0 end)
+        end
+
+        local success, err = pcall(function()
+            local MenuToys = ReplicatedStorage:WaitForChild("MenuToys")
+            local hrp = player.Character.HumanoidRootPart
+            local originalCFrame = hrp.CFrame
+
+            hrp.CFrame = CFrame.new(246.052, -7.35, 431.821)
+            task.wait(0.05)
+
+            MenuToys.SpawnToyRemoteFunction:InvokeServer(
+                "InstrumentWoodwindOcarina",
+                CFrame.new(184.148834, -5.54824972, 498.136749,
+                    0.829037189, -0.214714944, 0.516328275,
+                    0, 0.923344612, 0.383972496,
+                    -0.559193552, -0.318327487, 0.765486956),
+                Vector3.new(0, 34, 0)
+            )
+
+            task.wait(0.2)
+
+            local toyFolder = Workspace:FindFirstChild(player.Name .. "SpawnedInToys")
+            if not toyFolder then error("لم يتم العثور على مجلد SpawnedInToys") end
+
+            local ocarina = toyFolder:FindFirstChild("InstrumentWoodwindOcarina")
+            if not ocarina then error("لم يتم العثور على InstrumentWoodwindOcarina") end
+
+            if ocarina:FindFirstChild("HoldPart") and ocarina.HoldPart:FindFirstChild("HoldItemRemoteFunction") then
+                pcall(function()
+                    ocarina.HoldPart.HoldItemRemoteFunction:InvokeServer(ocarina, player.Character)
+                end)
+                task.wait(0.2)
+            end
+
+            player.Character.HumanoidRootPart.CFrame = CFrame.new(304.06, 25.77, 488.54)
+            task.wait(0.05)
+
+            if MenuToys:FindFirstChild("DestroyToy") then
+                MenuToys.DestroyToy:FireServer(ocarina)
+            else
+                local destroyEv = ReplicatedStorage:FindFirstChild("MenuToys") and ReplicatedStorage.MenuToys:FindFirstChild("DestroyToy")
+                if destroyEv then
+                    destroyEv:FireServer(ocarina)
+                else
+                    error("لم يتم العثور على حدث DestroyToy")
+                end
+            end
+
+            task.wait(0.05)
+
+            if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                player.Character.HumanoidRootPart.CFrame = originalCFrame
+            end
+
+            OrionLib:MakeNotification({Name="نجاح", Content="تم تنفيذ كسر الحاجز", Time = 3})
+        end)
+
+        local function tryRestore()
+            if originalWalkSpeed == nil and originalJumpPower == nil then return end
+            local curHum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+            if curHum then
+                pcall(function()
+                    if originalWalkSpeed ~= nil then curHum.WalkSpeed = originalWalkSpeed end
+                    if originalJumpPower ~= nil then curHum.JumpPower = originalJumpPower end
+                end)
+            end
+        end
+
+        tryRestore()
+
+        if not success then
+            OrionLib:MakeNotification({Name="خطأ", Content=tostring(err), Time = 6})
+        end
+    end
 })
 
-GrabTab:AddToggle({
-    Name = "Noclip while Grabbing",
-    Default = cfg.GrabMod.Noclip,
-    Callback = function(v) cfg.GrabMod.Noclip = v end
-})
-
-GrabTab:AddSection({ Name = "Spin Settings" })
-
-GrabTab:AddToggle({
-    Name = "Spin on Grab",
-    Default = cfg.GrabMod.Spin,
-    Callback = function(v) cfg.GrabMod.Spin = v end
-})
-
-GrabTab:AddSection({ Name = "Throw Settings" })
-
-GrabTab:AddToggle({
-    Name = "Super Throw",
-    Default = cfg.GrabMod.SuperThrow,
-    Callback = function(v) cfg.GrabMod.SuperThrow = v end
-})
-
-GrabTab:AddSlider({
-    Name = "Throw Power",
-    Min = 0,
-    Max = 5000,
-    Default = cfg.GrabMod.ThrowPower,
-    Color = Color3.fromRGB(255, 255, 255),
-    Increment = 100,
-    ValueName = "Power",
-    Callback = function(v) cfg.GrabMod.ThrowPower = v end
-})
-
-local ActionSec = SubTab:AddSection({ Name = "Actions" })
+local ActionSec = SubTab:AddSection({ Name = "إجراءات" })
 
 local tpTargetName = ""
 tpDropdown = ActionSec:AddDropdown({
-    Name = "Teleport Target",
-    Default = "Select player",
+    Name = "هدف الانتقال الآني",
+    Default = "اختر لاعباً",
     Options = getPList(),
     Callback = function(v)
         tpTargetName = v:match("@([^)]+)")
@@ -3610,7 +3530,7 @@ tpDropdown = ActionSec:AddDropdown({
 })
 
 ActionSec:AddButton({
-    Name = "Teleport to Selected Player",
+    Name = "الانتقال الآني إلى اللاعب المختار",
     Callback = function()
         local targetName = (tpTargetName ~= "" and tpTargetName) or (targetSub and targetSub.Name)
         local target = Players:FindFirstChild(targetName)
@@ -3622,7 +3542,7 @@ ActionSec:AddButton({
 
 local levitateRunning = false
 UIElements.BlobmanKick = ActionSec:AddToggle({
-    Name = "Blobman Kick",
+    Name = "ركلة Blobman (قم بالرمي باستمرار)",
     Default = false,
     Callback = function(v)
         levitateRunning = v
@@ -3632,26 +3552,11 @@ UIElements.BlobmanKick = ActionSec:AddToggle({
         local target = Players:FindFirstChild(targetName)
         
         if target and target ~= LocalPlayer and target.Character and target.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-            -- Find Blobman
+            -- Blobmanを探す
             local blobman = nil
             local spawned = Workspace:FindFirstChild(LocalPlayer.Name .. "SpawnedInToys")
             if spawned then blobman = spawned:FindFirstChild("CreatureBlobman") end
             
-            -- Auto Spawn Logic
-            if not blobman then
-                local mt = ReplicatedStorage:FindFirstChild("MenuToys")
-                local st = mt and mt:FindFirstChild("SpawnToyRemoteFunction")
-                if st then
-                    local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                    local spawnCF = myRoot and (myRoot.CFrame + Vector3.new(0, 5, 0)) or CFrame.new(0, 50, 0)
-                    st:InvokeServer("CreatureBlobman", spawnCF, Vector3.zero)
-                    task.wait(0.5)
-                    -- Re-fetch
-                    spawned = Workspace:FindFirstChild(LocalPlayer.Name .. "SpawnedInToys")
-                    if spawned then blobman = spawned:FindFirstChild("CreatureBlobman") end
-                end
-            end
-
             if not blobman then
                 for _, obj in ipairs(Workspace:GetChildren()) do
                     if obj.Name == "CreatureBlobman" and obj:FindFirstChild("VehicleSeat") then
@@ -3662,12 +3567,12 @@ UIElements.BlobmanKick = ActionSec:AddToggle({
             end
             
             if blobman then
-                -- 1. Find Remotes (Cosmic spec)
+                -- 1. Remoteを探す (Cosmic仕様)
                 local scriptObj = blobman:FindFirstChild("BlobmanSeatAndOwnerScript")
                 local grabRemote = scriptObj and scriptObj:FindFirstChild("CreatureGrab")
                 local dropRemote = scriptObj and scriptObj:FindFirstChild("CreatureDrop")
 
-                -- 2. Find Detector and Weld/Constraint (for both left/right)
+                -- 2. DetectorとWeld/Constraintを探す (左右対応)
                 local lDet = blobman:FindFirstChild("LeftDetector")
                 local rDet = blobman:FindFirstChild("RightDetector")
                 local lWeld = lDet and (lDet:FindFirstChild("LeftWeld") or lDet:FindFirstChild("RigidConstraint"))
@@ -3685,100 +3590,55 @@ UIElements.BlobmanKick = ActionSec:AddToggle({
                 end
                 
                 if grabRemote and dropRemote and ((lDet and lWeld) or (rDet and rWeld)) then
-                    OrionLib:MakeNotification({ Name = "Executing", Content = "Blobman Kick Loop", Time = 3 })
+                    OrionLib:MakeNotification({ Name = "تنفيذ", Content = "حلقة إمساك Blobman", Time = 3 })
 
                     task.spawn(function()
-                        -- raw.txt Logic Implementation
-                        local GE = ReplicatedStorage:WaitForChild("GrabEvents")
-                        local blobRoot = blobman:FindFirstChild("HumanoidRootPart") or blobman.PrimaryPart
-                        local SavedPos = blobRoot.CFrame
-                        
-                        -- Prefer Right, fallback to Left
-                        local Det = rDet or lDet
-                        local Weld = rWeld or lWeld
-                        
-                        -- Phase 1: Capture
-                        local bringStart = tick()
-                        while tick() - bringStart < 0.35 do
-                            if not levitateRunning or not blobman or not blobman.Parent then break end
+                        while levitateRunning and blobman and blobman.Parent do
                             if target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
                                 local tRoot = target.Character.HumanoidRootPart
-                                blobRoot.CFrame = tRoot.CFrame
-                                blobRoot.AssemblyLinearVelocity = Vector3.zero
                                 
-                                pcall(function()
-                                    if Det then grabRemote:FireServer(Det, tRoot, Weld) end
-                                    GE.CreateGrabLine:FireServer(tRoot, Vector3.zero, tRoot.Position, false)
-                                    GE.SetNetworkOwner:FireServer(tRoot, blobRoot.CFrame)
-                                end)
+                                -- まだ固定されていない（捕獲前）なら捕まえに行く
+                                if blobman.PrimaryPart and not blobman.PrimaryPart.Anchored then
+                                    -- 1. Force TP to Target
+                                    blobman.PrimaryPart.Anchored = false
+                                    blobman:SetPrimaryPartCFrame(tRoot.CFrame)
+                                    
+                                    -- 2. Grab with BOTH hands (両手で掴む)
+                                    if lDet and lWeld then grabRemote:FireServer(lDet, tRoot, lWeld) end
+                                    if rDet and rWeld then grabRemote:FireServer(rDet, tRoot, rWeld) end
+                                    
+                                    task.wait(0.1)
+                                    
+                                    -- 3. TP Up 100 studs & Stop (上空100で固定)
+                                    blobman:SetPrimaryPartCFrame(tRoot.CFrame + Vector3.new(0, 100, 0))
+                                    blobman.PrimaryPart.AssemblyLinearVelocity = Vector3.zero
+                                    blobman.PrimaryPart.AssemblyAngularVelocity = Vector3.zero
+                                    blobman.PrimaryPart.Anchored = true
+                                else
+                                    -- 既に固定されているなら掴み状態を維持（念のため再送信）
+                                    if lDet and lWeld then grabRemote:FireServer(lDet, tRoot, lWeld) end
+                                    if rDet and rWeld then grabRemote:FireServer(rDet, tRoot, rWeld) end
+                                end
                             end
-                            RunService.Heartbeat:Wait()
-                        end
-                        
-                        if blobRoot then
-                            blobRoot.CFrame = SavedPos
-                            blobRoot.AssemblyLinearVelocity = Vector3.zero
                             task.wait(0.05)
                         end
                         
-                        -- Phase 2: Lock
-                        while levitateRunning and blobman and blobman.Parent do
-                            if not target or not target.Parent or not target.Character then break end
-                            
-                            local tChar = target.Character
-                            local tRoot = tChar:FindFirstChild("HumanoidRootPart")
-                            local tHum = tChar:FindFirstChild("Humanoid")
-                            
-                            if tRoot and tHum and tHum.Health > 0 and blobRoot then
-                                blobRoot.CFrame = SavedPos
-                                blobRoot.AssemblyLinearVelocity = Vector3.zero
-                                
-                                local lockPos = SavedPos * CFrame.new(0, 23, 0)
-                                tRoot.CFrame = lockPos
-                                tRoot.AssemblyLinearVelocity = Vector3.zero
-                                tRoot.AssemblyAngularVelocity = Vector3.zero
-                                
-                                pcall(function()
-                                    tHum.PlatformStand = true
-                                    tHum.Sit = true
-                                    GE.SetNetworkOwner:FireServer(tRoot, lockPos)
-                                    
-                                    -- Check for existing weld to drop
-                                    local currentWeld = Det:FindFirstChild("RightWeld") or Det:FindFirstChild("LeftWeld") or Det:FindFirstChildWhichIsA("Weld") or Det:FindFirstChild("RigidConstraint")
-                                    if currentWeld then
-                                        dropRemote:FireServer(currentWeld)
-                                    end
-                                    
-                                    GE.DestroyGrabLine:FireServer(tRoot)
-                                    if Det then grabRemote:FireServer(Det, tRoot, Weld) end
-                                    GE.CreateGrabLine:FireServer(tRoot, Vector3.zero, tRoot.Position, false)
-                                end)
-                            else
-                                if blobRoot then
-                                    blobRoot.CFrame = SavedPos
-                                    blobRoot.AssemblyLinearVelocity = Vector3.zero
-                                end
-                            end
-                            RunService.Heartbeat:Wait()
-                        end
-                        
-                        -- Unanchor on exit
-                        if blobRoot then
-                            blobRoot.CFrame = SavedPos
-                            blobRoot.AssemblyLinearVelocity = Vector3.zero
+                        -- 終了時に固定解除
+                        if blobman and blobman.PrimaryPart then
+                            blobman.PrimaryPart.Anchored = false
                         end
                     end)
                 else
-                    -- Display detailed error content
+                    -- 詳細なエラー内容を表示
                     local missing = {}
                     if not grabRemote then table.insert(missing, "CreatureGrab") end
                     if not dropRemote then table.insert(missing, "CreatureDrop") end
                     if not (lDet or rDet) then table.insert(missing, "Detector") end
                     if not (lWeld or rWeld) then table.insert(missing, "Weld/Constraint") end
-                    OrionLib:MakeNotification({ Name = "Error", Content = "Missing: " .. table.concat(missing, ", "), Time = 5 })
+                    OrionLib:MakeNotification({ Name = "خطأ", Content = "مفقود: " .. table.concat(missing, ", "), Time = 5 })
                 end
             else
-                OrionLib:MakeNotification({ Name = "Error", Content = "Blobman not found (Please spawn a toy)", Time = 3 })
+                OrionLib:MakeNotification({ Name = "خطأ", Content = "لم يتم العثور على Blobman (يرجى إخراج لعبة)", Time = 3 })
             end
         end
     end
@@ -3786,61 +3646,60 @@ UIElements.BlobmanKick = ActionSec:AddToggle({
 
 -- --- TAB: PIANO ---
 local PianoTab = Window:MakeTab({
-	Name = "Piano",
+	Name = "بيانو",
 	Icon = "rbxassetid://7734020554"
 })
 
 local PianoControlSec = PianoTab:AddSection({
-	Name = "Piano Control"
+	Name = "تحكم البيانو"
 })
 
 UIElements.PianoEnabled = PianoControlSec:AddToggle({
-	Name = "Enable Piano",
+	Name = "تفعيل ميزة البيانو",
 	Default = false,
 	Callback = function(v)
 		pianoEnabled = v
 		if v then
-			-- Just enable the feature. Starting follow is left to the follow toggle
+			-- 機能を有効にするだけ。追従の開始は追従トグルに任せる
 			pianoKeyboard = getMusicKeyboard()
 			
 			if pianoKeyboard then
-				-- Start only if follow is on
+				-- 追従がオンの場合のみ開始
 				if pianoFollowEnabled then setupPianoFollow() end
 
 				OrionLib:MakeNotification({
-					Name = "Piano Feature",
-					Content = "MusicKeyboard detected",
+					Name = "ميزة البيانو",
+					Content = "تم اكتشاف MusicKeyboard",
 					Time = 5
 				})
 			else
 				pianoEnabled = false
-				UIElements.PianoEnabled:Set(false) -- Revert toggle on failure
 				OrionLib:MakeNotification({
-					Name = "Error",
-					Content = "MusicKeyboard not found",
+					Name = "خطأ",
+					Content = "لم يتم العثور على MusicKeyboard",
 					Time = 5
 				})
 			end
 		else
 			stopSong()
-			stopPiano() -- Stop follow
+			stopPiano() -- 追従を停止
 		end
 	end    
 })
 
 UIElements.PianoFollow = PianoControlSec:AddToggle({
-    Name = "Follow Player",
+    Name = "تتبع اللاعب",
     Default = true,
     Callback = function(v)
         pianoFollowEnabled = v
-        -- ★Fix: Also check if pianoKeyboard is valid (has a Parent)
+        -- ★修正: pianoKeyboardが有効か(Parentを持つか)もチェックする
         if pianoEnabled and pianoKeyboard and pianoKeyboard.Parent then
             if v then
                 setupPianoFollow()
             else
                 stopPiano()
             end
-        -- ★Add: If follow is turned on while piano is invalid, re-search and start following
+        -- ★追加: ピアノが無効な状態で追従をオンにしたら、再検索して追従を開始
         elseif pianoEnabled and v then
             pianoKeyboard = getMusicKeyboard()
             if pianoKeyboard then
@@ -3851,51 +3710,35 @@ UIElements.PianoFollow = PianoControlSec:AddToggle({
 })
 
 local PianoSongSec = PianoTab:AddSection({
-	Name = "Song Playback"
+	Name = "تشغيل الأغنية"
 })
 
--- Auto-download piano songs
+-- Auto-download Believer.json
 task.spawn(function()
     local targetFolder = "FTAP_Notes"
     if not isfolder(targetFolder) then makefolder(targetFolder) end
     
-    local apiUrl = "https://api.github.com/repos/hololove1021/HolonHUB/contents/piano"
-    local success, response = pcall(function() return game:HttpGet(apiUrl, true) end)
-
-    if not success then return warn("HolonHUB: Failed to get piano file list from GitHub API: " .. tostring(response)) end
-
-    local fileList
-    success, fileList = pcall(function() return HttpService:JSONDecode(response) end)
-
-    if not success or type(fileList) ~= "table" then return warn("HolonHUB: Failed to JSON decode piano file list.") end
-
-    for _, fileData in ipairs(fileList) do
-        if fileData.type == "file" and fileData.name:match("%.json$") then
-            local fileName = fileData.name
-            local filePath = targetFolder .. "/" .. fileName
-            
-            if not isfile(filePath) then
-                local downloadUrl = fileData.download_url
-                local fileSuccess, fileContent = pcall(function() return game:HttpGet(downloadUrl, true) end)
-                
-                if fileSuccess and fileContent then
-                    writefile(filePath, fileContent)
-                    OrionLib:MakeNotification({ Name = "System", Content = "Downloaded " .. fileName, Time = 3 })
-                    task.wait(0.2)
-                else
-                    warn("HolonHUB: Failed to download " .. fileName)
-                end
-            end
+    local filePath = targetFolder .. "/Believer.json"
+    if not isfile(filePath) then
+        local url = "https://raw.githubusercontent.com/hololove1021/HolonHUB/refs/heads/main/piano/Believer.json"
+        local success, content = pcall(function() return game:HttpGet(url) end)
+        if success and content then
+            writefile(filePath, content)
+            OrionLib:MakeNotification({
+                Name = "System",
+                Content = "Downloaded Believer.json",
+                Time = 5
+            })
         end
     end
 end)
 
--- Get JSON file list
+-- JSONファイル一覧を取得
 local function getSongFiles()
 	local files = {}
 	local targetFolder = "FTAP_Notes"
 
-	-- Create folder if it doesn't exist
+	-- إنشاء المجلد إذا لم يكن موجوداً
 	if not isfolder(targetFolder) then makefolder(targetFolder) end
 	
 	local success, allFiles = pcall(function()
@@ -3903,35 +3746,35 @@ local function getSongFiles()
 	end)
 	
 	if not success or not allFiles then
-		return {"Access Error"}
+		return {"خطأ في الوصول"}
 	end
 	
 	for _, filePath in ipairs(allFiles) do
 		if filePath:lower():match("%.json$") then
 			local fileName = filePath:match("([^/%\\]+)$") or filePath
-			table.insert(files, fileName) -- Add only the name for Orion's Dropdown
+			table.insert(files, fileName) -- OrionのDropdown用に名前のみ追加
 		end
 	end
 	
 	if #files == 0 then
-		return {"No JSON files"}
+		return {"لا توجد ملفات JSON"}
 	end
 	
 	return files
 end
 
 local songDropdown = PianoSongSec:AddDropdown({
-	Name = "Select Song",
-	Default = "None",
+	Name = "اختر أغنية",
+	Default = "لا شيء",
 	Options = getSongFiles(),
 	Callback = function(v)
-		if v == "None" or v == "Folder not found" or v == "No JSON files" then
+		if v == "لا شيء" or v == "المجلد غير موجود" or v == "لا توجد ملفات JSON" then
 			selectedSongFile = nil
 			selectedSongData = nil
 			return
 		end
 		
-		-- Create full path from filename (please adjust to your environment)
+		-- ファイル名からフルパスを作成（環境に合わせて調整してください）
 		local filePath = "FTAP_Notes/" .. v
 		selectedSongFile = filePath
 		
@@ -3947,8 +3790,8 @@ local songDropdown = PianoSongSec:AddDropdown({
 			if decodeSuccess then
 				selectedSongData = jsonData
 				OrionLib:MakeNotification({
-					Name = "Load Complete",
-					Content = "Note count: " .. #jsonData,
+					Name = "اكتمل التحميل",
+					Content = "عدد النغمات: " .. #jsonData,
 					Time = 5
 				})
 			else
@@ -3959,105 +3802,80 @@ local songDropdown = PianoSongSec:AddDropdown({
 })
 
 PianoSongSec:AddButton({
-	Name = "Refresh Song List",
+	Name = "تحديث قائمة الأغاني",
 	Callback = function()
 		songDropdown:Refresh(getSongFiles(), true)
 		OrionLib:MakeNotification({
-			Name = "Update Complete",
-			Content = "JSON file list updated",
+			Name = "اكتمل التحديث",
+			Content = "تم تحديث قائمة ملفات JSON",
 			Time = 5
 		})
 	end
 })
 
 PianoSongSec:AddButton({
-    Name = "Play Selected Song",
+    Name = "تشغيل الأغنية المختارة",
     Callback = function()
-        -- Make the piano enable check as lenient as the "Test button"
+        -- ピアノ有効化のチェックを「テストボタン」と同じくらい緩くします
         if not pianoKeyboard then
             pianoKeyboard = getMusicKeyboard()
         end
         
         if not pianoKeyboard then
-            OrionLib:MakeNotification({Name = "Error", Content = "MusicKeyboard not found", Time = 5})
+            OrionLib:MakeNotification({Name = "خطأ", Content = "لم يتم العثور على MusicKeyboard", Time = 5})
             return
         end
         
         if not selectedSongData then
-            OrionLib:MakeNotification({Name = "Error", Content = "Please select a song", Time = 5})
+            OrionLib:MakeNotification({Name = "خطأ", Content = "يرجى اختيار أغنية", Time = 5})
             return
         end
         
-        -- ★Fix point: Pass the data as is, without JSONEncode
-        -- This allows playSongFromJSON to start the loop correctly
+        -- ★修正ポイント：JSONEncodeせずに、そのままデータを渡す
+        -- これで playSongFromJSON が正しくループを開始できます
         playSongFromJSON(selectedSongData)
         
-        -- Notification to show the button has responded
+        -- ボタンが反応したことを知らせる通知
         OrionLib:MakeNotification({
-            Name = "Auto-Play",
-            Content = "Playback started",
+            Name = "عزف تلقائي",
+            Content = "بدأ التشغيل",
             Time = 3
         })
     end
 })
 
 PianoSongSec:AddButton({
-	Name = "Stop Playback",
+	Name = "إيقاف التشغيل",
 	Callback = function()
 		stopSong()
 		OrionLib:MakeNotification({
-			Name = "Stop",
-			Content = "Song playback stopped",
+			Name = "توقف",
+			Content = "تم إيقاف تشغيل الأغنية",
 			Time = 5
 		})
 	end
 })
 
 local PianoManualSec = PianoTab:AddSection({
-    Name = "Manual operation and testing"
+    Name = "تشغيل يدوي واختبار"
 })
 
-UIElements.PianoManualUIToggle = PianoManualSec:AddToggle({
-    Name = "Show Manual Play UI",
-    Default = false,
-    Callback = function(v)
-        manualPlayEnabled = v
-        if v then
-            pianoKeyboard = getMusicKeyboard()
-            if pianoKeyboard then
-                pianoEnabled = true
-                if UIElements.PianoEnabled then UIElements.PianoEnabled:Set(true) end
-                if not pianoUIGui then createPianoUI() end
-                if pianoUIGui then pianoUIGui.Enabled = true end
-            else
-                pianoEnabled = false
-                manualPlayEnabled = false
-                if UIElements.PianoEnabled then UIElements.PianoEnabled:Set(false) end
-                if UIElements.PianoManualUIToggle then UIElements.PianoManualUIToggle:Set(false) end
-                OrionLib:MakeNotification({Name = "Error", Content = "MusicKeyboard not found", Time = 5})
-            end
-        else
-            if pianoUIGui then pianoUIGui.Enabled = false end
-        end
-    end
-})
-
--- Added under PianoManualSec
+-- PianoManualSecの下に追加
 PianoManualSec:AddButton({
-    Name = "Test: Press C key",
+    Name = "اختبار: اضغط مفتاح C",
     Callback = function()
         if pianoKeyboard then
             local testKey = pianoKeyboard:FindFirstChild("Key1C", true)
             if testKey then
-                -- Command to play sound
+                -- 音を鳴らす命令
                 SetNetworkOwner:FireServer(testKey, testKey.CFrame)
                 
-                --   Make notification appear immediately after wait.
+                --   waitの後にすぐ通知が来るようにします。
                 task.wait(0.1)
                 
                 OrionLib:MakeNotification({
-                    Name = "Test", 
-                    Content = "Played Key1C!", 
+                    Name = "اختبار", 
+                    Content = "تم عزف Key1C!", 
                     Time = 2
                 })
             else
@@ -4067,81 +3885,111 @@ PianoManualSec:AddButton({
     end
 })
 
--- PC Keyboard Input Support
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed then return end
-    if not pianoEnabled then return end
-    
-    if input.UserInputType == Enum.UserInputType.Keyboard then
-        local char = UserInputService:GetStringForKeyCode(input.KeyCode):lower()
-        if pianoKeyMap[char] then
-           if pianoEnabled then pressPianoKey(pianoKeyMap[char]) end
-        end
-    end
-end)
+-- --- TAB: GRAB MOD ---
+local GrabTab = Window:MakeTab({
+    Name = "وضع الإمساك",
+    Icon = "rbxassetid://4483345998"
+})
 
-local DetailTab = Window:MakeTab({Name = "Details", Icon = DetailIcon})
+GrabTab:AddToggle({
+    Name = "القتل عند الإمساك",
+    Default = cfg.GrabMod.Kill,
+    Callback = function(v) cfg.GrabMod.Kill = v end
+})
+
+GrabTab:AddToggle({
+    Name = "Noclip أثناء الإمساك",
+    Default = cfg.GrabMod.Noclip,
+    Callback = function(v) cfg.GrabMod.Noclip = v end
+})
+
+GrabTab:AddSection({ Name = "إعدادات الدوران" })
+
+GrabTab:AddToggle({
+    Name = "الدوران عند الإمساك",
+    Default = cfg.GrabMod.Spin,
+    Callback = function(v) cfg.GrabMod.Spin = v end
+})
+
+GrabTab:AddSection({ Name = "إعدادات الرمي" })
+
+GrabTab:AddToggle({
+    Name = "رمي خارق",
+    Default = cfg.GrabMod.SuperThrow,
+    Callback = function(v) cfg.GrabMod.SuperThrow = v end
+})
+
+GrabTab:AddSlider({
+    Name = "قوة الرمي",
+    Min = 0, Max = 5000, Default = cfg.GrabMod.ThrowPower,
+    Increment = 100, ValueName = "Power",
+    Callback = function(v) cfg.GrabMod.ThrowPower = v end
+})
+
+local DetailTab = Window:MakeTab({Name = "التفاصيل", Icon = DetailIcon})
 AddDetailContent(DetailTab)
 
--- Notification (on startup)
+-- 通知（起動時）
 OrionLib:MakeNotification({
-	Name = "Holon HUB", Content = "v1.4.3 has been loaded!", Time = 5
+	Name = "Holon HUB",
+	Content = "تم تحميل v1.4.3!",
+	Time = 5
 })
-    -- Apply UI style on startup
+    -- 起動時にUIスタイルを適用
     applyCustomStyle()
 
-    -- Main screen side initialization
+    -- メイン画面側の初期化
     OrionLib:Init()
 end
 
 if isfile(KeyFileName) and readfile(KeyFileName) == CorrectKey then
-    -- If authenticated, go straight to main
+    -- 認証済みなら即メインへ
     StartHolonHUB()
 else
-    -- If not authenticated, create authentication UI
+    -- 未認証なら認証UIを作る
     local OrionLib = loadstring(game:HttpGet(OrionUrl))()
     
     local AuthWindow = OrionLib:MakeWindow({
-        Name = "Holon HUB | Key System",
+        Name = "Holon HUB | نظام المفاتيح",
         HidePremium = true,
         IntroEnabled = false
     })
 
-    local AuthTab = AuthWindow:MakeTab({Name = "Authentication", Icon = "rbxassetid://7733919526"})
+    local AuthTab = AuthWindow:MakeTab({Name = "المصادقة", Icon = "rbxassetid://7733919526"})
     local KeyInput = ""
 
     AuthTab:AddTextbox({
-        Name = "Enter Key",
+        Name = "أدخل المفتاح",
         Default = "",
-        TextDisappear = false, -- Changed this to false
+        TextDisappear = false, -- ここを false に変更
         Callback = function(Value) 
             KeyInput = Value 
         end     
     })
 
     AuthTab:AddButton({
-        Name = "Authenticate",
+        Name = "تحقق",
         Callback = function()
             if KeyInput == CorrectKey then
-                writefile(KeyFileName, CorrectKey) -- Save here
-                OrionLib:MakeNotification({Name = "Success", Content = "Starting!", Time = 2})
+                writefile(KeyFileName, CorrectKey) -- ここで保存
+                OrionLib:MakeNotification({Name = "نجاح", Content = "جارٍ البدء!", Time = 2})
                 task.wait(1)
                 pcall(function() game.CoreGui.Orion:Destroy() end)
                 task.wait(0.5)
                 StartHolonHUB()
             else
-                OrionLib:MakeNotification({Name = "Failure", Content = "Incorrect key", Time = 5})
+                OrionLib:MakeNotification({Name = "فشل", Content = "المفتاح غير صحيح", Time = 5})
             end
         end
     })
 
     AuthTab:AddButton({
-        Name = "Get Key (Discord)",
+        Name = "الحصول على المفتاح (Discord)",
         Callback = function() setclipboard("https://discord.gg/EHBXqgZZYN") end
     })
 
-    -- Details Tab
-    local AuthDetailTab = AuthWindow:MakeTab({Name = "Details", Icon = DetailIcon})
+    -- 詳細タブ
+    local AuthDetailTab = AuthWindow:MakeTab({Name = "التفاصيل", Icon = DetailIcon})
     AddDetailContent(AuthDetailTab)
     
     OrionLib:Init()
