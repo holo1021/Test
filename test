@@ -669,7 +669,7 @@ local defaultConfig = {
     Wing = { Size = 30, Gap = 3.0, Speed = 6, Height = 0.5, Back = 0, Joints = 3, V_Angle = 0, Tilt = 0, Strength = 15, RootFixed = true, Curve = false, CurveAmount = 10 },
     Heart = { Size = 8, Speed = 2, Height = 5, Back = 2 },
     Star = { Size = 10, Speed = 2, Height = 5, Back = 0 },
-    Vortex = { Size = 5, Speed = 3, Height = 0, Back = 0 },
+    Vortex = { Size = 30, Speed = 10, Height = 20, Back = 0 },
     Sphere = { Size = 30, Speed = 30, Height = 5, Back = 0 },
     Rotate = { Size = 15, Speed = 6, Height = 7, Back = 0, Wave = false, WaveSpeed = 2, WaveAmp = 2 },
     Pet = { Size = 8, Speed = 2, Height = 4, Back = 12, Count = 2, Joints = 3, Gap = 13 },
@@ -684,8 +684,8 @@ local defaultConfig = {
     MirrorPlayer = { Size = 60, Speed = 10, Height = 0, Back = 0, Scale = 1, EdgeSpacing = 1 },
     Beam = { Size = 60, Speed = 50, Height = 0.5, Back = 0, Count = 8 },
     BackGuard = { Size = 10, Speed = 2, Height = 2, Back = 15 },
-    Tornado = { Size = 20, Speed = 5, Height = 0, Back = 0, Radius = 5, TopRadius = 20 },
-    Gyro = { Size = 20, Speed = 2, Height = 5, Back = 0, InnerSize = 12, CenterType = "Sphere" },
+    Tornado = { Size = 20, Speed = 15, Height = 0, Back = 0, Radius = 5, TopRadius = 20 },
+    Gyro = { Size = 20, Speed = 5, Height = 5, Back = 0, InnerSize = 12, CenterType = "Sphere" },
     Combined = {Mode1 = "Wing", Mode2 = "Merkaba", Mode3 = "なし", Mode1Count = 15, Mode2Count = 15, Mode3Count = 0},
     AnimSpeed = 1.0,
     PlotReturn = { Enabled = false, Interval = 30, PlotCFrame = nil},
@@ -1266,6 +1266,7 @@ elseif mode == "MagicCircle3" then
     elseif mode == "Gyro" then
         local outerLimit = math.ceil(count * 0.5)
         local innerLimit = math.ceil(count * 0.8)
+        local finalPos
         
         if i <= outerLimit then
             -- 外側の縦向き円 (XY平面)
@@ -1276,8 +1277,7 @@ elseif mode == "MagicCircle3" then
             
             local x = math.cos(angle) * r
             local y = math.sin(angle) * r
-            
-            return Vector3.new(x, y + c.Height, c.Back)
+            finalPos = Vector3.new(x, y, 0)
             
         elseif i <= innerLimit then
             -- 内側の円 (斜めに回転)
@@ -1295,8 +1295,7 @@ elseif mode == "MagicCircle3" then
             local tx = -y * math.sin(tilt) -- x(0) * cos - y * sin
             local ty = y * math.cos(tilt)  -- x(0) * sin + y * cos
             
-            return Vector3.new(tx, ty + c.Height, z + c.Back)
-            
+            finalPos = Vector3.new(tx, ty, z)
         else
             -- 中心オブジェクト (選択可能)
             local idx = i - innerLimit
@@ -1310,26 +1309,35 @@ elseif mode == "MagicCircle3" then
                 local x = r * math.cos(theta) * math.sin(phi)
                 local y = r * math.sin(theta) * math.sin(phi)
                 local z = r * math.cos(phi)
-                return Vector3.new(x, y + c.Height, z + c.Back)
+                finalPos = Vector3.new(x, y, z)
             elseif cType == "Cube" then
                 local t = time * c.Speed
                 local x = math.clamp(math.sin(t + idx) * r * 1.5, -r, r)
                 local y = math.clamp(math.cos(t * 1.1 + idx) * r * 1.5, -r, r)
                 local z = math.clamp(math.sin(t * 1.3 + idx) * r * 1.5, -r, r)
-                return Vector3.new(x, y + c.Height, z + c.Back)
+                finalPos = Vector3.new(x, y, z)
             elseif cType == "Vertical" then
                 local angle = (idx / total) * math.pi * 2 + time * c.Speed * 4
                 local x = math.cos(angle) * r
                 local y = math.sin(angle) * r
-                return Vector3.new(x, y + c.Height, c.Back)
+                finalPos = Vector3.new(x, y, 0)
             else -- Random
                 local seed = idx * 13.37
                 local x = math.sin(time * 2 + seed) * r
                 local y = math.cos(time * 2.5 + seed) * r
                 local z = math.sin(time * 1.5 + seed) * r
-                return Vector3.new(x, y + c.Height, z + c.Back)
+                finalPos = Vector3.new(x, y, z)
             end
         end
+        
+        if not finalPos then return Vector3.zero end
+
+        -- エフェクト全体をY軸周りに回転させる
+        local overallRotAngle = time * c.Speed * 0.5
+        local rotatedX = finalPos.X * math.cos(overallRotAngle) - finalPos.Z * math.sin(overallRotAngle)
+        local rotatedZ = finalPos.X * math.sin(overallRotAngle) + finalPos.Z * math.cos(overallRotAngle)
+
+        return Vector3.new(rotatedX, finalPos.Y + c.Height, rotatedZ + c.Back)
     end
     
     return Vector3.zero
