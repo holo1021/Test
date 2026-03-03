@@ -715,6 +715,11 @@ local originalCollisions = {} -- {Part: Boolean}
 local updateConnection = nil
 local isReturningToPlot = false -- Plot帰還中のフラグ（重要）
 
+-- ジャイロ用物理変数
+local gyroInnerAngularVelocity = 0
+local gyroInnerAngle = 0
+local lastUpdateTick = 0
+
 local espCache = {}
 local espCfg = { Enabled = false, Names = true, Tracers = false, Hitbox = false, HitboxSize = 10, ESPColor = Color3.new(1, 0, 0), TargetOnly = false }
 
@@ -1333,7 +1338,7 @@ elseif mode == "MagicCircle3" then
             end
 
             -- 内側のみエフェクト全体（構造）を回転させる
-            local rotAngle = time * c.Speed * 0.5
+            local rotAngle = gyroInnerAngle -- 物理ベースの角度を使用
             local rx = finalPos.X * math.cos(rotAngle) - finalPos.Z * math.sin(rotAngle)
             local rz = finalPos.X * math.sin(rotAngle) + finalPos.Z * math.cos(rotAngle)
             finalPos = Vector3.new(rx, finalPos.Y, rz)
@@ -1357,6 +1362,10 @@ local function stopEffect()
         updateConnection:Disconnect()
         updateConnection = nil 
     end
+    
+    -- ジャイロの状態をリセット
+    gyroInnerAngularVelocity = 0
+    gyroInnerAngle = 0
     
     -- アタッチメント削除 & 固定化
     for _, v in ipairs(activeToys) do
@@ -1382,6 +1391,7 @@ end
 local function startEffect()
     stopEffect()
     activeToys = {}
+    lastUpdateTick = tick() -- 物理計算用の時間リセット
 
     if not targetMain or not targetMain.Character then return end
     local root = targetMain.Character:FindFirstChild("HumanoidRootPart")
@@ -1560,6 +1570,18 @@ local function startEffect()
     local char = targetMain.Character
     local rootPart = char and char:FindFirstChild("HumanoidRootPart")
     if not rootPart then return end
+
+    -- ジャイロの物理演算
+    local now = tick()
+    local deltaTime = now - lastUpdateTick
+    lastUpdateTick = now
+
+    local playerVelocity = rootPart.AssemblyLinearVelocity * Vector3.new(1, 0, 1)
+    local playerSpeed = playerVelocity.Magnitude
+    local targetAngularVelocity = playerSpeed * 0.1 -- 速度に応じて目標回転速度を設定
+    local damping = 0.97 -- 慣性の強さ (1に近いほど強い)
+    gyroInnerAngularVelocity = gyroInnerAngularVelocity * damping + targetAngularVelocity * (1 - damping)
+    gyroInnerAngle = gyroInnerAngle + gyroInnerAngularVelocity * deltaTime
 
     local baseCF
     if followPlayer and not isReturningToPlot then
