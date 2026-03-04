@@ -6,19 +6,19 @@ local HttpService = game:GetService("HttpService")
 local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
--- test.luaから持ってきたイベント定義
+-- تعريف الأحداث من test.lua
 local GrabEvents = ReplicatedStorage:WaitForChild("GrabEvents")
 local SetNetworkOwner = GrabEvents:WaitForChild("SetNetworkOwner")
 
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 
--- 作者情報の定義
+-- معلومات المؤلف
 local AuthorName = "holon_calm"
 local RobloxID = "najayou777"
 local DetailIcon = "rbxassetid://7733964719"
 
--- リンク集を表示する共通関数（認証画面とメイン画面で使い回せます）
+-- وظيفة مشتركة لعرض الروابط (قابلة للاستخدام في شاشة المصادقة والشاشة الرئيسية)
 local function AddDetailContent(Tab)
     Tab:AddButton({
         Name = "نسخ وتشغيل النسخة الإنجليزية",
@@ -34,7 +34,7 @@ local function AddDetailContent(Tab)
         Name = "TikTok",
         Callback = function()
             setclipboard("https://www.tiktok.com/@holon_calm")
-            OrionLib:MakeNotification({Name = "الرابط", Content = "تم نسخ رابط TikTok", Time = 3})
+            OrionLib:MakeNotification({Name = "رابط", Content = "تم نسخ رابط TikTok إلى الحافظة", Time = 3})
         end
     })
     
@@ -42,7 +42,7 @@ local function AddDetailContent(Tab)
         Name = "Discord",
         Callback = function()
             setclipboard("https://discord.gg/EHBXqgZZYN")
-            OrionLib:MakeNotification({Name = "الرابط", Content = "تم نسخ رابط دعوة Discord", Time = 3})
+            OrionLib:MakeNotification({Name = "رابط", Content = "تم نسخ رابط دعوة Discord إلى الحافظة", Time = 3})
         end
     })
     
@@ -50,16 +50,16 @@ local function AddDetailContent(Tab)
         Name = "YouTube",
         Callback = function()
             setclipboard("https://www.youtube.com/@Holoncalm")
-            OrionLib:MakeNotification({Name = "الرابط", Content = "تم نسخ رابط YouTube", Time = 3})
+            OrionLib:MakeNotification({Name = "رابط", Content = "تم نسخ رابط YouTube إلى الحافظة", Time = 3})
         end
     })
     Tab:AddLabel("المؤلف: " .. AuthorName)
-    Tab:AddLabel("Roblox ID: " .. RobloxID)
+    Tab:AddLabel("معرف Roblox: " .. RobloxID)
 end
 
--- BodyMover作成関数
+-- وظيفة إنشاء BodyMover
 local function createBodyMovers(part)
-    -- 既存のMoverがあれば削除
+    -- حذف Movers الموجودة إن وجدت
     for _, child in ipairs(part:GetChildren()) do
         if child:IsA("BodyPosition") or child:IsA("BodyGyro") then
             child:Destroy()
@@ -84,11 +84,11 @@ end
 
 local function getActiveTargetMain()
     if targetMainName == "" then return LocalPlayer end
-    -- 名前から「今現在」のプレイヤーを探し直す
+    -- البحث عن اللاعب "الحالي" بالاسم مرة أخرى
     return Players:FindFirstChild(targetMainName) or LocalPlayer
 end
 
--- プロット位置を自動取得する関数
+-- وظيفة للحصول تلقائيًا على موقع قطعة الأرض (Plot)
 local function getMyPlotCFrame()
     local plots = Workspace:FindFirstChild("Plots")
     if not plots then 
@@ -99,37 +99,37 @@ local function getMyPlotCFrame()
     local myName = LocalPlayer.Name
 
     for _, plot in ipairs(plots:GetChildren()) do
-        -- 教えていただいた構造: Plot○ -> PlotSign -> ThisPlotsOwners -> Value -> Data -> Value
+        -- الهيكل: Plot○ -> PlotSign -> ThisPlotsOwners -> Value -> Data -> Value
         local plotSign = plot:FindFirstChild("PlotSign")
         local ownerValObj = plotSign and plotSign:FindFirstChild("ThisPlotsOwners")
         local valueFolder = ownerValObj and ownerValObj:FindFirstChild("Value")
         local dataObj = valueFolder and valueFolder:FindFirstChild("Data")
 
-        -- StringValue である Data.Value の中身をチェック
+        -- التحقق من محتوى Data.Value وهو StringValue
         if dataObj and dataObj:IsA("StringValue") then
             if dataObj.Value == myName then
                 print("Holon HUB: تم العثور على الأرض! الهدف:", plot.Name)
-                return plot:GetPivot() -- プロットの中心座標を返す
+                return plot:GetPivot() -- إرجاع إحداثيات مركز الأرض
             end
         end
     end
     
-    warn("Holon HUB: أرضك لم توجد.")
+    warn("Holon HUB: لم يتم العثور على أرضك.")
     return nil
 end
 
--- ■ 1. getMusicKeyboard 関数の修正 (おもちゃリスト同様の探索ロジックに変更)
+-- ■ 1. إصلاح وظيفة getMusicKeyboard (تغيير منطق البحث ليكون مشابهًا لقائمة الألعاب)
 local function getMusicKeyboard()
     local myName = LocalPlayer.Name
     
-    -- 1. SpawnedInToys から探す
+    -- 1. البحث في SpawnedInToys
     local spawnedToys = Workspace:FindFirstChild(myName .. "SpawnedInToys")
     if spawnedToys then
         local kb = spawnedToys:FindFirstChild("MusicKeyboard")
         if kb then return kb end
     end
 
-    -- 2. Plots から探す
+    -- 2. البحث في Plots
     local plots = Workspace:FindFirstChild("Plots")
     local plotItems = Workspace:FindFirstChild("PlotItems")
 
@@ -141,13 +141,13 @@ local function getMusicKeyboard()
                 local val = ownerObj:FindFirstChild("Value") or ownerObj
                 local data = val:FindFirstChild("Data") or val
                 if (data:IsA("StringValue") and data.Value == myName) then
-                    -- PlotItemsフォルダ内を検索 (startEffectを参考)
+                    -- البحث داخل مجلد PlotItems (بالإشارة إلى startEffect)
                     local myPlotItems = plotItems:FindFirstChild(plot.Name)
                     if myPlotItems then
                         local kb = myPlotItems:FindFirstChild("MusicKeyboard")
                         if kb then return kb end
                     end
-                    -- 念のためBuild内も検索
+                    -- البحث أيضًا في Build للاحتياط
                     local build = plot:FindFirstChild("Build")
                     local kb = build and build:FindFirstChild("MusicKeyboard")
                     if kb then return kb end
@@ -156,7 +156,7 @@ local function getMusicKeyboard()
         end
     end
 
-    -- 3. Workspace全体から所有権のある MusicKeyboard を探す
+    -- 3. البحث عن MusicKeyboard المملوك في Workspace بالكامل
     for _, item in ipairs(Workspace:GetChildren()) do
         if item.Name == "MusicKeyboard" and item:IsA("Model") then
             local ownerValue = item:FindFirstChild("Owner") or item:FindFirstChild("PartOwner")
@@ -169,7 +169,7 @@ local function getMusicKeyboard()
     return nil
 end
 
--- ピアノ機能用の変数 (関数の前に定義して、関数から見えるようにする)
+-- متغيرات لوظيفة البيانو (يتم تعريفها قبل الوظيفة لتكون مرئية)
 local pianoEnabled = false
 local pianoFollowEnabled = true
 local selectedSongFile = nil
@@ -179,12 +179,12 @@ local isPlayingSong = false
 local pianoUpdateConnection = nil
 local lastPianoCF = nil
 local pianoOriginalCollisions = {} 
-local manualPlayEnabled = false -- للتحكم في حالة واجهة المستخدم للعب اليدوي
+local manualPlayEnabled = false -- لإدارة حالة واجهة العزف اليدوي
 local isRecording = false
 local recordedNotes = {}
 local recordStartTime = 0
 
--- واجهة مستخدم العزف اليدوي على البيانو
+-- واجهة العزف اليدوي للبيانو
 local pianoUIGui = nil
 local function createPianoUI()
     if pianoUIGui and pianoUIGui.Parent then return end
@@ -194,12 +194,12 @@ local function createPianoUI()
     pianoUIGui.Parent = game:GetService("CoreGui")
     pianoUIGui.Enabled = manualPlayEnabled
     pianoUIGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
-    pianoUIGui.DisplayOrder = 100 -- إظهار في المقدمة
+    pianoUIGui.DisplayOrder = 100 -- إظهار في الأعلى
     pianoUIGui.ResetOnSpawn = false
 
     local mainFrame = Instance.new("Frame")
     mainFrame.AnchorPoint = Vector2.new(0.5, 1)
-    mainFrame.Position = UDim2.new(0.5, 0, 0.95, 0)
+    mainFrame.Position = UDim2.new(0.5, 0, 1, -20) -- تم الإصلاح: الموضع من الأسفل
     mainFrame.Size = UDim2.new(0, 500, 0, 140) -- حجم مصغر
     mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
     mainFrame.BackgroundTransparency = 0.3
@@ -221,7 +221,7 @@ local function createPianoUI()
         end
     end)
 
-    -- واجهة مستخدم التسجيل/الحفظ
+    -- واجهة التسجيل/الحفظ
     local recFrame = Instance.new("Frame", mainFrame)
     recFrame.Size = UDim2.new(1, -40, 0, 25)
     recFrame.Position = UDim2.new(0, 10, 0, 5)
@@ -323,16 +323,16 @@ local function createPianoUI()
     end
 end
 
--- ピアノを腰の前に追従させる関数
+-- وظيفة لجعل البيانو يتبع أمام الخصر
 local function setupPianoFollow()
-    -- pianoKeyboardがnilなら再取得
+    -- إذا كان pianoKeyboard فارغًا، احصل عليه مرة أخرى
     if not pianoKeyboard then pianoKeyboard = getMusicKeyboard() end
     if not pianoKeyboard then return end
     
-    -- 既に実行中の場合は何もしない
+    -- إذا كان قيد التشغيل بالفعل، لا تفعل شيئًا
     if pianoUpdateConnection then return end
 
-    -- ★修正: Mainパーツを探す (なければPrimaryPart)
+    -- ★إصلاح: البحث عن جزء Main (أو PrimaryPart إذا لم يتم العثور عليه)
     local mainPart = pianoKeyboard:FindFirstChild("Main", true) or pianoKeyboard.PrimaryPart
     if not mainPart then 
         warn("Holon HUB: لم يتم العثور على الجزء الرئيسي للبيانو")
@@ -340,10 +340,10 @@ local function setupPianoFollow()
     end
     print("Holon HUB: بدء إعداد البيانو:", pianoKeyboard.Name)
     
-    -- startEffect同様の初期設定
+    -- الإعداد الأولي مشابه لـ startEffect
     for _, part in ipairs(pianoKeyboard:GetDescendants()) do
         if part:IsA("BasePart") then
-            -- ★追加: 元の当たり判定を保存
+            -- ★إضافة: حفظ خصائص التصادم الأصلية
             if pianoOriginalCollisions[part] == nil then
                 pianoOriginalCollisions[part] = part.CanCollide
             end
@@ -354,7 +354,7 @@ local function setupPianoFollow()
             part.Massless = true
             part.AssemblyLinearVelocity = Vector3.zero
             part.AssemblyAngularVelocity = Vector3.zero
-            -- 所有権を取得 (startEffectの方式に合わせる)
+            -- الحصول على ملكية الشبكة (مطابقة لطريقة startEffect)
             pcall(function() part:SetNetworkOwner(LocalPlayer) end)
         end
     end
@@ -388,7 +388,7 @@ local function setupPianoFollow()
             return 
         end
 
-        -- 所有権維持 (startEffectの方式に合わせる)
+        -- الحفاظ على الملكية (مطابقة لطريقة startEffect)
         if math.random() < 0.05 then
              pcall(function() pp:SetNetworkOwner(LocalPlayer) end)
         end
@@ -402,7 +402,7 @@ local function setupPianoFollow()
     print("Holon HUB: بدأ تتبع البيانو")
 end
 
--- ピアノを停止・解放する関数
+-- وظيفة لإيقاف/تحرير البيانو
 local function stopPiano()
     if pianoUpdateConnection then
         pianoUpdateConnection:Disconnect()
@@ -411,7 +411,7 @@ local function stopPiano()
     if pianoKeyboard and pianoKeyboard.Parent then
         local pp = pianoKeyboard:FindFirstChild("Main", true) or pianoKeyboard.PrimaryPart
         if not pp then return end
-        -- AlignPosition/Orientation を削除
+        -- حذف AlignPosition/Orientation
         for _, child in ipairs(pp:GetChildren()) do
             if child:IsA("Attachment") or child:IsA("AlignPosition") or child:IsA("AlignOrientation") then
                 child:Destroy()
@@ -419,26 +419,26 @@ local function stopPiano()
         end
     end
     
-    -- ★追加: 当たり判定を元に戻す
+    -- ★إضافة: استعادة خصائص التصادم
     for part, canCollide in pairs(pianoOriginalCollisions) do
         if part and part.Parent then
             part.CanCollide = canCollide
         end
     end
-    pianoOriginalCollisions = {} -- テーブルをクリア
+    pianoOriginalCollisions = {} -- مسح الجدول
 
-    print("Holon HUB: تم إيقاف تتبع البيانو")
+    print("Holon HUB: توقف تتبع البيانو")
 end
 
--- ピアノのキーマッピング（画像の配置に対応）
+-- تعيين مفاتيح البيانو (يتوافق مع تخطيط الصورة)
 local pianoKeyMap = {
-    -- 白鍵
+    -- المفاتيح البيضاء
     ["1"] = "Key1C", ["2"] = "Key1D", ["3"] = "Key1E", ["4"] = "Key1F", 
     ["5"] = "Key1G", ["6"] = "Key1A", ["7"] = "Key1B", ["8"] = "Key2C",
     ["9"] = "Key2D", ["0"] = "Key2E", ["q"] = "Key2F", ["w"] = "Key2G",
     ["e"] = "Key2A", ["r"] = "Key2B", ["t"] = "Key3C",
     
-    -- 黒鍵
+    -- المفاتيح السوداء
     ["f"] = "Key1Csharp", ["g"] = "Key1Dsharp", ["h"] = "Key1Fsharp",
     ["j"] = "Key1Gsharp", ["k"] = "Key1Asharp", ["l"] = "Key2Csharp",
     ["z"] = "Key2Dsharp", ["x"] = "Key2Fsharp", ["c"] = "Key2Gsharp",
@@ -452,38 +452,38 @@ end
 
 local function canPressPianoKey() return pianoEnabled end
 
--- 1. 鍵盤を叩く関数
+-- 1. وظيفة الضغط على مفتاح البيانو
 local function pressPianoKey(keyName)
-    -- 毎回直接 MusicKeyboard を探しに行く
+    -- البحث مباشرة عن MusicKeyboard في كل مرة
     local targetKeyboard = getMusicKeyboard()
     
-    -- 見つからなければ終了
+    -- إذا لم يتم العثور عليه، اخرج
     if not targetKeyboard then return end
 
     if not canPressPianoKey() then return end
 
     local key = targetKeyboard:FindFirstChild(keyName, true)
     if key and key:IsA("BasePart") then
-        -- ネットワークオーナーの設定（サーバーへ通知）
+        -- تعيين مالك الشبكة (إخطار الخادم)
         SetNetworkOwner:FireServer(key, key.CFrame)
         
-        -- 指定の待機時間
+        -- وقت الانتظار المحدد
         task.wait(0.15)
     end
 
-    -- Recording process
+    -- عملية التسجيل
     if isRecording and canPressPianoKey() then
         table.insert(recordedNotes, {key = keyName, time = tick()})
     end
 end
 
--- 2. JSON再生関数
+-- 2. وظيفة التشغيل من JSON
 local function playSongFromJSON(jsonData)
     if isPlayingSong then return end
     
     local songData
     local success, err = pcall(function()
-        -- 文字列ならデコード、テーブルならそのまま使う
+        -- إذا كانت سلسلة، قم بفك تشفيرها؛ إذا كانت جدولاً، استخدمها كما هي
         if type(jsonData) == "string" then
             return HttpService:JSONDecode(jsonData)
         else
@@ -498,18 +498,18 @@ local function playSongFromJSON(jsonData)
     songData = err
 
     isPlayingSong = true
-    print("بدء العزف: " .. #songData .. " نغمة")
+    print("بدء الأداء: " .. #songData .. " نوتة")
     
     task.spawn(function()
-        -- 演奏開始前に一度だけピアノを探す
+        -- العثور على البيانو مرة واحدة قبل بدء الأداء
         if not pianoKeyboard then pianoKeyboard = getMusicKeyboard() end
         
         for i, note in ipairs(songData) do
-            -- ボタンで「停止」を押したときだけ止まるようにする
+            -- التوقف فقط عند الضغط على زر "إيقاف"
             if not isPlayingSong then break end
             
             local rawKey = tostring(note.key)
-            -- JSONのキーが "Key" で始まる場合は変換せずそのまま使う（誤変換防止）
+            -- إذا كان مفتاح JSON يبدأ بـ "Key"، استخدمه كما هو دون تحويل (لمنع التحويل الخاطئ)
             local keyName = rawKey
             if not string.match(rawKey, "^Key") then
                 keyName = pianoKeyMap[rawKey] or rawKey
@@ -517,33 +517,33 @@ local function playSongFromJSON(jsonData)
             
             local delayTime = note.delay or 0.1
             
-            -- テストと同じ仕組みで叩く
+            -- الضغط باستخدام نفس الآلية مثل الاختبار
             task.spawn(function()
                 pressPianoKey(keyName)
             end)
             
-            -- 次の音まで待機
+            -- الانتظار حتى النوتة التالية
             task.wait(delayTime)
         end
         
         isPlayingSong = false
-        print("انتهى العزف")
+        print("انتهى الأداء")
     end)
 end
 
--- 曲の再生を停止
+-- إيقاف تشغيل الأغنية
 local function stopSong()
     isPlayingSong = false
 end
 
--- Recording save function (called from UI)
+-- وظيفة حفظ التسجيل (يتم استدعاؤها من واجهة المستخدم)
 _G.HolonSaveRecording = function(filename)
     if #recordedNotes == 0 then 
         OrionLib:MakeNotification({Name="حفظ", Content="لا توجد بيانات تسجيل", Time=3})
         return 
     end
     
-    -- Calculate delay between notes and create data for saving
+    -- حساب التأخير بين النوتات وإنشاء بيانات للحفظ
     local finalData = {}
     for i = 1, #recordedNotes do
         local current = recordedNotes[i]
@@ -557,7 +557,7 @@ _G.HolonSaveRecording = function(filename)
     
     local fname = filename
     if not fname or fname == "" then
-        -- Auto-naming: Test_1, Test_2 ...
+        -- التسمية التلقائية: Test_1, Test_2 ...
         local idx = 1
         while isfile("FTAP_Notes/Test_" .. idx .. ".json") do
             idx = idx + 1
@@ -573,15 +573,15 @@ _G.HolonSaveRecording = function(filename)
         OrionLib:MakeNotification({Name="حفظ", Content="تم حفظ " .. fname, Time=3})
         isRecording = false
     else
-        warn("JSON Encode Error")
+        warn("خطأ في تشفير JSON")
     end
 end
 
 --------------------------------------------------------------------------------
--- [データ定義] ベクターパス / 形状データ
+-- [تعريف البيانات] مسارات المتجهات / بيانات الشكل
 --------------------------------------------------------------------------------
 local Paths = {
-    -- アルファベット (A-Z, Space) の簡易ストロークデータ
+    -- بيانات السكتة الدماغية البسيطة للأبجدية (A-Z، مسافة)
     Alpha = {
         ["A"]={Vector2.new(0,0),Vector2.new(1,2),Vector2.new(2,0),Vector2.new(1.5,1),Vector2.new(0.5,1)},
         ["B"]={Vector2.new(0,0),Vector2.new(0,2),Vector2.new(1.5,2),Vector2.new(1.5,1),Vector2.new(0,1),Vector2.new(1.5,1),Vector2.new(1.5,0),Vector2.new(0,0)},
@@ -611,29 +611,29 @@ local Paths = {
         ["Z"]={Vector2.new(0,2),Vector2.new(2,2),Vector2.new(0,0),Vector2.new(2,0)},
         [" "]={Vector2.new(0,0), Vector2.new(0,0)}
     },
-    -- マカバ (Merkaba) 立体頂点
+    -- رؤوس صلبة ميركابا
     Merkaba = { 
         Vector3.new(1,1,1),Vector3.new(-1,-1,1),Vector3.new(-1,1,-1),Vector3.new(1,-1,-1),
         Vector3.new(1,1,1),Vector3.new(-1,-1,-1),Vector3.new(1,1,-1),Vector3.new(1,-1,1),
         Vector3.new(-1,1,1),Vector3.new(-1,-1,-1) 
     },
-    -- 五芒星
+    -- نجمة خماسية
     Star = (function() local t={}; for i=0,5 do local a=math.rad(i*144+90); table.insert(t, Vector2.new(math.cos(a),math.sin(a))) end; return t end)(),
-    -- 円
+    -- دائرة
     Circle = (function() local t={}; for i=0,20 do local a=math.rad(i*18); table.insert(t, Vector2.new(math.cos(a),math.sin(a))) end; return t end)(),
     MagicCircle2 = (function()
         local t = {}
-        -- 外側の大きな円
+        -- الدائرة الكبيرة الخارجية
         for i = 0, 36 do
             local a = math.rad(i * 10)
             table.insert(t, Vector2.new(math.cos(a) * 2, math.sin(a) * 2))
         end
-        -- 中間の円
+        -- الدائرة الوسطى
         for i = 0, 24 do
             local a = math.rad(i * 15)
             table.insert(t, Vector2.new(math.cos(a) * 1.5, math.sin(a) * 1.5))
         end
-        -- 内側の円
+        -- الدائرة الداخلية
         for i = 0, 18 do
             local a = math.rad(i * 20)
             table.insert(t, Vector2.new(math.cos(a), math.sin(a)))
@@ -643,7 +643,7 @@ local Paths = {
     
     MagicCircle3 = (function()
         local t = {}
-        -- 多重円構造
+        -- هيكل دائرة متعدد الطبقات
         for layer = 1, 5 do
             local radius = 2.5 - (layer * 0.4)
             local points = 12 + (layer * 4)
@@ -657,7 +657,7 @@ local Paths = {
 }
 
 --------------------------------------------------------------------------------
--- [コンフィグ & 変数管理]
+-- [التكوين وإدارة المتغيرات]
 --------------------------------------------------------------------------------
 local defaultConfig = {
     Wing = { Size = 30, Gap = 3.0, Speed = 6, Height = 0.5, Back = 0, Joints = 3, V_Angle = 0, Tilt = 0, Strength = 15, RootFixed = true, Curve = false, CurveAmount = 10 },
@@ -680,21 +680,21 @@ local defaultConfig = {
     BackGuard = { Size = 10, Speed = 2, Height = 2, Back = 15 },
     Tornado = { Size = 20, Speed = 15, Height = 0, Back = 0, Radius = 5, TopRadius = 20 },
     Gyro = { Size = 20, Speed = 5, Height = 5, Back = 0, InnerSize = 12, CenterType = "Sphere" },
-    Combined = {Mode1 = "Wing", Mode2 = "Merkaba", Mode3 = "None", Mode1Count = 15, Mode2Count = 15, Mode3Count = 0},
+    Combined = {Mode1 = "Wing", Mode2 = "Merkaba", Mode3 = "لا شيء", Mode1Count = 15, Mode2Count = 15, Mode3Count = 0},
     AnimSpeed = 1.0,
     PlotReturn = { Enabled = false, Interval = 30, PlotCFrame = nil},
     GrabMod = { Kill = false, Noclip = false, Spin = false, SuperThrow = false, ThrowPower = 500 },
     Global = { MaxToys = 30, EffectRotation = Vector3.new(0,0,0), IndividualRotation = Vector3.new(0, -90, 0) },
 }
 
--- Deep Copy Helper
+-- مساعد النسخ العميق
 local function deepCopy(target)
     local copy = {}
     for k, v in pairs(target) do copy[k] = (type(v) == "table") and deepCopy(v) or v end
     return copy
 end
 
-local selectedItemName = "جميع الألعاب" 
+local selectedItemName = "كل الألعاب" 
 local detectedItems = {}
 
 local cfg = deepCopy(defaultConfig)
@@ -707,9 +707,8 @@ local autoWidth = true
 local activeToys = {}        -- {A0, A1, AP, AO, Part}
 local originalCollisions = {} -- {Part: Boolean}
 local updateConnection = nil
-local isReturningToPlot = false -- Plot帰還中のフラグ（重要）
+local isReturningToPlot = false -- علم العودة إلى الأرض (مهم)
 
--- Gyro physics variables
 local gyroInnerAngularVelocity = 0
 local gyroInnerAngle = 0
 local lastUpdateTick = 0
@@ -717,7 +716,7 @@ local lastUpdateTick = 0
 local espCache = {}
 local espCfg = { Enabled = false, Names = true, Tracers = false, Hitbox = false, HitboxSize = 10, ESPColor = Color3.new(1, 0, 0), TargetOnly = false }
 
--- プレイヤー設定用変数
+-- متغيرات إعداد اللاعب
 local walkSpeed = 16
 local jumpPower = 25
 local infiniteJump = false
@@ -729,32 +728,32 @@ local antiFire = false
 local antiGrab = false
 
 --------------------------------------------------------------------------------
--- [計算ロジック] 各モードの座標計算
+-- [منطق الحساب] حساب الإحداثيات لكل وضع
 --------------------------------------------------------------------------------
 local function getPositionForMode(mode, i, count, time)
     local c = cfg[mode] or cfg.Wing
     
-    -- iは1からcountまで。比率を計算
+    -- i هو من 1 إلى count. حساب النسبة.
     local ratio = (i-1) / (count > 1 and count-1 or 1)
     
     if mode == "Wing" then
     local side, idx, totalSide
 
     if combinedActive then
-        -- 【合体モード】
-        -- i は全体の通し番号(1,2,3,4...)なので、そのまま奇数/偶数で分ける
-        side = (i % 2 == 1) and -1 or 1 -- 1->左(-1), 2->右(1)
-        idx = math.ceil(i / 2)          -- 1,2番目は1段目、3,4番目は2段目...
+        -- [الوضع المدمج]
+        -- i هو الرقم التسلسلي العام (1، 2، 3، 4...)، لذا فقط قسّم على فردي/زوجي
+        side = (i % 2 == 1) and -1 or 1 -- 1->يسار(-1)، 2->يمين(1)
+        idx = math.ceil(i / 2)          -- الأول، الثاني هما المستوى الأول، الثالث، الرابع هما المستوى الثاني...
         totalSide = math.ceil(count / 2)
     else
-        -- 【単体モード】
-        -- 自分のパーツ内での順番通りに並べる
+        -- [الوضع الفردي]
+        -- الترتيب بالترتيب داخل أجزائه الخاصة
         side = (i % 2 == 1) and -1 or 1
         idx = math.ceil(i / 2)
         totalSide = math.ceil(count / 2)
     end
 
-    -- 以降の計算は共通
+    -- الحسابات اللاحقة مشتركة
     local distRatio = idx / math.max(1, totalSide)
     
     local flapPhase = time * c.Speed
@@ -792,38 +791,38 @@ local function getPositionForMode(mode, i, count, time)
         return Vector3.new(x * c.Size * 0.1, y * c.Size * 0.1 + c.Height, c.Back)
 
     elseif mode == "Star" then
-        -- 綺麗な五芒星を描くためのロジック（直線補間）
-        local totalPoints = 10 -- 5つの頂点 + 5つの谷
-        -- アニメーション進行度
+        -- منطق لرسم نجمة خماسية جميلة (استيفاء خطي)
+        local totalPoints = 10 -- 5 رؤوس + 5 وديان
+        -- تقدم الرسوم المتحركة
         local cycle = (time * c.Speed * 0.2 + ratio) % 1
         local currentStep = cycle * totalPoints
         
         local idx1 = math.floor(currentStep)
         local idx2 = (idx1 + 1) % totalPoints
-        local alpha = currentStep % 1 -- 2点間のどこにいるか
+        local alpha = currentStep % 1 -- أين هو بين نقطتين
 
-        -- 星の頂点座標を計算するローカル関数
+        -- وظيفة محلية لحساب إحداثيات رأس النجمة
         local function getStarPoint(i)
-            -- 36度ずつ回転、+90度で頂点を真上に
+            -- تدوير بمقدار 36 درجة، +90 درجة لجلب الرأس إلى الأعلى
             local theta = math.rad(i * 36 + 90) 
-            -- 偶数は外側(Size)、奇数は内側(Size * 0.382 -> 黄金比に近い鋭さ)
+            -- الأرقام الزوجية خارجية (Size)، الأرقام الفردية داخلية (Size * 0.382 -> حدة قريبة من النسبة الذهبية)
             local r = (i % 2 == 0) and c.Size or (c.Size * 0.382)
-            -- Xを反転させると時計回り/反時計回りが調整可能（ここではそのまま）
+            -- عكس X يمكن أن يضبط الدوران في اتجاه عقارب الساعة/عكس اتجاه عقارب الساعة (هنا كما هو)
             return Vector2.new(-math.cos(theta) * r, math.sin(theta) * r)
         end
 
         local p1 = getStarPoint(idx1)
         local p2 = getStarPoint(idx2)
         
-        -- 丸みを消すため、計算した2点間を直線で結ぶ(Lerp)
+        -- لإزالة الاستدارة، قم بتوصيل النقطتين المحسوبتين بخط مستقيم (Lerp)
         local p = p1:Lerp(p2, alpha)
 
-        -- Heartモードと同じ向き（垂直）にする
-        -- X=横幅, Y=高さ(縦幅), Z=奥行き(固定)
+        -- اجعله بنفس اتجاه وضع القلب (عمودي)
+        -- X=عرض، Y=ارتفاع، Z=عمق(ثابت)
         return Vector3.new(p.X, p.Y + c.Height, c.Back)
         
     elseif mode == "Vortex" then
-        -- 平らな渦
+        -- دوامة مسطحة
         local spiral = (i / count) * math.pi * 4 + time * c.Speed
         local dist = (i / count) * c.Size
         
@@ -833,7 +832,7 @@ local function getPositionForMode(mode, i, count, time)
         return Vector3.new(x, c.Height, z + c.Back)
         
     elseif mode == "Sphere" then
-        -- 球体配置
+        -- وضع كروي
         local phi = math.acos(-1 + (2 * i) / count)
         local theta = math.sqrt(count * math.pi) * phi + time * c.Speed
         
@@ -844,12 +843,12 @@ local function getPositionForMode(mode, i, count, time)
         return Vector3.new(x, y + c.Height, z + c.Back)
 
     elseif mode == "Rotate" or mode == "MagicCircle" then
-    -- 回転・八卦：星形または円
+    -- تدوير/باغوا: نجمة أو دائرة
     local shape = (mode == "MagicCircle" and (i % 2 == 0)) and Paths.Star or Paths.Circle
     local speed = c.Speed
     local totalPoints = #shape
     
-    -- ★完全に書き直し
+    -- ★إعادة كتابة كاملة
     local cycle = (time * speed * 0.1 + ratio) % 1
     local currentStep = cycle * totalPoints
     
@@ -857,14 +856,14 @@ local function getPositionForMode(mode, i, count, time)
     local idx2 = (math.floor(currentStep) + 1) % totalPoints + 1
     local alpha = currentStep % 1
     
-    -- 安全なLerp
+    -- Lerp آمن
     local p1 = shape[idx1]
     local p2 = shape[idx2]
     if not p1 or not p2 then return Vector3.zero end
     
     local p = p1:Lerp(p2, alpha)
     
-    -- Y軸回転を追加
+    -- إضافة دوران المحور Y
     local rotAngle = time * speed * 0.3
     local rotX = p.X * math.cos(rotAngle) - p.Y * math.sin(rotAngle)
     local rotY = p.X * math.sin(rotAngle) + p.Y * math.cos(rotAngle)
@@ -877,7 +876,7 @@ local function getPositionForMode(mode, i, count, time)
     return Vector3.new(rotX * c.Size, c.Height + waveY, rotY * c.Size + c.Back)
 
 elseif mode == "MagicCircle2" then
-    -- 画像1のような放射状の魔法陣
+    -- دائرة سحرية شعاعية مثل الصورة 1
     local totalPoints = #Paths.MagicCircle2
     local cycle = (time * c.Speed * 0.05 + ratio) % 1
     local currentStep = cycle * totalPoints
@@ -892,18 +891,18 @@ elseif mode == "MagicCircle2" then
     
     local p = p1:Lerp(p2, alpha)
     
-    -- Y軸回転
+    -- دوران المحور Y
     local rotAngle = time * c.Speed * 0.2
     local rotX = p.X * math.cos(rotAngle) - p.Y * math.sin(rotAngle)
     local rotZ = p.X * math.sin(rotAngle) + p.Y * math.cos(rotAngle)
     
-    -- 上下の波動
+    -- موجة صعود وهبوط
     local wave = math.sin(time * c.Speed + i * 0.5) * 0.5
     
     return Vector3.new(rotX * c.Size, c.Height + wave, rotZ * c.Size + c.Back)
 
 elseif mode == "MagicCircle3" then
-    -- 画像2のような垂直ビーム風の魔法陣
+    -- دائرة سحرية بنمط شعاع عمودي مثل الصورة 2
     local totalPoints = #Paths.MagicCircle3
     local cycle = (time * c.Speed * 0.03 + ratio) % 1
     local currentStep = cycle * totalPoints
@@ -918,7 +917,7 @@ elseif mode == "MagicCircle3" then
     
     local p = p1:Lerp(p2, alpha)
     
-    -- ゆっくり回転
+    -- دوران بطيء
     local rotAngle = time * c.Speed * 0.1
     local rotX = p.X * math.cos(rotAngle) - p.Y * math.sin(rotAngle)
     local rotZ = p.X * math.sin(rotAngle) + p.Y * math.cos(rotAngle)
@@ -926,41 +925,41 @@ elseif mode == "MagicCircle3" then
     return Vector3.new(rotX * c.Size, c.Height, rotZ * c.Size + c.Back)
 
     elseif mode == "Pet" then
-        -- 設定から各種パラメータを取得
+        -- الحصول على معلمات مختلفة من الإعدادات
         local petCountSetting = cfg.Pet.Count or 2
-        local totalFws = count -- 使用可能な全花火数
+        local totalFws = count -- إجمالي الألعاب النارية المتاحة
         
-        -- 1体あたりの花火数を計算
+        -- حساب الألعاب النارية لكل حيوان أليف
         local fwsPerPet = math.floor(totalFws / petCountSetting)
         if fwsPerPet < 1 then fwsPerPet = 1 end
 
-        -- 現在の花火(i)が、何体目のペットの、何番目のパーツか
+        -- أي حيوان أليف وأي رقم جزء هو الألعاب النارية الحالية (i)
         local petIndex = math.ceil(i / fwsPerPet)
         local partIndexInPet = (i - 1) % fwsPerPet 
         
-        -- 指定したペット数を超える余り花火は非表示
+        -- إخفاء الألعاب النارية الفائضة التي تتجاوز العدد المحدد للحيوانات الأليفة
         if petIndex > petCountSetting then
             return Vector3.new(0, -1000, 0)
         end
 
-        -- パーツの役割分担 (0:体, 1:左羽, 2:右羽)
+        -- تعيين دور الجزء (0:جسم، 1:جناح أيسر، 2:جناح أيمن)
         local role = 0 
         local sideIndex = 0
         if partIndexInPet == 0 then
-            role = 0 -- 最初の1個は体
+            role = 0 -- الأول هو الجسم
         elseif partIndexInPet <= math.ceil((fwsPerPet - 1) / 2) then
-            role = 1 -- 左羽
+            role = 1 -- جناح أيسر
             sideIndex = partIndexInPet
         else
-            role = 2 -- 右羽
+            role = 2 -- جناح أيمن
             sideIndex = partIndexInPet - math.ceil((fwsPerPet - 1) / 2)
         end
 
-        -- ペット自体の配置（Gapを使用して間隔を調整）
+        -- وضع الحيوان الأليف نفسه (استخدم Gap لضبط التباعد)
         local petSide = (petIndex % 2 == 0) and 1 or -1
         local horizontalOffset = (c.Gap or 5) + (math.floor((petIndex - 1) / 2) * 8)
         
-        -- 共通の浮遊ムーブ
+        -- حركة عائمة مشتركة
         local hover = math.sin(time * c.Speed) * 1.2
         local bob = math.cos(time * c.Speed * 0.5) * 1
         
@@ -973,11 +972,11 @@ elseif mode == "MagicCircle3" then
         if role == 0 then
             return basePos
         else
-            -- 羽の計算
+            -- حساب الجناح
             local wingSide = (role == 1) and -1 or 1
             
-            -- ★ここを修正：c.Size を羽の広がり（幅）に直接反映
-            -- sideIndex（羽の中のパーツ番号）に比例して、c.Sizeの分だけ外に広がります
+            -- ★إصلاح هنا: عكس c.Size مباشرة على انتشار الجناح (العرض)
+            -- ينتشر بمقدار c.Size بالتناسب مع sideIndex (رقم الجزء داخل الجناح)
             local wingSpread = (sideIndex * (c.Size * 0.1)) 
             
             local flapPhase = time * c.Speed * 3 - (sideIndex * 0.3)
@@ -986,25 +985,25 @@ elseif mode == "MagicCircle3" then
             local jointFactor = (c.Joints or 3) * 0.2
             
             return basePos + Vector3.new(
-                wingSide * (1 + jointFactor + wingSpread), -- c.Sizeがここにかかる
+                wingSide * (1 + jointFactor + wingSpread), -- يتم تطبيق c.Size هنا
                 flap * (1 + jointFactor),
                 -0.5 + (sideIndex * 0.1)
             )
         end
 
     elseif mode == "FloatStone" then
-        -- アニメーションの「カオス展開」の動きを計算に導入
+        -- تقديم حركة "نشر الفوضى" من الرسوم المتحركة في الحساب
         local rTime = time * cfg[mode].Speed
         local spread = cfg[mode].Size
         
-        -- 複数の正弦波を組み合わせて不規則な軌道を生成
+        -- توليد مسار غير منتظم من خلال الجمع بين موجات جيبية متعددة
         local x = math.cos(rTime + i * 1.5) * spread
         local y = math.sin(rTime * 0.7 + i) * (spread * 0.5) + cfg[mode].Height
         local z = math.sin(rTime * 1.2 + i * 2.2) * spread + cfg[mode].Back
         
         return Vector3.new(x, y, z)
 
--- [Textモードの計算ロジック抜粋] 
+-- [مقتطف منطق حساب وضع النص] 
 
     elseif mode == "Text" then
         local str = cfg.Text.Content
@@ -1021,7 +1020,7 @@ elseif mode == "MagicCircle3" then
         local charStr = chars[charIndex]
         local path = Paths.Alpha[charStr:upper()] or Paths.Alpha[" "]
         
-        -- アニメーション計算
+        -- حساب الرسوم المتحركة
         local totalPoints = #path
         local speed = math.max(1, math.floor(c.Speed)) * 0.5
         local cycle = (time * speed + (i % fwsPerChar) * 0.1) % 2 
@@ -1030,21 +1029,21 @@ elseif mode == "MagicCircle3" then
         local idx2 = math.min(idx1 + 1, totalPoints)
         local p = path[idx1]:Lerp(path[idx2] or path[idx1], tP % 1)
         
-        -- ★ 文字間隔の自動調節
-        -- サイズ(c.Size)が大きくなれば間隔(spacing)も広がるように設定
+        -- ★ ضبط تباعد الأحرف تلقائيًا
+        -- اضبط بحيث كلما زاد الحجم (c.Size)، زاد التباعد أيضًا
         local charSizeScale = c.Size * 0.4
-        local spacing = c.Size * 1.2 -- 1.2倍の間隔で自動調整
+        local spacing = c.Size * 1.2 -- ضبط تلقائي بتباعد 1.2x
         local totalWidth = (numChars - 1) * spacing
         
-        -- 配置計算 (反転なし、常に正面)
-        local xPos = p.X * charSizeScale * -1 -- 文字の形が正しく見える向き
+        -- حساب الموضع (بدون عكس، دائمًا يواجه الأمام)
+        local xPos = p.X * charSizeScale * -1 -- الاتجاه حيث يبدو شكل الحرف صحيحًا
         local yPos = p.Y * charSizeScale
         local xOffset = ((charIndex - 1) * spacing - (totalWidth / 2)) * -1
         
         return Vector3.new(xOffset + xPos, yPos + c.Height, -c.Back)
 
     elseif mode == "Merkaba" then
-        -- マカバ：3D回転
+        -- ميركابا: دوران ثلاثي الأبعاد
         local totalP = #Paths.Merkaba
         local tP = (time * c.Speed + ratio * totalP) % totalP
         local p1 = Paths.Merkaba[math.floor(tP) + 1]
@@ -1052,7 +1051,7 @@ elseif mode == "MagicCircle3" then
         
         local p = p1:Lerp(p2, tP % 1) * c.Size
         
-        -- 複雑な3軸回転
+        -- دوران معقد على 3 محاور
         local rot = CFrame.Angles(time, time * 1.5, 0)
         return (rot * p) + Vector3.new(0, c.Height + math.sin(time * 2), c.Back)
 
@@ -1080,46 +1079,46 @@ elseif mode == "MagicCircle3" then
         return p1:Lerp(p2, alpha) + Vector3.new(0, c.Height, c.Back)
 
     elseif mode == "Cube" then
-        -- 立方体の頂点定義
+        -- تعريف رأس المكعب
         local size = c.Size
         local v = {
-            Vector3.new(size, size, size),      -- 1: 右上前
-            Vector3.new(-size, size, size),     -- 2: 左上前
-            Vector3.new(size, -size, size),     -- 3: 右下前
-            Vector3.new(-size, -size, size),    -- 4: 左下前
-            Vector3.new(size, size, -size),     -- 5: 右上後
-            Vector3.new(-size, size, -size),    -- 6: 左上後
-            Vector3.new(size, -size, -size),    -- 7: 右下後
-            Vector3.new(-size, -size, -size)    -- 8: 左下後
+            Vector3.new(size, size, size),      -- 1: أعلى-أمام-يمين
+            Vector3.new(-size, size, size),     -- 2: أعلى-أمام-يسار
+            Vector3.new(size, -size, size),     -- 3: أسفل-أمام-يمين
+            Vector3.new(-size, -size, size),    -- 4: أسفل-أمام-يسار
+            Vector3.new(size, size, -size),     -- 5: أعلى-خلف-يمين
+            Vector3.new(-size, size, -size),    -- 6: أعلى-خلف-يسار
+            Vector3.new(size, -size, -size),    -- 7: أسفل-خلف-يمين
+            Vector3.new(-size, -size, -size)    -- 8: أسفل-خلف-يسار
         }
 
-        -- ■ 変更点: 「辺」ではなく「面（4頂点のループ）」を定義
+        -- ■ تغيير: تعريف "الوجوه (حلقات 4 رؤوس)" بدلاً من "الحواف"
         local faces = {
-            {v[1], v[2], v[4], v[3]}, -- 前面ループ
-            {v[5], v[6], v[8], v[7]}, -- 背面ループ
-            {v[1], v[5], v[6], v[2]}, -- 上面ループ
-            {v[3], v[7], v[8], v[4]}, -- 底面ループ
-            {v[1], v[5], v[7], v[3]}, -- 右面ループ
-            {v[2], v[6], v[8], v[4]}  -- 左面ループ
+            {v[1], v[2], v[4], v[3]}, -- حلقة أمامية
+            {v[5], v[6], v[8], v[7]}, -- حلقة خلفية
+            {v[1], v[5], v[6], v[2]}, -- حلقة علوية
+            {v[3], v[7], v[8], v[4]}, -- حلقة سفلية
+            {v[1], v[5], v[7], v[3]}, -- حلقة يمنى
+            {v[2], v[6], v[8], v[4]}  -- حلقة يسرى
         }
 
         local numFaces = #faces
         
-        -- 1. おもちゃを6つの面に順番に割り振る
+        -- 1. تعيين الألعاب للوجوه الستة بالترتيب
         local faceIdx = ((i - 1) % numFaces) + 1
         local currentFace = faces[faceIdx]
 
-        -- 2. 進行具合の計算 (周回ループ)
+        -- 2. حساب التقدم (تكرار)
         local speed = c.Speed * 0.5 
-        -- おもちゃごとに位置をずらす (i * 0.25) ことで重なりを防ぐ
+        -- منع التداخل عن طريق تغيير الموضع لكل لعبة (i * 0.25)
         local totalProgress = (time * speed) + (i * 0.25)
         
-        -- 3. 現在どの辺(0~3)にいるか、その辺のどこ(0.0~1.0)にいるか
+        -- 3. أي حافة (0-3) هو عليها، وأين على تلك الحافة (0.0-1.0)
         local edgeIndex = math.floor(totalProgress) % 4 + 1
-        local nextEdgeIndex = (edgeIndex % 4) + 1 -- 次の頂点
-        local alpha = totalProgress % 1 -- 辺の上の進捗 (0.0 -> 1.0)
+        local nextEdgeIndex = (edgeIndex % 4) + 1 -- الرأس التالي
+        local alpha = totalProgress % 1 -- التقدم على الحافة (0.0 -> 1.0)
 
-        -- 4. 座標を計算
+        -- 4. حساب الإحداثيات
         local p1 = currentFace[edgeIndex]
         local p2 = currentFace[nextEdgeIndex]
         
@@ -1133,7 +1132,7 @@ elseif mode == "MagicCircle3" then
         local root = char:FindFirstChild("HumanoidRootPart")
         if not root then return Vector3.new(0,0,0) end
 
-        -- 1. R6パーツ定義（サイズと名前をセット）
+        -- 1. تعريف جزء R6 (تعيين الحجم والاسم)
         local bodyParts = {
             { name = "Head",      size = Vector3.new(1.2, 1.2, 1.2) },
             { name = "Torso",     size = Vector3.new(2, 2, 1) },
@@ -1148,10 +1147,10 @@ elseif mode == "MagicCircle3" then
         local localIdx = ((i - 1) % toysPerPart) + 1
         local data = bodyParts[partIdx]
         
-        -- 対象の部位を特定
+        -- تحديد الجزء المستهدف
         local targetPart = char:FindFirstChild(data.name) or root
 
-        -- 2. サイズと形状の計算（ここはおもちゃの形を作る）
+        -- 2. حساب الحجم والشكل (هنا يتم إنشاء شكل اللعبة)
         local s = data.size * c.Size * 0.5
         local t = (time * c.Speed) % 4
         local step = t % 1
@@ -1166,31 +1165,31 @@ elseif mode == "MagicCircle3" then
         elseif faceIdx == 4 then p = (edge==0 and Vector3.new(-s.X+s.X*2*step,s.Y,-s.Z) or edge==1 and Vector3.new(s.X,s.Y,-s.Z+s.Z*2*step) or edge==2 and Vector3.new(s.X-s.X*2*step,s.Y,s.Z) or Vector3.new(-s.X,s.Y,s.Z-s.Z*2*step))
         else p = (edge==0 and Vector3.new(-s.X+s.X*2*step,-s.Y,-s.Z) or edge==1 and Vector3.new(s.X,-s.Y,-s.Z+s.Z*2*step) or edge==2 and Vector3.new(s.X-s.X*2*step,-s.Y,s.Z) or Vector3.new(-s.X,-s.Y,s.Z-s.Z*2*step)) end
 
-        -- 3. 【これが「位置」を直す魔法の式】
-        -- 自分の各部位が「RootPartから見てどこにいるか」というオフセットを計算
-        -- PointToObjectSpace を使うことで、エモート等でズレた位置も自動計算されます
+        -- 3. 【هذه هي الصيغة السحرية لإصلاح الموضع】
+        -- حساب إزاحة مكان وجود كل جزء من أجزائي بالنسبة إلى RootPart
+        -- باستخدام PointToObjectSpace، يتم أيضًا حساب المواضع التي تم تغييرها بواسطة التعبيرات وما إلى ذلك تلقائيًا
         local partRelativePos = root.CFrame:PointToObjectSpace(targetPart.Position)
         
-        -- 背後距離(Back)と高さ(Height)のオフセット
+        -- المسافة الخلفية وإزاحة الارتفاع
         local extraOffset = Vector3.new(0, c.Height, -c.Back)
         
-        -- 回転情報を適用（部位が傾けばおもちゃの枠も傾く）
+        -- تطبيق معلومات الدوران (إذا مال الجزء، يميل إطار اللعبة أيضًا)
         local rotatedBoxPoint = (root.CFrame:Inverse() * targetPart.CFrame).Rotation * p
 
-        -- 全部を足して返す
-        -- [部位の相対位置] + [一筆書きの頂点] + [ユーザー設定のズレ]
+        -- جمع كل شيء وإرجاعه
+        -- [الموضع النسبي للجزء] + [رأس السكتة الدماغية] + [إزاحة إعداد المستخدم]
         return partRelativePos + rotatedBoxPoint + extraOffset
 
     elseif mode == "Beam" then
-        -- Y方向の光の柱
+        -- عمود ضوء اتجاه Y
         local ang = (i % c.Count) * (math.pi * 2 / c.Count)
         local radius = c.Size * 0.3
         
-        -- 円周配置
+        -- وضع دائري
         local x = math.cos(ang) * radius
         local z = math.sin(ang) * radius
         
-        -- Y軸高速往復
+        -- تبادل عالي السرعة للمحور Y
         local yOsc = math.sin(time * c.Speed + (i / count) * math.pi * 2)
         local y = yOsc * c.Size
         
@@ -1199,15 +1198,15 @@ elseif mode == "MagicCircle3" then
     elseif mode == "BackGuard" then
         local spread = c.Size
     
-         -- 各石のランダム位置(固定シードで再現性確保)
+         -- موضع عشوائي لكل حجر (ضمان التكرار ببذرة ثابتة)
         local seed = i * 123.456
-        local randomX = (math.sin(seed) * 2 - 1) * spread  -- 左右にバラバラ
-        local randomY = (math.cos(seed * 1.3) * 2 - 1) * (spread * 0.3) + c.Height  -- 上下にバラバラ
+        local randomX = (math.sin(seed) * 2 - 1) * spread  -- مبعثر يسارًا ويمينًا
+        local randomY = (math.cos(seed * 1.3) * 2 - 1) * (spread * 0.3) + c.Height  -- مبعثر لأعلى ولأسفل
     
-        -- 後ろ側に配置
+        -- موضوع في الخلف
         local backDistance = c.Back + math.abs(math.sin(seed * 0.7)) * spread * 0.5
     
-        -- 微妙な浮遊動作
+        -- حركة عائمة خفية
         local hover = math.sin(time * c.Speed + i * 0.5) * 0.5
     
         return Vector3.new(randomX, randomY + hover, -backDistance)
@@ -1215,7 +1214,7 @@ elseif mode == "MagicCircle3" then
     elseif mode == "Tornado" then
         local r1 = c.Radius or 5
         local r2 = c.TopRadius or 20
-        local h = c.Size -- Use Size as height
+        local h = c.Size -- استخدام الحجم كارتفاع
         
         local ratio = (i - 1) / (count > 1 and count - 1 or 1)
         local currentR = r1 + (r2 - r1) * ratio
@@ -1305,7 +1304,7 @@ elseif mode == "MagicCircle3" then
 end
 
 --------------------------------------------------------------------------------
--- [メイン機能] エフェクト制御 (Start / Stop / Update)
+-- [الوظيفة الرئيسية] التحكم في التأثير (بدء / إيقاف / تحديث)
 --------------------------------------------------------------------------------
 local function stopEffect()
     isEnabled = false
@@ -1314,11 +1313,11 @@ local function stopEffect()
         updateConnection = nil 
     end
     
-    -- Reset gyro state
     gyroInnerAngularVelocity = 0
     gyroInnerAngle = 0
     
-    -- アタッチメント削除 & 固定化
+    
+    -- حذف المرفقات وتثبيت
     for _, v in ipairs(activeToys) do
         pcall(function() 
             v.Part.Anchored = false 
@@ -1330,7 +1329,7 @@ local function stopEffect()
     end
     activeToys = {}
     
-    -- 当たり判定復元
+    -- استعادة خصائص التصادم
     for part, val in pairs(originalCollisions) do
         if part and part.Parent then 
             part.CanCollide = val 
@@ -1353,9 +1352,9 @@ local function startEffect()
     
     local maxCount
     if combinedActive then
-        local c1 = (cfg.Combined.Mode1 ~= "None") and (cfg.Combined.Mode1Count or 15) or 0
-        local c2 = (cfg.Combined.Mode2 ~= "None") and (cfg.Combined.Mode2Count or 15) or 0
-        local c3 = (cfg.Combined.Mode3 ~= "None") and (cfg.Combined.Mode3Count or 0) or 0
+        local c1 = (cfg.Combined.Mode1 ~= "لا شيء") and (cfg.Combined.Mode1Count or 15) or 0
+        local c2 = (cfg.Combined.Mode2 ~= "لا شيء") and (cfg.Combined.Mode2Count or 15) or 0
+        local c3 = (cfg.Combined.Mode3 ~= "لا شيء") and (cfg.Combined.Mode3Count or 0) or 0
         maxCount = c1 + c2 + c3
     else
         maxCount = cfg.Global.MaxToys or 30 
@@ -1365,7 +1364,7 @@ local function startEffect()
     local plotsFolder = Workspace:FindFirstChild("Plots")
     local plotItemsFolder = Workspace:FindFirstChild("PlotItems")
 
-    -- 0. Get items from SpawnedInToys (Cosmic style)
+    -- 0. الحصول على العناصر من SpawnedInToys (نمط Cosmic)
     local spawnedToys = Workspace:FindFirstChild(myName .. "SpawnedInToys")
     if spawnedToys then
         for _, item in ipairs(spawnedToys:GetChildren()) do
@@ -1373,7 +1372,7 @@ local function startEffect()
         end
     end
 
-    -- 1. Get items from my plot
+    -- 1. الحصول على العناصر من أرضي
     if plotsFolder and plotItemsFolder then
         for _, plot in ipairs(plotsFolder:GetChildren()) do
             local sign = plot:FindFirstChild("PlotSign")
@@ -1395,7 +1394,7 @@ local function startEffect()
         end
     end
 
-    -- 2. Get items directly from Workspace that I own
+    -- 2. الحصول على العناصر مباشرة من Workspace التي أملكها
     for _, item in ipairs(Workspace:GetChildren()) do
         local ownerValue = item:FindFirstChild("Owner") or item:FindFirstChild("PartOwner")
         if item:IsA("Model") and ownerValue and ownerValue:IsA("StringValue") and ownerValue.Value == myName and not table.find(allMyItems, item) then
@@ -1403,15 +1402,15 @@ local function startEffect()
         end
     end
 
-    -- 3. Filter items based on selection and add to fws
+    -- 3. تصفية العناصر بناءً على الاختيار وإضافتها إلى fws
     for _, item in ipairs(allMyItems) do
         if #fws >= maxCount then break end
-        if item:IsA("Model") and item.PrimaryPart and (selectedItemName == "جميع الألعاب" or item.Name == selectedItemName) then
+        if item:IsA("Model") and item.PrimaryPart and (selectedItemName == "كل الألعاب" or item.Name == selectedItemName) then
             table.insert(fws, item)
         end
     end
 
-    -- 4. Ensure network ownership for all found items
+    -- 4. ضمان ملكية الشبكة لجميع العناصر التي تم العثور عليها
     for _, item in ipairs(fws) do
         for _, part in ipairs(item:GetDescendants()) do
             if part:IsA("BasePart") then
@@ -1427,11 +1426,11 @@ local function startEffect()
 
         print("تم التقاط " .. #fws .. " لعبة. (الهدف: " .. maxCount .. ")")
 
-   -- ネットワークオーナーシップを強制的に取得
+   -- الحصول على ملكية الشبكة بالقوة
     for i, model in ipairs(fws) do
         local pp = model.PrimaryPart
         
-        -- 全パーツの勢いを殺す
+        -- قتل زخم جميع الأجزاء
         for _, d in ipairs(model:GetDescendants()) do 
             if d:IsA("BasePart") then
                 d.AssemblyLinearVelocity = Vector3.zero
@@ -1440,12 +1439,12 @@ local function startEffect()
             end
         end
         
-        -- スタート時の爆発を防ぐため、計算上の初期位置に直接配置する
+        -- لمنع الانفجار عند البدء، ضعه مباشرة في الموضع الأولي المحسوب
         if root then
             local m, relIdx, relTotal
             if combinedActive then
-                local c1 = (cfg.Combined.Mode1 ~= "None") and (cfg.Combined.Mode1Count or 15) or 0
-                local c2 = (cfg.Combined.Mode2 ~= "None") and (cfg.Combined.Mode2Count or 15) or 0
+                local c1 = (cfg.Combined.Mode1 ~= "لا شيء") and (cfg.Combined.Mode1Count or 15) or 0
+                local c2 = (cfg.Combined.Mode2 ~= "لا شيء") and (cfg.Combined.Mode2Count or 15) or 0
                 if i <= c1 then m = cfg.Combined.Mode1; relIdx = i; relTotal = c1
                 elseif i <= c1 + c2 then m = cfg.Combined.Mode2; relIdx = i - c1; relTotal = c2
                 else m = cfg.Combined.Mode3; relIdx = i - c1 - c2; relTotal = cfg.Combined.Mode3Count or 0 end
@@ -1459,10 +1458,10 @@ local function startEffect()
             pp.CFrame = root.CFrame:ToWorldSpace(CFrame.new(relativePos))
         end
         
-        pp.Anchored = false -- 配置が終わってから物理を有効化
+        pp.Anchored = false -- تمكين الفيزياء بعد الانتهاء من الوضع
         pcall(function() pp:SetNetworkOwner(LocalPlayer) end)
 
-        -- 当たり判定無効化
+        -- تعطيل التصادم
         for _, d in ipairs(model:GetDescendants()) do 
             if d:IsA("BasePart") then 
                 if originalCollisions[d] == nil then originalCollisions[d] = d.CanCollide end
@@ -1472,7 +1471,7 @@ local function startEffect()
             end 
         end
         
-        -- (AttachmentやAlignPositionの設定はそのまま...)
+        -- (إعدادات المرفق و AlignPosition تظل كما هي...)
         local a0 = Instance.new("Attachment", pp)
         local ap = Instance.new("AlignPosition", pp)
         ap.Attachment0 = a0
@@ -1496,7 +1495,6 @@ local function startEffect()
     local rootPart = char and char:FindFirstChild("HumanoidRootPart")
     if not rootPart then return end
 
-    -- Gyro physics
     local now = tick()
     local deltaTime = now - lastUpdateTick
     lastUpdateTick = now
@@ -1509,11 +1507,11 @@ local function startEffect()
 
     local baseCF
     if followPlayer and not isReturningToPlot then
-        -- 追従ON：常にプレイヤーの最新座標を基準にする
+        -- المتابعة قيد التشغيل: استخدم دائمًا أحدث إحداثيات اللاعب كقاعدة
         baseCF = rootPart.CFrame
         lastBaseCF = baseCF
     else
-        -- 追従OFF：lastBaseCF があればそれを「絶対」に使う
+        -- المتابعة متوقفة: إذا كان lastBaseCF موجودًا، فاستخدمه "بالتأكيد"
         if not lastBaseCF then
             lastBaseCF = rootPart.CFrame
         end
@@ -1522,29 +1520,27 @@ local function startEffect()
 
     local t = tick()
     
-    -- Calculate overall effect rotation
     local effectRot = cfg.Global.EffectRotation or Vector3.zero
     local effectRotationCF = CFrame.Angles(math.rad(effectRot.X), math.rad(effectRot.Y), math.rad(effectRot.Z))
     local rotatedBaseCF = baseCF * effectRotationCF
 
-    -- Calculate individual toy rotation
     local indivRot = cfg.Global.IndividualRotation or Vector3.new(0, -90, 0)
     local individualRotation = CFrame.Angles(math.rad(indivRot.X), math.rad(indivRot.Y), math.rad(indivRot.Z))
 
     for i, fw in ipairs(activeToys) do
-        -- 奈落判定
+        -- فحص الهاوية
         if fw.Part.Position.Y <= -90 then
-            -- 奈落に落ちている場合は固定して何もしない
+            -- إذا سقط في الهاوية، قم بتثبيته ولا تفعل شيئًا
             fw.Part.Anchored = true
         else
-            -- 奈落に落ちていない場合のみ、通常処理を行う (continueの代わり)
+            -- قم بإجراء المعالجة العادية فقط إذا لم يكن في الهاوية (بدلاً من المتابعة)
             fw.Part.Anchored = false
 
-            -- 位置計算
+            -- حساب الموضع
             local m, relIdx, relTotal
             if combinedActive then
-                local c1 = (cfg.Combined.Mode1 ~= "None") and (cfg.Combined.Mode1Count or 15) or 0
-                local c2 = (cfg.Combined.Mode2 ~= "None") and (cfg.Combined.Mode2Count or 15) or 0
+                local c1 = (cfg.Combined.Mode1 ~= "لا شيء") and (cfg.Combined.Mode1Count or 15) or 0
+                local c2 = (cfg.Combined.Mode2 ~= "لا شيء") and (cfg.Combined.Mode2Count or 15) or 0
                 if i <= c1 then m = cfg.Combined.Mode1; relIdx = i; relTotal = c1
                 elseif i <= c1 + c2 then m = cfg.Combined.Mode2; relIdx = i - c1; relTotal = c2
                 else m = cfg.Combined.Mode3; relIdx = i - c1 - c2; relTotal = cfg.Combined.Mode3Count or 0 end
@@ -1554,7 +1550,7 @@ local function startEffect()
                 relTotal = #activeToys
             end
 
-            if m and m ~= "None" then
+            if m and m ~= "لا شيء" then
                 local relativePos = getPositionForMode(m, relIdx, relTotal, t)
                 local worldPos = rotatedBaseCF:PointToWorldSpace(relativePos)
                 fw.AP.Position = worldPos
@@ -1573,24 +1569,24 @@ local function startEffect()
             else
                 fw.AP.Position = Vector3.new(0, -10000, 0)
             end
-        end -- if 奈落判定の閉じ
-    end -- for ループの閉じ
+        end -- نهاية فحص الهاوية
+    end -- نهاية حلقة for
 end)
 end
 
 --------------------------------------------------------------------------------
--- [汎用ベースポイント帰還機能]
+-- [وظيفة العودة إلى نقطة القاعدة العامة]
 --------------------------------------------------------------------------------
 local selectedHouseCF = nil 
 local houseCoords = {
     ["منزل زهر الكرز"] = CFrame.new(548, 123, -73),
-    ["منزل أزرق فاتح"] = CFrame.new(509, 83, -338),
-    ["منزل أرجواني"] = CFrame.new(255, -7, 449),
-    ["منزل أخضر"] = CFrame.new(-534, -7, 89),
-    ["منزل وردي"] = CFrame.new(-485, -7, -163)
+    ["المنزل الأزرق الفاتح"] = CFrame.new(509, 83, -338),
+    ["المنزل البنفسجي"] = CFrame.new(255, -7, 449),
+    ["المنزل الأخضر"] = CFrame.new(-534, -7, 89),
+    ["المنزل الوردي"] = CFrame.new(-485, -7, -163)
 }
 local plotNames = {
-    [1] = "منزل أخضر", [2] = "منزل وردي", [3] = "منزل أرجواني", [4] = "منزل أزرق فاتح", [5] = "منزل زهر الكرز"
+    [1] = "المنزل الأخضر", [2] = "المنزل الوردي", [3] = "المنزل البنفسجي", [4] = "المنزل الأزرق الفاتح", [5] = "منزل زهر الكرز"
 }
 local HomeStatus = nil -- للوصول إلى واجهة المستخدم
 
@@ -1629,7 +1625,7 @@ task.spawn(function()
 
                                     if ownerName == LocalPlayer.Name then
                                         found = true
-                                        local houseName = plotNames[i] or "Unknown"
+                                        local houseName = plotNames[i] or "غير معروف"
                                         if HomeStatus then
                                             HomeStatus:Set("المنزل: " .. houseName .. "\nالوقت المتبقي: " .. tostring(timeVal) .. " ثانية")
                                         end
@@ -1640,10 +1636,10 @@ task.spawn(function()
                                                 isReturningToPlot = true
                                                 local oldCF = root.CFrame
                                                 root.CFrame = targetCF
-                                                task.wait(0.15) -- تقصير
+                                                task.wait(0.15) -- قصير
                                                 root.CFrame = oldCF
                                                 isReturningToPlot = false
-                                                task.wait(2) -- منع النقل الآني المستمر
+                                                task.wait(2) -- منع الانتقال الآني المستمر
                                             end
                                         end
                                         break
@@ -1655,7 +1651,7 @@ task.spawn(function()
                 end)
                 
                 if not found and HomeStatus then
-                    HomeStatus:Set("لم يتم العثور على المنزل (يرجى الدخول إلى قطعة أرض)")
+                    HomeStatus:Set("المنزل غير موجود (يرجى الدخول إلى أرض)")
                 end
             end
         else
@@ -1667,9 +1663,9 @@ task.spawn(function()
 end)
 
 --------------------------------------------------------------------------------
--- [ESP & サブ機能] 更新ループ (Prometheus対応版)
+-- [ESP والميزات الفرعية] حلقة التحديث (إصدار متوافق مع Prometheus)
 --------------------------------------------------------------------------------
--- 共通のクリーンアップ関数（退出時や非表示時に使用）
+-- وظيفة تنظيف مشتركة (تستخدم عند الخروج أو الإخفاء)
 local function removeESP(p)
     local esp = espCache[p]
     if esp then
@@ -1678,14 +1674,14 @@ local function removeESP(p)
         if esp.T then 
             pcall(function() 
                 esp.T.Visible = false 
-                esp.T:Remove() -- DrawingオブジェクトはRemove()で完全に消去
+                esp.T:Remove() -- يتم حذف كائنات الرسم تمامًا باستخدام Remove()
             end) 
         end
         espCache[p] = nil
     end
 end
 
--- プレイヤーがサーバーを抜けた時に即座に実行
+-- التنفيذ فورًا عندما يغادر اللاعب الخادم
 Players.PlayerRemoving:Connect(removeESP)
 
 local function updateSubFeatures()
@@ -1698,7 +1694,7 @@ local function updateSubFeatures()
             local shouldShow = false
             local isTarget = (not espCfg.TargetOnly) or (espCfg.TargetOnly and p == targetSub)
             
-            -- 設定が有効、かつターゲット一致、かつ生存している場合
+            -- إذا تم تمكين الإعداد، وتطابق الهدف، وكان على قيد الحياة
             if espCfg.Enabled and isTarget and root and hum and hum.Health > 0 then
                 shouldShow = true
             end
@@ -1706,7 +1702,7 @@ local function updateSubFeatures()
             local esp = espCache[p] or {}
             
             if shouldShow then
-                -- 1. ハイライト処理
+                -- 1. معالجة التمييز
                 if not esp.H or esp.H.Parent ~= char then 
                     esp.H = Instance.new("Highlight")
                     esp.H.Parent = char
@@ -1715,7 +1711,7 @@ local function updateSubFeatures()
                 esp.H.Enabled = true
                 esp.H.FillColor = espCfg.ESPColor
 
-                -- 2. アイコン付き名前表示 (確実に動くURL形式)
+                -- 2. عرض الاسم مع الرمز (تنسيق URL الذي يعمل بشكل موثوق)
                 if not esp.B or esp.B.Parent ~= root then
                     esp.B = Instance.new("BillboardGui")
                     esp.B.Parent = root
@@ -1732,7 +1728,7 @@ local function updateSubFeatures()
                     icon.Size = UDim2.new(0, 30, 0, 30)
                     icon.Position = UDim2.new(0, 0, 0.5, -15)
                     icon.BackgroundTransparency = 1
-                    -- アイコンが表示されていた形式のURLを使用
+                    -- استخدم تنسيق URL حيث تم عرض الرمز
                     icon.Image = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. p.UserId .. "&width=420&height=420&format=png"
 
                     local l = Instance.new("TextLabel", frame)
@@ -1752,7 +1748,7 @@ local function updateSubFeatures()
                 esp.L.Text = p.DisplayName .. " (@" .. p.Name .. ")"
                 esp.L.TextColor3 = espCfg.ESPColor
 
-                -- 3. トレーサー (改善版)
+                -- 3. التتبع (إصدار محسن)
                 if espCfg.Tracers then
                     if not esp.T then
                         esp.T = Drawing.new("Line")
@@ -1768,14 +1764,14 @@ local function updateSubFeatures()
                         esp.T.To = Vector2.new(screenPos.X, screenPos.Y)
                         esp.T.Visible = true
                     else
-                        -- 画面外のトレーサー処理（不要な場合は visible = false に）
+                        -- معالجة التتبع خارج الشاشة (اضبط visible = false إذا لم تكن هناك حاجة)
                         esp.T.Visible = false 
                     end
                 elseif esp.T then
                     esp.T.Visible = false
                 end
 
-                -- 4. ヒットボックス
+                -- 4. صندوق الإصابة (Hitbox)
                 if espCfg.Hitbox then
                     root.Size = Vector3.new(espCfg.HitboxSize, espCfg.HitboxSize, espCfg.HitboxSize)
                     root.Transparency = 0.5
@@ -1787,9 +1783,9 @@ local function updateSubFeatures()
                 end
                 espCache[p] = esp
             else
-                -- 表示不要（退出・死亡・設定OFF）になったら即座にクリーンアップ
+                -- التنظيف فورًا عندما لا تكون هناك حاجة (خروج، موت، إيقاف الإعداد)
                 removeESP(p)
-                -- ヒットボックスのサイズも元に戻す
+                -- استعادة حجم صندوق الإصابة أيضًا
                 if root and root.Parent then
                     root.Size = Vector3.new(2, 2, 1)
                     root.Transparency = 1
@@ -1801,7 +1797,7 @@ end
 
 RunService.Heartbeat:Connect(updateSubFeatures)
 
--- プレイヤー機能ループ
+-- حلقة وظيفة اللاعب
 UserInputService.JumpRequest:Connect(function()
     if infiniteJump and LocalPlayer.Character then
         local hum = LocalPlayer.Character:FindFirstChild("Humanoid")
@@ -1816,16 +1812,16 @@ RunService.Stepped:Connect(function(time, deltaTime)
 
     if hum then
         if useWalkSpeed and root and hum.MoveDirection.Magnitude > 0 then
-            -- CFrameによる移動 (Cosmic Hub参考)
+            -- الحركة بواسطة CFrame (بالإشارة إلى Cosmic Hub)
             local extraSpeed = math.max(0, walkSpeed - 16)
             root.CFrame = root.CFrame + (hum.MoveDirection * (extraSpeed * deltaTime))
         end
         if useJumpPower then 
             hum.UseJumpPower = true
             hum.JumpPower = jumpPower
-            -- UseJumpPowerが強制的にfalseにされる場合への対策 (JumpHeightを使用)
+            -- إجراء مضاد عندما يتم تعيين UseJumpPower قسرًا إلى false (استخدم JumpHeight)
             if not hum.UseJumpPower then
-                hum.JumpHeight = jumpPower * 0.2 -- 概算
+                hum.JumpHeight = jumpPower * 0.2 -- تقريبي
             end
         end
     end
@@ -1839,23 +1835,23 @@ RunService.Stepped:Connect(function(time, deltaTime)
     if antiGrab then
         local char = LocalPlayer.Character
         if char then
-            -- Cosmic style Anti-Grab Loop
+            -- حلقة Anti-Grab بنمط Cosmic
             local head = char:FindFirstChild("Head")
             local isHeldVal = LocalPlayer:FindFirstChild("IsHeld")
             local isHeld = (head and head:FindFirstChild("PartOwner")) or (isHeldVal and isHeldVal.Value)
             local struggleEvt = ReplicatedStorage:FindFirstChild("CharacterEvents") and ReplicatedStorage.CharacterEvents:FindFirstChild("Struggle")
 
             if isHeld then
-                -- 掴まれている間、固定して抵抗し続ける
+                -- أثناء الإمساك، قم بالتثبيت واستمر في المقاومة
                 for _, p in ipairs(char:GetChildren()) do
                     if p:IsA("BasePart") then p.Anchored = true end
                 end
                 
                 if struggleEvt then
-                    struggleEvt:FireServer(LocalPlayer) -- 引数追加
+                    struggleEvt:FireServer(LocalPlayer) -- إضافة وسيطة
                 end
             else
-                -- 掴まれていない、かつアンチ爆発(ラグドール)中でなければ固定解除
+                -- إذا لم يتم الإمساك به، ولم يكن في حالة ضد الانفجار (ragdoll)، قم بإلغاء التثبيت
                 local isRagdolled = antiExplosion and char:FindFirstChild("Humanoid") and char.Humanoid:FindFirstChild("Ragdolled") and char.Humanoid.Ragdolled.Value
                 if not isRagdolled then
                     for _, p in ipairs(char:GetChildren()) do
@@ -1886,7 +1882,7 @@ Workspace.DescendantAdded:Connect(function(v)
     end
 end)
 
--- Anti-Explosion (Ragdoll Anchor) & Anti-Fire (Extinguish) Loop 修正版
+-- حلقة ضد الانفجار (تثبيت Ragdoll) وضد النار (إطفاء) النسخة المصححة
 local extOriginalCFrame = nil
 local extPart = nil
 
@@ -1895,18 +1891,18 @@ task.spawn(function()
         task.wait(0.1)
         local char = LocalPlayer.Character
         if char then
-            -- Anti-Explosion: Ragdoll Anchor (修正: 解除処理を追加)
+            -- ضد الانفجار: تثبيت Ragdoll (إصلاح: إضافة عملية التحرير)
             if antiExplosion then
                 local hum = char:FindFirstChild("Humanoid")
                 if hum then
                     local rag = hum:FindFirstChild("Ragdolled")
                     if rag and rag.Value then
-                        -- ラグドール中は固定
+                        -- التثبيت أثناء ragdoll
                         for _, p in ipairs(char:GetChildren()) do
                             if p:IsA("BasePart") then p.Anchored = true end
                         end
                     else
-                        -- ラグドール解除後は固定解除 (動けるようにする)
+                        -- إلغاء التثبيت بعد تحرير ragdoll (للسماح بالحركة)
                         for _, p in ipairs(char:GetChildren()) do
                             if p:IsA("BasePart") then p.Anchored = false end
                         end
@@ -1914,12 +1910,12 @@ task.spawn(function()
                 end
             end
 
-            -- Anti-Fire: Extinguish Part (修正: 紫の物体を元の位置に戻す)
+            -- ضد النار: جزء الإطفاء (إصلاح: إعادة الكائن الأرجواني إلى موضعه الأصلي)
             if antiFire then
                 local hrp = char:FindFirstChild("HumanoidRootPart")
                 local hasFire = hrp and (hrp:FindFirstChild("FireLight") or hrp:FindFirstChild("FireParticleEmitter"))
                 
-                -- パーツを一度だけ取得・保存
+                -- الحصول على الجزء وحفظه مرة واحدة فقط
                 if not extPart then
                     local map = Workspace:FindFirstChild("Map")
                     local hole = map and map:FindFirstChild("Hole")
@@ -1930,10 +1926,10 @@ task.spawn(function()
                 
                 if extPart then
                     if hasFire then
-                        -- 炎があるなら消火パーツを自分に持ってくる
+                        -- إذا كان هناك حريق، أحضر جزء الإطفاء إلى النفس
                         extPart.CFrame = hrp.CFrame
                     elseif extOriginalCFrame then
-                        -- 炎が消えたら元の位置に戻す (紫の物体を隠す)
+                        -- عندما ينطفئ الحريق، أعده إلى موضعه الأصلي (إخفاء الكائن الأرجواني)
                         extPart.CFrame = extOriginalCFrame
                     end
                 end
@@ -1944,17 +1940,17 @@ end)
 
 
 --------------------------------------------------------------------------------
--- [設定]保存、見た目 
+-- [الإعدادات] الحفظ، المظهر
 --------------------------------------------------------------------------------
--- --- 設定読み込み用関数 ---
--- 設定ファイルのリストをリアルタイムに取得する関数
+-- --- وظيفة تحميل الإعدادات ---
+-- وظيفة للحصول على قائمة ملفات التكوين في الوقت الفعلي
 local function getConfigFileList()
     local files = {}
     if not isfolder("holon_config") then makefolder("holon_config") end
     
     for _, file in ipairs(listfiles("holon_config")) do
         if file:sub(-5) == ".json" then
-            -- パスを除去してファイル名だけにする
+            -- إزالة المسار للحصول على اسم الملف فقط
             local name = file:gsub("holon_config\\", ""):gsub("holon_config/", "")
             table.insert(files, name)
         end
@@ -1963,7 +1959,7 @@ local function getConfigFileList()
     return files
 end
 
--- 1. cfgの中にUIの項目がない場合のエラーを防止する
+-- 1. منع الأخطاء إذا لم تكن عناصر واجهة المستخدم موجودة في cfg
 if not cfg.UI then
     cfg.UI = {
         Transparency = 0.1,
@@ -1973,9 +1969,9 @@ if not cfg.UI then
     }
 end
 
--- UI外観をリアルタイムに反映させるエンジン
+-- محرك لتطبيق مظهر واجهة المستخدم في الوقت الفعلي
 local function applyCustomStyle()
-    -- 安全策: cfg.UIが存在しない場合の初期化（ロード直後対策）
+    -- فحص الأمان: تأكد من وجود cfg.UI (لما بعد التحميل)
     if not cfg.UI then
         cfg.UI = {
             Transparency = 0.1,
@@ -2009,39 +2005,39 @@ local function applyCustomStyle()
             main.BackgroundColor3 = bgColor
             main.BackgroundTransparency = trans
             
-            -- 子要素を再帰的に探索してスタイル適用
+            -- تطبيق الأنماط بشكل متكرر على جميع الأحفاد
             for _, desc in ipairs(main:GetDescendants()) do
-                -- 1. 枠線 (UIStroke)
+                -- 1. الحدود (UIStroke)
                 if desc:IsA("UIStroke") then
                     desc.Color = accent
                 end
-                -- 2. 区切り線 (Lineという名前のFrame)
+                -- 2. خطوط الفاصل (إطار يسمى "Line")
                 if desc:IsA("Frame") and desc.Name == "Line" then
                     desc.BackgroundColor3 = accent
                 end
-                -- 3. サイドバーとトップバー
+                -- 3. الشريط الجانبي والشريط العلوي
                 if desc:IsA("Frame") and (desc.Name == "SideBar" or desc.Name == "TopBar") then
                     desc.BackgroundColor3 = bgColor
                     desc.BackgroundTransparency = trans
-                    -- ヘッダーの角を丸くする
+                    -- تدوير زوايا الرأس
                     if desc.Name == "TopBar" then
                         local corner = desc:FindFirstChild("UICorner") or Instance.new("UICorner", desc)
                         corner.CornerRadius = UDim.new(0, 9)
                     end
                 end
-                -- 4. ボタンとタブ (TextButton)
-                -- 透明でないものだけ適用（見えないヒットボックスが表示されるのを防ぐ）
+                -- 4. الأزرار وعلامات التبويب (TextButton)
+                -- تطبيق فقط إذا لم يكن شفافًا تمامًا (لتجنب إظهار صناديق الإصابة غير المرئية)
                 if desc:IsA("TextButton") and desc.BackgroundTransparency < 1 then
                     desc.BackgroundColor3 = bgColor
                     desc.BackgroundTransparency = trans
                 end
             end
             
-            -- メインフレーム自体の角も確実に丸くする
+            -- تأكد من أن الإطار الرئيسي له زوايا مستديرة أيضًا
             local mainCorner = main:FindFirstChild("UICorner") or Instance.new("UICorner", main)
             mainCorner.CornerRadius = UDim.new(0, 9)
         
-        -- 背景画像のリアルタイム処理
+        -- المعالجة في الوقت الفعلي لصورة الخلفية
         local bgImage = main:FindFirstChild("CustomBG")
         if cfg.UI.BackgroundImage and cfg.UI.BackgroundImage ~= "" then
             if not bgImage then
@@ -2070,18 +2066,18 @@ local function applyCustomStyle()
 end
 
 --------------------------------------------------------------------------------
--- [UI 構築] orion lib
+-- [بناء واجهة المستخدم] orion lib
 --------------------------------------------------------------------------------
 local KeyFileName = "HolonHub_Key.txt"
 local CorrectKey = "holox"
 local OrionUrl = "https://raw.githubusercontent.com/hololove1021/HolonHUB/refs/heads/main/source.txt"
 
--- [[ 1. メイン画面の関数 ]]
+-- [[ 1. وظيفة الشاشة الرئيسية ]]
 local function StartHolonHUB()
-    -- スマホ対策：OrionLibを関数内で読み込み直す
+    -- إصلاح الهاتف المحمول: إعادة تحميل OrionLib داخل الوظيفة
     local OrionLib = loadstring(game:HttpGet(OrionUrl))()
     
-    -- 既存のUIを強制削除（二重表示防止）
+    -- حذف واجهة المستخدم الحالية بالقوة (لمنع العرض المزدوج)
     pcall(function()
         if game:GetService("CoreGui"):FindFirstChild("Orion") then 
             game:GetService("CoreGui").Orion:Destroy() 
@@ -2091,13 +2087,13 @@ local function StartHolonHUB()
     local Window = OrionLib:MakeWindow({
         Name = "Holon HUB v1.4.3 (AR)",
         HidePremium = false,
-        SaveConfig = false, -- 初期化時の干渉を防ぐため無効化
+        SaveConfig = false, -- تعطيل لمنع التداخل عند التهيئة
         ConfigFolder = "HolonHUB",
         IntroEnabled = true,
-        IntroText = "تم تحميل Holon HUB!"
+        IntroText = "!تم تحميل Holon HUB"
     })
 
-    -- [Grab Mod Logic Integration]
+    -- [تكامل منطق Grab Mod]
     local function getGrabNotify()
         local ps = LocalPlayer:WaitForChild("PlayerScripts", 10)
         if not ps then return nil end
@@ -2192,23 +2188,41 @@ local function StartHolonHUB()
         end)
     end
 
--- プレイヤーリスト取得関数
+-- وظيفة الحصول على قائمة اللاعبين
 local function getPList()
     local plist = {}
     for _, p in ipairs(Players:GetPlayers()) do
-        -- 「表示名 (@ユーザー名)」の形式でテーブルに入れる
+        -- وضع في الجدول بتنسيق "DisplayName (@Username)"
         table.insert(plist, p.DisplayName .. " (@" .. p.Name .. ")")
     end
     return plist
 end
 
--- UI要素を管理するテーブル
+-- جدول لإدارة عناصر واجهة المستخدم
 local UIElements = {}
+
+-- جدول الترجمة
+local modeNames = {
+    ["Wing"] = "جناح (Wing)", ["Heart"] = "قلب (Heart)", ["Star"] = "نجمة (Star)", ["Vortex"] = "دوامة (Vortex)",
+    ["Sphere"] = "كرة (Sphere)", ["Rotate"] = "دوران (Rotate)", ["Pet"] = "حيوان أليف (Pet)", ["Text"] = "نص (Text)",
+    ["MagicCircle"] = "دائرة سحرية (MagicCircle)", ["MagicCircle2"] = "دائرة سحرية 2 (MagicCircle2)", ["MagicCircle3"] = "دائرة سحرية 3 (MagicCircle3)",
+    ["FloatStone"] = "حجر عائم (FloatStone)", ["Merkaba"] = "ميركابا (Merkaba)", ["Cube"] = "مكعب (Cube)",
+    ["Pyramid"] = "هرم (Pyramid)", ["MirrorPlayer"] = "نسخة لاعب (MirrorPlayer)", ["Beam"] = "شعاع (Beam)",
+    ["BackGuard"] = "حارس خلفي (BackGuard)", ["Tornado"] = "إعصار (Tornado)", ["Gyro"] = "جيروسكوب (Gyro)", ["لا شيء"] = "لا شيء"
+}
+local modeKeys = {}
+for k, v in pairs(modeNames) do modeKeys[v] = k end
+local function getModeList()
+    local list = {}
+    local order = {"Wing","Heart","Star","Vortex","Sphere","Rotate","Pet","Text","MagicCircle","MagicCircle2","MagicCircle3","FloatStone","Merkaba","Cube","Pyramid","MirrorPlayer","Beam","BackGuard","Tornado","Gyro"}
+    for _, k in ipairs(order) do table.insert(list, modeNames[k]) end
+    return list
+end
 
 -- --- TAB: MAIN ---
 local MainTab = Window:MakeTab({
     Name = "الرئيسية",
-    Icon = "rbxassetid://7733960981" -- 適当なアイコンIDに差し替えてください
+    Icon = "rbxassetid://7733960981"
 })
 
 -- --- TAB: PLAYER ---
@@ -2219,7 +2233,7 @@ local PlayerTab = Window:MakeTab({
 
 local MoveSec = PlayerTab:AddSection({ Name = "إعدادات الحركة" })
 
--- 現在のステータスを初期値にする
+-- تعيين الحالة الحالية كافتراضي
 local currentWS = (LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid")) and LocalPlayer.Character.Humanoid.WalkSpeed or 16
 walkSpeed = currentWS
 
@@ -2251,11 +2265,11 @@ UIElements.JumpPowerToggle = MoveSec:AddToggle({
 })
 
 UIElements.NoclipToggle = MoveSec:AddToggle({
-    Name = "Noclip", Default = false,
+    Name = "Noclip (اختراق الجدران)", Default = false,
     Callback = function(v) 
         noclip = v 
         if not v and LocalPlayer.Character then
-            -- 修正: 全パーツをCanCollide=trueにすると荒ぶるため、主要パーツのみ戻す
+            -- إصلاح: تعيين جميع الأجزاء إلى CanCollide=true يسبب مشاكل، لذا قم بإعادة الأجزاء الرئيسية فقط
             local char = LocalPlayer.Character
             local partsToCollide = {"HumanoidRootPart", "Head", "Torso", "UpperTorso", "LowerTorso"}
             for _, name in ipairs(partsToCollide) do
@@ -2275,7 +2289,7 @@ local vflyEnabled = false
 local vflySpeed = 1
 
 UIElements.VFlyToggle = MoveSec:AddToggle({
-    Name = "VFly",
+    Name = "VFly (طيران)",
     Default = false,
     Callback = function(v)
         vflyEnabled = v
@@ -2354,7 +2368,7 @@ UIElements.VFlySpeedSlider = MoveSec:AddSlider({
     Callback = function(v) vflySpeed = v end
 })
 
-local ProtectSec = PlayerTab:AddSection({ Name = "الحماية" })
+local ProtectSec = PlayerTab:AddSection({ Name = "حماية" })
 
 UIElements.AntiExplosionToggle = ProtectSec:AddToggle({ Name = "ضد الانفجار", Default = false, Callback = function(v) antiExplosion = v end })
 UIElements.AntiFireToggle = ProtectSec:AddToggle({ Name = "ضد النار", Default = false, Callback = function(v) antiFire = v end })
@@ -2362,11 +2376,11 @@ UIElements.AntiGrabToggle = ProtectSec:AddToggle({ Name = "ضد الإمساك",
 
 local gucciConn = nil
 UIElements.AntiGucciToggle = ProtectSec:AddToggle({ 
-    Name = "ضد غوتشي", 
+    Name = "Anti-Gucci", 
     Default = false, 
     Callback = function(v) 
         if v then
-            -- Cosmic Logic: Spawn Blobman far away and sit
+            -- منطق Cosmic: استدعاء Blobman بعيدًا والجلوس
             task.spawn(function()
                 local mt = ReplicatedStorage:FindFirstChild("MenuToys")
                 local st = mt and mt:FindFirstChild("SpawnToyRemoteFunction")
@@ -2384,7 +2398,7 @@ UIElements.AntiGucciToggle = ProtectSec:AddToggle({
                     local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid")
                     if seat and hum then seat:Sit(hum) end
                     
-                    -- Ragdoll Loop (Cosmic)
+                    -- حلقة Ragdoll (Cosmic)
                     if gucciConn then gucciConn:Disconnect() end
                     gucciConn = RunService.Heartbeat:Connect(function()
                         local ce = ReplicatedStorage:FindFirstChild("CharacterEvents")
@@ -2400,7 +2414,7 @@ UIElements.AntiGucciToggle = ProtectSec:AddToggle({
     end 
 })
 
-local PlayerViewSec = PlayerTab:AddSection({ Name = "المنظور/الكاميرا" })
+local PlayerViewSec = PlayerTab:AddSection({ Name = "عرض/كاميرا" })
 
 UIElements.ThirdPersonToggle = PlayerViewSec:AddToggle({
     Name = "منظور الشخص الثالث",
@@ -2420,7 +2434,7 @@ UIElements.ThirdPersonToggle = PlayerViewSec:AddToggle({
 
 local currentFOV = Camera.FieldOfView
 UIElements.FOVSlider = PlayerViewSec:AddSlider({
-    Name = "تعديل FOV",
+    Name = "مجال الرؤية (FOV)",
     Min = 30,
     Max = 120,
     Default = currentFOV,
@@ -2433,11 +2447,11 @@ UIElements.FOVSlider = PlayerViewSec:AddSlider({
 -- --- MAIN SECTION ---
 
 local MainSec = MainTab:AddSection({
-    Name = "التحكم بالتأثيرات"
+    Name = "تحكم التأثير"
 })
 
--- メイン対象ドロップダウン（変数として定義）
-local targetMainName = "" -- 名前を保存する変数を新しく用意
+-- القائمة المنسدلة للهدف الرئيسي (معرفة كمتغير)
+local targetMainName = "" -- متغير جديد لتخزين الاسم
 local tpDropdown = nil
 
 local pDropMain
@@ -2446,7 +2460,7 @@ UIElements.MainTargetDropdown = MainSec:AddDropdown({
     Default = LocalPlayer.DisplayName .. " (@" .. LocalPlayer.Name .. ")",
     Options = getPList(),
     Callback = function(v)
-        -- @以降を正確に切り出す (アンダーバー等にも対応)
+        -- استخراج اسم المستخدم بدقة بعد @ (يعالج الشرطات السفلية، إلخ)
         local name = v:match("@([^)]+)")
         targetMainName = name or LocalPlayer.Name
         targetMain = Players:FindFirstChild(targetMainName) or LocalPlayer
@@ -2466,7 +2480,7 @@ Players.PlayerRemoving:Connect(function()
     if tpDropdown then tpDropdown:Refresh(getPList(), true) end
 end)
 
--- エフェクト有効化トグル
+-- تبديل تمكين التأثير
 UIElements.EffectToggle = MainSec:AddToggle({
     Name = "تفعيل التأثير",
     Default = false,
@@ -2475,10 +2489,10 @@ UIElements.EffectToggle = MainSec:AddToggle({
     end    
 })
 
--- モード選択ドロップダウン
+-- القائمة المنسدلة لاختيار الوضع
 UIElements.ModeDropdown = MainSec:AddDropdown({
     Name = "اختيار الوضع",
-    Default = "Wing",
+    Default = modeNames["Wing"],
     Options = getModeList(),
     Callback = function(v)
         currentMode = modeKeys[v]
@@ -2486,11 +2500,11 @@ UIElements.ModeDropdown = MainSec:AddDropdown({
     end    
 })
 
--- 制御対象ドロップダウン
+-- القائمة المنسدلة للهدف المتحكم به
 local itemDropdown
 
 UIElements.ItemDropdown = MainSec:AddDropdown({
-    Name = "اختيار العنصر المتحكم به",
+    Name = "اختيار العنصر المستهدف",
     Default = "لا شيء",
     Options = {"لا شيء"},
     Callback = function(v)
@@ -2499,7 +2513,7 @@ UIElements.ItemDropdown = MainSec:AddDropdown({
 })
 itemDropdown = UIElements.ItemDropdown
 
--- おもちゃリストをスキャンしてドロップダウンを更新する共通関数
+-- وظيفة مشتركة لمسح قائمة الألعاب وتحديث القائمة المنسدلة
 local function refreshToyList()
     detectedItems = {}
     local myName = LocalPlayer.Name
@@ -2507,7 +2521,7 @@ local function refreshToyList()
     local plotsFolder = Workspace:FindFirstChild("Plots")
     local plotItemsFolder = Workspace:FindFirstChild("PlotItems")
 
-    -- 0. Get items from SpawnedInToys
+    -- 0. الحصول على العناصر من SpawnedInToys
     if useOtherToys then
         for _, folder in ipairs(Workspace:GetChildren()) do
             if folder.Name:match("SpawnedInToys$") then
@@ -2525,7 +2539,7 @@ local function refreshToyList()
         end
     end
 
-    -- 1. Get items from my plot
+    -- 1. الحصول على العناصر من أرضي
     if plotsFolder and plotItemsFolder then
         for _, plot in ipairs(plotsFolder:GetChildren()) do
             local sign = plot:FindFirstChild("PlotSign")
@@ -2542,7 +2556,7 @@ local function refreshToyList()
                         for _, item in ipairs(targetFolder:GetChildren()) do
                             table.insert(allMyItems, item)
                         end
-                        -- ★このフォルダの増減を監視開始 (初回のみ)
+                        -- ★بدء مراقبة هذا المجلد للتغييرات (المرة الأولى فقط)
                         if isMine and not _G.ToyWatcher then
                             _G.ToyWatcher = true
                             targetFolder.ChildAdded:Connect(function() task.wait(0.1) refreshToyList() end)
@@ -2555,7 +2569,7 @@ local function refreshToyList()
         end
     end
 
-    -- 2. Get items directly from Workspace that I own
+    -- 2. الحصول على العناصر مباشرة من Workspace التي أملكها
     for _, item in ipairs(Workspace:GetChildren()) do
         local ownerValue = item:FindFirstChild("Owner") or item:FindFirstChild("PartOwner")
         if item:IsA("Model") and ownerValue and ownerValue:IsA("StringValue") then
@@ -2565,7 +2579,7 @@ local function refreshToyList()
         end
     end
 
-    -- 3. Process all found items to create the name list
+    -- 3. معالجة جميع العناصر التي تم العثور عليها لإنشاء قائمة الأسماء
     for _, item in ipairs(allMyItems) do
         if item:IsA("Model") and item.PrimaryPart then
             local itemName = tostring(item.Name)
@@ -2575,8 +2589,8 @@ local function refreshToyList()
         end
     end
     
-    -- 4. Update dropdown
-    local newValues = {"جميع الألعاب"}
+    -- 4. تحديث القائمة المنسدلة
+    local newValues = {"كل الألعاب"}
     for _, name in ipairs(detectedItems) do table.insert(newValues, name) end
     itemDropdown:Refresh(newValues, true)
 end
@@ -2585,12 +2599,12 @@ MainSec:AddButton({
     Name = "تحديث قائمة الألعاب",
     Callback = function()
         refreshToyList()
-        OrionLib:MakeNotification({ Name = "تحديث", Content = "تم إعادة فحص قائمة الألعاب", Time = 3 })
+        OrionLib:MakeNotification({ Name = "تحديث", Content = "تم إعادة مسح قائمة الألعاب", Time = 3 })
     end
 })
 
 UIElements.OtherToysToggle = MainSec:AddToggle({
-    Name = "Use Other Players' Toys",
+    Name = "استخدام ألعاب لاعبين آخرين",
     Default = false,
     Callback = function(v)
         useOtherToys = v
@@ -2598,10 +2612,10 @@ UIElements.OtherToysToggle = MainSec:AddToggle({
     end
 })
 
--- 起動時に一度実行
+-- تشغيل مرة واحدة عند البدء
 task.spawn(refreshToyList)
 
--- 合体モードトグル
+-- تبديل الوضع المدمج
 UIElements.CombinedToggle = MainSec:AddToggle({
     Name = "استخدام الوضع المدمج",
     Default = false,
@@ -2610,71 +2624,94 @@ UIElements.CombinedToggle = MainSec:AddToggle({
     end    
 })
 
--- --- アニメーションセクション ---
+-- --- قسم الرسوم المتحركة ---
 local AnimSec = MainTab:AddSection({
-    Name = "الرسوم المتحركة"
+    Name = "رسوم متحركة"
 })
 
-AnimSec:AddButton({
+local seqRunning = false
+AnimSec:AddToggle({
     Name = "تسلسل التحول",
-    Callback = function()
-        task.spawn(function()
-            local s = 1 / cfg.AnimSpeed
-            currentMode = "MagicCircle"
-            cfg.MagicCircle.Height = -10
-            startEffect()
-            for i = -10, 5, 0.5 do 
-                cfg.MagicCircle.Height = i
-                task.wait(0.2 * s) 
-            end
-            currentMode = "Merkaba"
-            task.wait(6 * s)
-            currentMode = "FloatStone"
-            cfg.FloatStone.Chaos = true
-            cfg.FloatStone.Size = 2
-            for i = 2, 15, 0.5 do
-                cfg.FloatStone.Size = i
-                task.wait(0.05 * s)
-            end
-        end)
+    Default = false,
+    Callback = function(v)
+        seqRunning = v
+        if v then
+            task.spawn(function()
+                local s = 1 / cfg.AnimSpeed
+                currentMode = "MagicCircle"
+                cfg.MagicCircle.Height = -10
+                startEffect()
+                for i = -10, 5, 0.5 do 
+                    if not seqRunning then break end
+                    cfg.MagicCircle.Height = i
+                    task.wait(0.2 * s) 
+                end
+                if not seqRunning then return end
+                currentMode = "Merkaba"
+                task.wait(6 * s)
+                if not seqRunning then return end
+                currentMode = "FloatStone"
+                cfg.FloatStone.Chaos = true
+                cfg.FloatStone.Size = 2
+                for i = 2, 15, 0.5 do
+                    if not seqRunning then break end
+                    cfg.FloatStone.Size = i
+                    task.wait(0.05 * s)
+                end
+            end)
+        end
     end
 })
 
-AnimSec:AddButton({
-    Name = "Surge",
-    Callback = function()
-        task.spawn(function()
-            local s = 1 / cfg.AnimSpeed
-            currentMode = "MagicCircle"
-            cfg.MagicCircle.Height = -3
-            cfg.MagicCircle.Size = 5
-            cfg.MagicCircle.Speed = 10
-            startEffect()
-            for i = 5, 30, 2 do
-                cfg.MagicCircle.Size = i
-                task.wait(0.09 * s)
-            end
-            currentMode = "Sphere"
-            cfg.Sphere.Size = 30
-            task.wait(1 * s)
-            for i = 30, 3, 2 do
-                cfg.Sphere.Size = i
-                cfg.Sphere.Speed = (cfg.Sphere.Speed or 1) + 0.5
-                task.wait(0.05 * s)
-            end
-            task.wait(0.9 * s)
-            cfg.Sphere.Speed = 20
-            for i = 3, 25, 3 do
-                cfg.Sphere.Size = i
-                task.wait(0.04 * s)
-            end
-            task.wait(1.5 * s)
-            currentMode = "BackGuard"
-            cfg.BackGuard.Back = 15
-            cfg.BackGuard.Height = 5
-            cfg.BackGuard.Size = 20
-            cfg.BackGuard.Speed = 1
-        end)
+local surgeRunning = false
+AnimSec:AddToggle({
+    Name = "موجة (Surge)",
+    Default = false,
+    Callback = function(v)
+        surgeRunning = v
+        if v then
+            task.spawn(function()
+                local s = 1 / cfg.AnimSpeed
+                currentMode = "MagicCircle"
+                cfg.MagicCircle.Height = -3
+                cfg.MagicCircle.Size = 5
+                cfg.MagicCircle.Speed = 10
+                startEffect()
+                for i = 5, 30, 2 do
+                    if not surgeRunning then break end
+                    cfg.MagicCircle.Size = i
+                    task.wait(0.09 * s)
+                end
+                if not surgeRunning then return end
+                currentMode = "Sphere"
+                cfg.Sphere.Size = 30
+                task.wait(1 * s)
+                if not surgeRunning then return end
+                for i = 30, 3, 2 do
+                    if not surgeRunning then break end
+                    cfg.Sphere.Size = i
+                    cfg.Sphere.Speed = (cfg.Sphere.Speed or 1) + 0.5
+                    task.wait(0.05 * s)
+                end
+                if not surgeRunning then return end
+                task.wait(0.9 * s)
+                if not surgeRunning then return end
+                cfg.Sphere.Speed = 20
+                for i = 3, 25, 3 do
+                    if not surgeRunning then break end
+                    cfg.Sphere.Size = i
+                    task.wait(0.04 * s)
+                end
+                if not surgeRunning then return end
+                task.wait(1.5 * s)
+                if not surgeRunning then return end
+                currentMode = "BackGuard"
+                cfg.BackGuard.Back = 15
+                cfg.BackGuard.Height = 5
+                cfg.BackGuard.Size = 20
+                cfg.BackGuard.Speed = 1
+            end)
+        end
     end
 })
 
@@ -2689,14 +2726,15 @@ local CombineSec = ModeSetTab:AddSection({
 })
 
 local function getModeListWithNone()
-    local list = {"None"}
-    for _, v in ipairs(getModeList()) do table.insert(list, v) end
+    local list = {"لا شيء"}
+    local order = {"Wing","Heart","Star","Vortex","Sphere","Rotate","Pet","Text","MagicCircle","MagicCircle2","MagicCircle3","FloatStone","Merkaba","Cube","Pyramid","MirrorPlayer","Beam","BackGuard","Tornado","Gyro"}
+    for _, k in ipairs(order) do table.insert(list, modeNames[k]) end
     return list
 end
 
 UIElements.CombineMode1 = CombineSec:AddDropdown({
     Name = "دمج: الوضع 1",
-    Default = "Wing",
+    Default = modeNames["Wing"],
     Options = getModeListWithNone(),
     Callback = function(v) cfg.Combined.Mode1 = modeKeys[v] end
 })
@@ -2713,7 +2751,7 @@ UIElements.CombineMode1Count = CombineSec:AddSlider({
 
 UIElements.CombineMode2 = CombineSec:AddDropdown({
     Name = "دمج: الوضع 2",
-    Default = "Rotate",
+    Default = modeNames["Rotate"],
     Options = getModeListWithNone(),
     Callback = function(v) cfg.Combined.Mode2 = modeKeys[v] end
 })
@@ -2730,7 +2768,7 @@ UIElements.CombineMode2Count = CombineSec:AddSlider({
 
 UIElements.CombineMode3 = CombineSec:AddDropdown({
     Name = "دمج: الوضع 3",
-    Default = "None",
+    Default = "لا شيء",
     Options = getModeListWithNone(),
     Callback = function(v) cfg.Combined.Mode3 = modeKeys[v] end
 })
@@ -2745,7 +2783,7 @@ UIElements.CombineMode3Count = CombineSec:AddSlider({
     Callback = function(v) cfg.Combined.Mode3Count = v end    
 })
 
--- --- 共通設定エディタ (ドロップダウンで切り替え) ---
+-- --- محرر الإعدادات المشتركة (التبديل بالقائمة المنسدلة) ---
 local EditSec = ModeSetTab:AddSection({
     Name = "محرر الإعدادات المشتركة"
 })
@@ -2754,12 +2792,12 @@ local currentEditMode = "Wing"
 local sl_Speed, sl_Size, sl_Height, sl_Back
 
 EditSec:AddDropdown({
-    Name = "وضع التحرير",
-    Default = "Wing",
+    Name = "تعديل الوضع المستهدف",
+    Default = modeNames["Wing"],
     Options = getModeList(),
     Callback = function(v)
         currentEditMode = modeKeys[v]
-        -- スライダーの値を更新
+        -- تحديث قيم أشرطة التمرير
         if sl_Speed then sl_Speed:Set(cfg[currentEditMode].Speed or 10) end
         if sl_Size then sl_Size:Set(cfg[currentEditMode].Size or 10) end
         if sl_Height then sl_Height:Set(cfg[currentEditMode].Height or 0) end
@@ -2768,81 +2806,82 @@ EditSec:AddDropdown({
 })
 
 sl_Speed = EditSec:AddSlider({
-    Name = "السرعة", Min = 0, Max = 100, Default = cfg.Wing.Speed or 10,
+    Name = "سرعة", Min = 0, Max = 100, Default = cfg.Wing.Speed or 10,
     Callback = function(v) cfg[currentEditMode].Speed = v end
 })
 sl_Size = EditSec:AddSlider({
-    Name = "الحجم/العرض", Min = 1, Max = 150, Default = cfg.Wing.Size or 10,
+    Name = "حجم/عرض", Min = 1, Max = 150, Default = cfg.Wing.Size or 10,
     Callback = function(v) cfg[currentEditMode].Size = v end
 })
 sl_Height = EditSec:AddSlider({
-    Name = "الارتفاع", Min = -50, Max = 50, Default = cfg.Wing.Height or 0,
+    Name = "ارتفاع", Min = -50, Max = 50, Default = cfg.Wing.Height or 0,
     Callback = function(v) cfg[currentEditMode].Height = v end
 })
 sl_Back = EditSec:AddSlider({
-    Name = "العمق", Min = -50, Max = 50, Default = cfg.Wing.Back or 0,
+    Name = "عمق", Min = -50, Max = 50, Default = cfg.Wing.Back or 0,
     Callback = function(v) cfg[currentEditMode].Back = v end
 })
 
--- --- 詳細設定タブ (固有設定のみ) ---
+-- --- علامة تبويب الإعدادات المتقدمة (الإعدادات الفريدة فقط) ---
 local AdvTab = Window:MakeTab({
     Name = "إعدادات متقدمة",
     Icon = "rbxassetid://7733771472"
 })
 
-for _, m in ipairs(getModeList()) do
-    local modeKey = modeKeys[m]
-    -- 固有設定があるモードのみセクションを作成
-    if modeKey == "Wing" or modeKey == "Pet" or modeKey == "Text" or modeKey == "MagicCircle2" or modeKey == "MagicCircle3" or modeKey == "MirrorPlayer" or modeKey == "Beam" or modeKey == "FloatStone" or modeKey == "Tornado" or modeKey == "Rotate" or modeKey == "Gyro" then
-        local s = AdvTab:AddSection({ Name = m })
+local modes = {"Wing","Heart","Star","Vortex","Sphere","Rotate","Pet","Text","MagicCircle","MagicCircle2","MagicCircle3","FloatStone","Merkaba","Cube","Pyramid","MirrorPlayer","Beam","BackGuard","Tornado","Gyro"}
+
+for _, m in ipairs(modes) do
+    -- إنشاء أقسام فقط للأوضاع ذات الإعدادات الفريدة
+    if m == "Wing" or m == "Pet" or m == "Text" or m == "MagicCircle2" or m == "MagicCircle3" or m == "Beam" or m == "FloatStone" or m == "Tornado" or m == "Rotate" or m == "Gyro" then
+        local s = AdvTab:AddSection({ Name = modeNames[m] or m })
         
-        if modeKey == "Wing" then
+        if m == "Wing" then
             s:AddToggle({ Name = "تثبيت الجذر (Root Fixed)", Default = cfg.Wing.RootFixed, Callback = function(v) cfg.Wing.RootFixed = v end })
             s:AddSlider({ Name = "المسافة من الجسم (Gap)", Min = 0, Max = 50, Default = cfg.Wing.Gap or 10, Callback = function(v) cfg.Wing.Gap = v end })
-            s:AddSlider({ Name = "عدد المفاصل", Min = 0, Max = 10, Default = 3, Callback = function(v) cfg.Wing.Joints = v end })
+            s:AddSlider({ Name = "مفاصل", Min = 0, Max = 10, Default = 3, Callback = function(v) cfg.Wing.Joints = v end })
             s:AddSlider({ Name = "زاوية V (أمام/خلف)", Min = -180, Max = 180, Default = 0, Callback = function(v) cfg.Wing.V_Angle = v end })
-            s:AddSlider({ Name = "الميل الرأسي", Min = -90, Max = 90, Default = 0, Callback = function(v) cfg.Wing.Tilt = v end })
+            s:AddSlider({ Name = "ميل عمودي", Min = -90, Max = 90, Default = 0, Callback = function(v) cfg.Wing.Tilt = v end })
             s:AddSlider({ Name = "قوة الرفرفة", Min = 0, Max = 50, Default = 15, Callback = function(v) cfg.Wing.Strength = v end })
             s:AddToggle({ Name = "انحناء", Default = cfg.Wing.Curve or false, Callback = function(v) cfg.Wing.Curve = v end })
             s:AddSlider({ Name = "مقدار الانحناء", Min = -50, Max = 50, Default = cfg.Wing.CurveAmount or 10, Callback = function(v) cfg.Wing.CurveAmount = v end })
         
-        elseif modeKey == "Pet" then
-            s:AddSlider({ Name = "العدد", Min = 1, Max = 10, Default = 2, Callback = function(v) cfg.Pet.Count = v end })
-            s:AddSlider({ Name = "المفاصل (تموج)", Min = 0, Max = 10, Default = 3, Callback = function(v) cfg.Pet.Joints = v end })
-            s:AddSlider({ Name = "الانتشار الأفقي (Gap)", Min = 1, Max = 20, Default = 13, Callback = function(v) cfg.Pet.Gap = v end })
+        elseif m == "Pet" then
+            s:AddSlider({ Name = "عدد", Min = 1, Max = 10, Default = 2, Callback = function(v) cfg.Pet.Count = v end })
+            s:AddSlider({ Name = "مفاصل (تذبذب)", Min = 0, Max = 10, Default = 3, Callback = function(v) cfg.Pet.Joints = v end })
+            s:AddSlider({ Name = "انتشار أفقي (Gap)", Min = 1, Max = 20, Default = 13, Callback = function(v) cfg.Pet.Gap = v end })
         
-        elseif modeKey == "Text" then
+        elseif m == "Text" then
             s:AddTextbox({ Name = "عرض النص", Default = "HELLO", TextDisappear = false, Callback = function(v) cfg.Text.Content = v end })
         
-        elseif modeKey == "MagicCircle2" then
-            s:AddSlider({ Name = "عدد الطبقات", Min = 1, Max = 5, Default = 3, Callback = function(v) cfg.MagicCircle2.Layers = v end })
+        elseif m == "MagicCircle2" then
+            s:AddSlider({ Name = "طبقات", Min = 1, Max = 5, Default = 3, Callback = function(v) cfg.MagicCircle2.Layers = v end })
         
-        elseif modeKey == "MagicCircle3" then
-            s:AddSlider({ Name = "التعقيد", Min = 1, Max = 10, Default = 5, Callback = function(v) cfg.MagicCircle3.Complexity = v end })
+        elseif m == "MagicCircle3" then
+            s:AddSlider({ Name = "تعقيد", Min = 1, Max = 10, Default = 5, Callback = function(v) cfg.MagicCircle3.Complexity = v end })
         
-        elseif modeKey == "MirrorPlayer" then
-            -- Orionは小数が苦手なので10倍で表示
-            s:AddSlider({ Name = "مقياس التكبير (x10)", Min = 1, Max = 100, Default = 10, Callback = function(v) cfg.MirrorPlayer.Scale = v/10 end })
+        elseif m == "MirrorPlayer" then
+            -- Orion يواجه مشكلة مع الكسور العشرية، لذا اعرضها كـ 10x
+            s:AddSlider({ Name = "مقياس (x10)", Min = 1, Max = 100, Default = 10, Callback = function(v) cfg.MirrorPlayer.Scale = v/10 end })
             s:AddSlider({ Name = "حجم الصندوق (x10)", Min = 5, Max = 100, Default = 20, Callback = function(v) cfg.MirrorPlayer.Size = v/10 end })
             s:AddSlider({ Name = "كثافة تباعد الحواف (x10)", Min = 5, Max = 30, Default = 10, Callback = function(v) cfg.MirrorPlayer.EdgeSpacing = v/10 end })
         
-        elseif modeKey == "Beam" then
+        elseif m == "Beam" then
             s:AddSlider({ Name = "عدد الأشعة", Min = 1, Max = 20, Default = 8, Callback = function(v) cfg.Beam.Count = v end })
         
-        elseif modeKey == "FloatStone" then
-            s:AddToggle({ Name = "حركة الفوضى", Default = false, Callback = function(v) cfg.FloatStone.Chaos = v end })
+        elseif m == "FloatStone" then
+            s:AddToggle({ Name = "حركة فوضوية", Default = false, Callback = function(v) cfg.FloatStone.Chaos = v end })
 
-        elseif modeKey == "Tornado" then
-            s:AddSlider({ Name = "Bottom Radius", Min = 0, Max = 50, Default = cfg.Tornado.Radius, Callback = function(v) cfg.Tornado.Radius = v end })
-            s:AddSlider({ Name = "Top Radius", Min = 0, Max = 50, Default = cfg.Tornado.TopRadius, Callback = function(v) cfg.Tornado.TopRadius = v end })
+        elseif m == "Tornado" then
+            s:AddSlider({ Name = "نصف القطر السفلي", Min = 0, Max = 50, Default = cfg.Tornado.Radius, Callback = function(v) cfg.Tornado.Radius = v end })
+            s:AddSlider({ Name = "نصف القطر العلوي", Min = 0, Max = 50, Default = cfg.Tornado.TopRadius, Callback = function(v) cfg.Tornado.TopRadius = v end })
             s:AddToggle({ Name = "شكل هرمي", Default = false, Callback = function(v) cfg.Tornado.Pyramid = v end })
 
-        elseif modeKey == "Rotate" then
+        elseif m == "Rotate" then
             s:AddToggle({ Name = "موجة", Default = cfg.Rotate.Wave or false, Callback = function(v) cfg.Rotate.Wave = v end })
             s:AddSlider({ Name = "سرعة الموجة", Min = 1, Max = 20, Default = cfg.Rotate.WaveSpeed or 2, Callback = function(v) cfg.Rotate.WaveSpeed = v end })
             s:AddSlider({ Name = "سعة الموجة", Min = 1, Max = 20, Default = cfg.Rotate.WaveAmp or 2, Callback = function(v) cfg.Rotate.WaveAmp = v end })
 
-        elseif modeKey == "Gyro" then
+        elseif m == "Gyro" then
             s:AddSlider({ Name = "الحجم الداخلي", Min = 1, Max = 50, Default = cfg.Gyro.InnerSize, Callback = function(v) cfg.Gyro.InnerSize = v end })
             s:AddDropdown({ Name = "نوع المركز", Default = cfg.Gyro.CenterType, Options = {"Sphere", "Cube", "Vertical", "Random"}, Callback = function(v) cfg.Gyro.CenterType = v end })
         end
@@ -2856,19 +2895,19 @@ local ConfigTab = Window:MakeTab({
 })
 
 local GlobalSec = ConfigTab:AddSection({
-    Name = "النظام"
+    Name = "نظام"
 })
 
--- 1. 追従切り替え
+-- 1. تبديل المتابعة
 UIElements.FollowToggle = GlobalSec:AddToggle({
-    Name = "تتبع اللاعب",
+    Name = "متابعة اللاعب",
     Default = true,
     Callback = function(v)
         followPlayer = v
     end
 })
 
--- 0,0,0リセットボタン
+-- زر إعادة تعيين 0,0,0
 GlobalSec:AddButton({
     Name = "إعادة تعيين التأثير إلى العالم 0,0,0",
     Callback = function()
@@ -2894,7 +2933,7 @@ GlobalSec:AddButton({
 })
 
 UIElements.MaxToysSlider = GlobalSec:AddSlider({
-    Name = "الحد الأقصى للألعاب المستخدمة",
+    Name = "أقصى عدد للألعاب",
     Min = 1, Max = 200, Default = cfg.Global.MaxToys or 100,
     Callback = function(v) cfg.Global.MaxToys = v end
 })
@@ -2905,42 +2944,42 @@ UIElements.AutoWidthToggle = GlobalSec:AddToggle({
     Callback = function(v) autoWidth = v end
 })
 
--- アニメ速度倍率 (小数のため10倍で処理)
+-- مضاعف سرعة الرسوم المتحركة (تتم معالجته كـ 10x للكسور العشرية)
 UIElements.AnimSpeedSlider = GlobalSec:AddSlider({
-    Name = "مضاعف سرعة الرسوم المتحركة",
+    Name = "سرعة الرسوم المتحركة",
     Min = 1, Max = 50, Default = 10,
     Callback = function(v) cfg.AnimSpeed = v/10 end
 })
 
-local EffectRotSec = ConfigTab:AddSection({ Name = "دوران التأثير الكلي" })
+local EffectRotSec = ConfigTab:AddSection({ Name = "دوران التأثير" })
 UIElements.EffectRotationX = EffectRotSec:AddSlider({
-    Name = "المحور X (ميل)", Min = -180, Max = 180, Default = 0,
+    Name = "محور X (Pitch)", Min = -180, Max = 180, Default = 0,
     Callback = function(v) cfg.Global.EffectRotation = Vector3.new(v, cfg.Global.EffectRotation.Y, cfg.Global.EffectRotation.Z) end
 })
 UIElements.EffectRotationY = EffectRotSec:AddSlider({
-    Name = "المحور Y (انحراف)", Min = -180, Max = 180, Default = 0,
+    Name = "محور Y (Yaw)", Min = -180, Max = 180, Default = 0,
     Callback = function(v) cfg.Global.EffectRotation = Vector3.new(cfg.Global.EffectRotation.X, v, cfg.Global.EffectRotation.Z) end
 })
 UIElements.EffectRotationZ = EffectRotSec:AddSlider({
-    Name = "المحور Z (دوران)", Min = -180, Max = 180, Default = 0,
+    Name = "محور Z (Roll)", Min = -180, Max = 180, Default = 0,
     Callback = function(v) cfg.Global.EffectRotation = Vector3.new(cfg.Global.EffectRotation.X, cfg.Global.EffectRotation.Y, v) end
 })
 
-local IndivRotSec = ConfigTab:AddSection({ Name = "دوران اللعبة الفردي" })
+local IndivRotSec = ConfigTab:AddSection({ Name = "دوران اللعبة الفردية" })
 UIElements.IndividualRotationX = IndivRotSec:AddSlider({
-    Name = "المحور X (ميل)", Min = -180, Max = 180, Default = 0,
+    Name = "محور X (Pitch)", Min = -180, Max = 180, Default = 0,
     Callback = function(v) cfg.Global.IndividualRotation = Vector3.new(v, cfg.Global.IndividualRotation.Y, cfg.Global.IndividualRotation.Z) end
 })
 UIElements.IndividualRotationY = IndivRotSec:AddSlider({
-    Name = "المحور Y (انحراف)", Min = -180, Max = 180, Default = -90,
+    Name = "محور Y (Yaw)", Min = -180, Max = 180, Default = -90,
     Callback = function(v) cfg.Global.IndividualRotation = Vector3.new(cfg.Global.IndividualRotation.X, v, cfg.Global.IndividualRotation.Z) end
 })
 UIElements.IndividualRotationZ = IndivRotSec:AddSlider({
-    Name = "المحور Z (دوران)", Min = -180, Max = 180, Default = 0,
+    Name = "محور Z (Roll)", Min = -180, Max = 180, Default = 0,
     Callback = function(v) cfg.Global.IndividualRotation = Vector3.new(cfg.Global.IndividualRotation.X, cfg.Global.IndividualRotation.Y, v) end
 })
 
--- --- 家制限時間リセット設定 ---
+-- --- إعدادات إعادة تعيين حد وقت المنزل ---
 local ResetSec = ConfigTab:AddSection({
     Name = "إعادة تعيين وقت المنزل"
 })
@@ -2948,7 +2987,7 @@ local ResetSec = ConfigTab:AddSection({
 HomeStatus = ResetSec:AddParagraph("حالة المنزل", "انتظار...")
 
 UIElements.PlotReturnToggle = ResetSec:AddToggle({
-    Name = "الكشف التلقائي عن المنزل وإعادة التعيين",
+    Name = "كشف المنزل وإعادة التعيين تلقائيًا",
     Default = cfg.PlotReturn.Enabled,
     Callback = function(v)
         cfg.PlotReturn.Enabled = v
@@ -2956,7 +2995,7 @@ UIElements.PlotReturnToggle = ResetSec:AddToggle({
     end
 })
 
--- --- 座標管理システム ---
+-- --- نظام إدارة الإحداثيات ---
 local CoordSec = ConfigTab:AddSection({
     Name = "إدارة الإحداثيات/الموقع"
 })
@@ -2965,7 +3004,7 @@ local CoordHUD = nil
 local HUDLabel = nil
 
 CoordSec:AddToggle({
-    Name = "عرض الإحداثيات دائماً في نافذة منفصلة",
+    Name = "عرض الإحداثيات دائمًا في نافذة منفصلة",
     Default = false,
     Callback = function(state)
         if state then
@@ -3022,14 +3061,14 @@ CoordSec:AddButton({
     end
 })
 
------ データ管理 ---
+----- إدارة البيانات ---
 local SaveSec = ConfigTab:AddSection({Name = "إدارة البيانات (تحديث فوري)"})
 
--- 1. ドロップダウンを変数として定義（後で中身を書き換えるため）
+-- 1. تعريف القائمة المنسدلة كمتغير (لتغيير محتواها لاحقًا)
 local fileDropdown
 
 fileDropdown = SaveSec:AddDropdown({
-    Name = "اختر ملفاً محفوظاً",
+    Name = "اختر ملفًا محفوظًا",
     Default = "يرجى الاختيار",
     Options = getConfigFileList(),
     Callback = function(v) 
@@ -3037,9 +3076,9 @@ fileDropdown = SaveSec:AddDropdown({
     end
 })
 
--- 2. 読み込みボタン（読み込んだ瞬間に見た目を更新）
+-- 2. زر التحميل (يحدث المظهر فورًا عند التحميل)
 SaveSec:AddButton({
-    Name = "تحميل الملف المختار",
+    Name = "تحميل الملف المحدد",
     Callback = function()
         if selectedFile and selectedFile ~= "لا توجد ملفات" then
             local path = "holon_config/" .. selectedFile
@@ -3051,7 +3090,6 @@ SaveSec:AddButton({
                 if success then
                     cfg = data
                     
-                    -- Reconstruct Vector3s after loading from JSON
                     if cfg.Global.EffectRotation and type(cfg.Global.EffectRotation) == "table" then
                         cfg.Global.EffectRotation = Vector3.new(cfg.Global.EffectRotation.X or 0, cfg.Global.EffectRotation.Y or 0, cfg.Global.EffectRotation.Z or 0)
                     else
@@ -3063,7 +3101,7 @@ SaveSec:AddButton({
                         cfg.Global.IndividualRotation = Vector3.new(0,-90,0)
                     end
 
-                    -- 保存された設定をローカル変数に反映
+                    -- استعادة المتغيرات المحلية من الإعدادات المحفوظة
                     if cfg.LocalSettings then
                         local s = cfg.LocalSettings
                         walkSpeed = s.WalkSpeed or 16
@@ -3082,7 +3120,7 @@ SaveSec:AddButton({
                         autoWidth = s.AutoWidth or true
                         if s.Esp then espCfg = s.Esp end
                         
-                        -- ★UI要素の見た目を更新 (Setメソッドを使用)
+                        -- ★تحديث مظهر واجهة المستخدم (استخدم طريقة Set)
                         if UIElements.WalkSpeedSlider then UIElements.WalkSpeedSlider:Set(walkSpeed) end
                         if UIElements.WalkSpeedToggle then UIElements.WalkSpeedToggle:Set(useWalkSpeed) end
                         if UIElements.JumpPowerSlider then UIElements.JumpPowerSlider:Set(jumpPower) end
@@ -3092,9 +3130,9 @@ SaveSec:AddButton({
                         if UIElements.AntiExplosionToggle then UIElements.AntiExplosionToggle:Set(antiExplosion) end
                         if UIElements.AntiFireToggle then UIElements.AntiFireToggle:Set(antiFire) end
                         if UIElements.AntiGrabToggle then UIElements.AntiGrabToggle:Set(antiGrab) end
-                        if UIElements.AntiGucciToggle then UIElements.AntiGucciToggle:Set(false) end -- 安全のためOFF
+                        if UIElements.AntiGucciToggle then UIElements.AntiGucciToggle:Set(false) end -- إيقاف للأمان
                         if UIElements.EffectToggle then UIElements.EffectToggle:Set(isEnabled) end
-                        if UIElements.ModeDropdown then UIElements.ModeDropdown:Set(currentMode) end
+                        if UIElements.ModeDropdown then UIElements.ModeDropdown:Set(modeNames[currentMode] or currentMode) end
                         if UIElements.CombinedToggle then UIElements.CombinedToggle:Set(combinedActive) end
                         if UIElements.FollowToggle then UIElements.FollowToggle:Set(followPlayer) end
                         if UIElements.EffectRotationX then UIElements.EffectRotationX:Set(cfg.Global.EffectRotation.X) end
@@ -3110,7 +3148,7 @@ SaveSec:AddButton({
                         if UIElements.PlotReturnToggle then UIElements.PlotReturnToggle:Set(cfg.PlotReturn.Enabled) end
                         if UIElements.PlotReturnInterval then UIElements.PlotReturnInterval:Set(cfg.PlotReturn.Interval) end
                         
-                        -- ESP設定の反映
+                        -- إعدادات ESP
                         if UIElements.EspEnabled then UIElements.EspEnabled:Set(espCfg.Enabled) end
                         if UIElements.EspTargetOnly then UIElements.EspTargetOnly:Set(espCfg.TargetOnly) end
                         if UIElements.EspNames then UIElements.EspNames:Set(espCfg.Names) end
@@ -3119,22 +3157,22 @@ SaveSec:AddButton({
                         if UIElements.EspHitboxSize then UIElements.EspHitboxSize:Set(espCfg.HitboxSize) end
                         if UIElements.EspColor then UIElements.EspColor:Set(espCfg.ESPColor) end
                         
-                        -- 合体設定の反映
-                        if UIElements.CombineMode1 then UIElements.CombineMode1:Set(cfg.Combined.Mode1) end
+                        -- الإعدادات المدمجة
+                        if UIElements.CombineMode1 then UIElements.CombineMode1:Set(modeNames[cfg.Combined.Mode1] or cfg.Combined.Mode1) end
                         if UIElements.CombineMode1Count then UIElements.CombineMode1Count:Set(cfg.Combined.Mode1Count) end
-                        if UIElements.CombineMode2 then UIElements.CombineMode2:Set(cfg.Combined.Mode2) end
+                        if UIElements.CombineMode2 then UIElements.CombineMode2:Set(modeNames[cfg.Combined.Mode2] or cfg.Combined.Mode2) end
                         if UIElements.CombineMode2Count then UIElements.CombineMode2Count:Set(cfg.Combined.Mode2Count) end
                         if UIElements.CombineMode3 then UIElements.CombineMode3:Set(modeNames[cfg.Combined.Mode3] or cfg.Combined.Mode3) end
                         if UIElements.CombineMode3Count then UIElements.CombineMode3Count:Set(cfg.Combined.Mode3Count) end
                         
-                        -- 追加項目の反映
+                        -- استعادة العناصر الإضافية
                         vflyEnabled = s.VFlyEnabled or false
                         vflySpeed = s.VFlySpeed or 1
                         local isThirdPerson = s.ThirdPerson or false
                         local savedFOV = s.FOV or 70
                         targetMainName = s.TargetMainName or ""
                         targetSubName = s.TargetSubName or ""
-                        selectedItemName = s.SelectedItemName or "جميع الألعاب"
+                        selectedItemName = s.SelectedItemName or "كل الألعاب"
                         pianoEnabled = s.PianoEnabled or false
                         pianoFollowEnabled = s.PianoFollowEnabled or true
 
@@ -3146,7 +3184,7 @@ SaveSec:AddButton({
                         if UIElements.PianoEnabled then UIElements.PianoEnabled:Set(pianoEnabled) end
                         if UIElements.PianoFollow then UIElements.PianoFollow:Set(pianoFollowEnabled) end
 
-                        -- ターゲットドロップダウンの復元（リストから検索）
+                        -- استعادة القوائم المنسدلة المستهدفة (البحث من القائمة)
                         local function restoreDropdown(dd, name)
                             if dd and name ~= "" then
                                 for _, opt in ipairs(getPList()) do
@@ -3157,7 +3195,7 @@ SaveSec:AddButton({
                         restoreDropdown(UIElements.MainTargetDropdown, targetMainName)
                         restoreDropdown(UIElements.SubTargetDropdown, targetSubName)
                         
-                        -- ★UI設定の復元
+                        -- ★استعادة إعدادات واجهة المستخدم
                         if not cfg.UI then
                             cfg.UI = {
                                 Transparency = 0.1,
@@ -3173,9 +3211,9 @@ SaveSec:AddButton({
                         if UIElements.UIBackgroundImage then UIElements.UIBackgroundImage:Set(cfg.UI.BackgroundImage or "") end
                     end
 
-                    -- ★ここでリアルタイムにUIの見た目（カラー・透明度・画像）を更新
+                    -- ★تحديث مظهر واجهة المستخدم (اللون، الشفافية، الصورة) في الوقت الفعلي هنا
                     applyCustomStyle() 
-                    OrionLib:MakeNotification({Name = "نجاح", Content = selectedFile .. " تم تطبيق", Time = 3})
+                    OrionLib:MakeNotification({Name = "نجاح", Content = selectedFile .. " تم التطبيق", Time = 3})
                 else
                     OrionLib:MakeNotification({Name = "خطأ", Content = "فشل تحميل الملف", Time = 3})
                 end
@@ -3191,7 +3229,7 @@ SaveSec:AddTextbox({
     Callback = function(v) saveName = v end
 })
 
--- 3. 保存ボタン（保存した瞬間にドロップダウンを更新）
+-- 3. زر الحفظ (يحدث القائمة المنسدلة فورًا عند الحفظ)
 SaveSec:AddButton({
     Name = "حفظ الإعدادات الحالية",
     Callback = function()
@@ -3199,7 +3237,7 @@ SaveSec:AddButton({
             if not isfolder("holon_config") then makefolder("holon_config") end
             local path = "holon_config/" .. saveName .. ".json"
             
-            -- ローカル変数の状態をcfgに同期させてから保存
+            -- مزامنة المتغيرات المحلية مع cfg قبل الحفظ
             cfg.LocalSettings = {
                 WalkSpeed = walkSpeed,
                 JumpPower = jumpPower,
@@ -3217,8 +3255,8 @@ SaveSec:AddButton({
                 IndividualRotation = cfg.Global.IndividualRotation,
                 UseOtherToys = useOtherToys,
                 AutoWidth = autoWidth,
-                Esp = espCfg, -- ESP設定(テーブル)も保存
-                -- 追加保存項目
+                Esp = espCfg, -- حفظ جدول إعدادات ESP
+                -- عناصر حفظ إضافية
                 VFlyEnabled = vflyEnabled,
                 VFlySpeed = vflySpeed,
                 ThirdPerson = (LocalPlayer.CameraMode == Enum.CameraMode.Classic),
@@ -3233,20 +3271,20 @@ SaveSec:AddButton({
 
             writefile(path, HttpService:JSONEncode(cfg))
             
-            -- ★ここがポイント：保存した直後にドロップダウンのリストを最新にする
+            -- ★هذا هو المفتاح: تحديث القائمة المنسدلة فورًا بعد الحفظ
             fileDropdown:Refresh(getConfigFileList(), true)
             
             OrionLib:MakeNotification({
                 Name = "تم الحفظ", 
-                Content = "تم حفظ " .. saveName .. ".json وتحديث القائمة", 
+                Content = saveName .. ".json تم الحفظ وتحديث القائمة", 
                 Time = 3
             })
         end
     end
 })
 
--- --- UI外観設定 ---
-local UISec = ConfigTab:AddSection({Name = "إعدادات مظهر/ألوان واجهة المستخدم"})
+-- --- إعدادات مظهر واجهة المستخدم ---
+local UISec = ConfigTab:AddSection({Name = "إعدادات مظهر/لون واجهة المستخدم"})
 
 UIElements.UITransparency = UISec:AddSlider({
     Name = "شفافية واجهة المستخدم",
@@ -3257,7 +3295,7 @@ UIElements.UITransparency = UISec:AddSlider({
     end
 })
 
--- 以降、cfg.UI が存在するので消えずに表示されます
+-- من هنا فصاعدًا، cfg.UI موجود، لذا سيتم عرضه دون اختفاء
 UIElements.UIBackgroundColor = UISec:AddColorpicker({
     Name = "لون الخلفية",
     Default = cfg.UI.BackgroundColor,
@@ -3268,7 +3306,7 @@ UIElements.UIBackgroundColor = UISec:AddColorpicker({
 })
 
 UIElements.UIAccentColor = UISec:AddColorpicker({
-    Name = "لون الإطار (التمييز)",
+    Name = "لون الحدود (تأكيد)",
     Default = cfg.UI.AccentColor,
     Callback = function(v)
         cfg.UI.AccentColor = v
@@ -3281,12 +3319,10 @@ UIElements.UIBackgroundImage = UISec:AddTextbox({
     Default = cfg.UI.BackgroundImage,
     TextDisappear = false,
     Callback = function(v)
-        -- 数字以外の文字を除去して、数値のみ取り出す
-        local id = v:match("%d+") 
-        if id then
-            -- Decal IDをImage IDとして読み込ませるためのURL形式
-            -- ※Robloxの内部処理で自動変換を促す書き方です
-            cfg.UI.BackgroundImage = "rbxassetid://" .. id
+        local numericId = v:match("%d+")
+        
+        if numericId then
+            cfg.UI.BackgroundImage = "rbxassetid://" .. numericId
         else
             cfg.UI.BackgroundImage = ""
         end
@@ -3301,12 +3337,12 @@ local SubTab = Window:MakeTab({
     Icon = "rbxassetid://10747372167"
 })
 
--- サブターゲットセクション
+-- قسم الهدف الفرعي
 local SubTargetSec = SubTab:AddSection({
-    Name = "هدف فرعي"
+    Name = "الهدف الفرعي"
 })
 
--- 1. ドロップダウンの作成
+-- 1. إنشاء قائمة منسدلة
 local targetSubName = "" 
 
 UIElements.SubTargetDropdown = SubTargetSec:AddDropdown({
@@ -3314,11 +3350,11 @@ UIElements.SubTargetDropdown = SubTargetSec:AddDropdown({
     Default = LocalPlayer.DisplayName .. " (@" .. LocalPlayer.Name .. ")",
     Options = getPList(),
     Callback = function(v)
-        -- @以降のユーザー名を正確に切り出す
+        -- استخراج اسم المستخدم بدقة بعد @
         local name = v:match("@([^)]+)")
         targetSubName = name or LocalPlayer.Name
         
-        -- 即座に最新のオブジェクトも一度取得しておく（既存コードとの互換性のため）
+        -- الحصول فورًا على أحدث كائن أيضًا (للتوافق مع الكود الحالي)
         targetSub = Players:FindFirstChild(targetSubName) or LocalPlayer
     end    
 })
@@ -3342,13 +3378,13 @@ SubTargetSec:AddButton({
     end
 })
 
--- 視点・カメラセクション
+-- قسم العرض/الكاميرا
 local ViewSec = SubTab:AddSection({
-    Name = "المنظور/الكاميرا"
+    Name = "عرض/كاميرا"
 })
 
 ViewSec:AddToggle({
-    Name = "مشاهدة (Spectate)",
+    Name = "مشاهدة",
     Default = false,
     Callback = function(v) 
         if v then 
@@ -3366,7 +3402,7 @@ ViewSec:AddToggle({
     end 
 })
 
--- ESP設定セクション
+-- قسم إعدادات ESP
 local EspSec = SubTab:AddSection({
     Name = "إعدادات ESP"
 })
@@ -3384,25 +3420,25 @@ UIElements.EspTargetOnly = EspSec:AddToggle({
 })
 
 UIElements.EspNames = EspSec:AddToggle({
-    Name = "عرض الأسماء",
+    Name = "إظهار الأسماء",
     Default = true,
     Callback = function(v) espCfg.Names = v end 
 })
 
 UIElements.EspTracers = EspSec:AddToggle({
-    Name = "عرض التتبع",
+    Name = "إظهار التتبعات",
     Default = false,
     Callback = function(v) espCfg.Tracers = v end 
 })
 
 UIElements.EspHitbox = EspSec:AddToggle({
-    Name = "صندوق الاصطدام (Hitbox)",
+    Name = "صندوق الإصابة (Hitbox)",
     Default = false,
     Callback = function(v) espCfg.Hitbox = v end 
 })
 
 UIElements.EspHitboxSize = EspSec:AddSlider({
-    Name = "حجم صندوق الاصطدام",
+    Name = "حجم صندوق الإصابة",
     Min = 2,
     Max = 20,
     Default = 10,
@@ -3431,7 +3467,7 @@ BarrierSec:AddButton({
         end
 
         if not (player.Character and player.Character:FindFirstChild("HumanoidRootPart")) then
-            OrionLib:MakeNotification({Name="خطأ", Content="الشخصية ليست جاهزة", Time = 4})
+            OrionLib:MakeNotification({Name="خطأ", Content="الشخصية غير جاهزة", Time = 4})
             return
         end
 
@@ -3522,7 +3558,7 @@ local ActionSec = SubTab:AddSection({ Name = "إجراءات" })
 local tpTargetName = ""
 tpDropdown = ActionSec:AddDropdown({
     Name = "هدف الانتقال الآني",
-    Default = "اختر لاعباً",
+    Default = "اختر لاعبًا",
     Options = getPList(),
     Callback = function(v)
         tpTargetName = v:match("@([^)]+)")
@@ -3530,7 +3566,7 @@ tpDropdown = ActionSec:AddDropdown({
 })
 
 ActionSec:AddButton({
-    Name = "الانتقال الآني إلى اللاعب المختار",
+    Name = "الانتقال إلى اللاعب المحدد",
     Callback = function()
         local targetName = (tpTargetName ~= "" and tpTargetName) or (targetSub and targetSub.Name)
         local target = Players:FindFirstChild(targetName)
@@ -3542,7 +3578,7 @@ ActionSec:AddButton({
 
 local levitateRunning = false
 UIElements.BlobmanKick = ActionSec:AddToggle({
-    Name = "ركلة Blobman (قم بالرمي باستمرار)",
+    Name = "ركلة Blobman (تكرار)",
     Default = false,
     Callback = function(v)
         levitateRunning = v
@@ -3552,7 +3588,7 @@ UIElements.BlobmanKick = ActionSec:AddToggle({
         local target = Players:FindFirstChild(targetName)
         
         if target and target ~= LocalPlayer and target.Character and target.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-            -- Blobmanを探す
+            -- العثور على Blobman
             local blobman = nil
             local spawned = Workspace:FindFirstChild(LocalPlayer.Name .. "SpawnedInToys")
             if spawned then blobman = spawned:FindFirstChild("CreatureBlobman") end
@@ -3567,18 +3603,18 @@ UIElements.BlobmanKick = ActionSec:AddToggle({
             end
             
             if blobman then
-                -- 1. Remoteを探す (Cosmic仕様)
+                -- 1. العثور على Remotes (مواصفات Cosmic)
                 local scriptObj = blobman:FindFirstChild("BlobmanSeatAndOwnerScript")
                 local grabRemote = scriptObj and scriptObj:FindFirstChild("CreatureGrab")
                 local dropRemote = scriptObj and scriptObj:FindFirstChild("CreatureDrop")
 
-                -- 2. DetectorとWeld/Constraintを探す (左右対応)
+                -- 2. العثور على الكاشف واللحام/القيد (لليسار/اليمين)
                 local lDet = blobman:FindFirstChild("LeftDetector")
                 local rDet = blobman:FindFirstChild("RightDetector")
                 local lWeld = lDet and (lDet:FindFirstChild("LeftWeld") or lDet:FindFirstChild("RigidConstraint"))
                 local rWeld = rDet and (rDet:FindFirstChild("RightWeld") or rDet:FindFirstChild("RigidConstraint"))
                 
-                -- Auto Sit (Cosmic Style)
+                -- الجلوس التلقائي (نمط Cosmic)
                 local seat = blobman:FindFirstChild("VehicleSeat")
                 local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid")
                 if seat and hum then
@@ -3590,32 +3626,32 @@ UIElements.BlobmanKick = ActionSec:AddToggle({
                 end
                 
                 if grabRemote and dropRemote and ((lDet and lWeld) or (rDet and rWeld)) then
-                    OrionLib:MakeNotification({ Name = "تنفيذ", Content = "حلقة إمساك Blobman", Time = 3 })
+                    OrionLib:MakeNotification({ Name = "جاري التنفيذ", Content = "حلقة إمساك Blobman", Time = 3 })
 
                     task.spawn(function()
                         while levitateRunning and blobman and blobman.Parent do
                             if target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
                                 local tRoot = target.Character.HumanoidRootPart
                                 
-                                -- まだ固定されていない（捕獲前）なら捕まえに行く
+                                -- إذا لم يتم تثبيته بعد (قبل الالتقاط)، اذهب للالتقاط
                                 if blobman.PrimaryPart and not blobman.PrimaryPart.Anchored then
-                                    -- 1. Force TP to Target
+                                    -- 1. فرض الانتقال إلى الهدف
                                     blobman.PrimaryPart.Anchored = false
                                     blobman:SetPrimaryPartCFrame(tRoot.CFrame)
                                     
-                                    -- 2. Grab with BOTH hands (両手で掴む)
+                                    -- 2. الإمساك بكلتا اليدين
                                     if lDet and lWeld then grabRemote:FireServer(lDet, tRoot, lWeld) end
                                     if rDet and rWeld then grabRemote:FireServer(rDet, tRoot, rWeld) end
                                     
                                     task.wait(0.1)
                                     
-                                    -- 3. TP Up 100 studs & Stop (上空100で固定)
+                                    -- 3. الانتقال لأعلى 100 مسمار والتوقف
                                     blobman:SetPrimaryPartCFrame(tRoot.CFrame + Vector3.new(0, 100, 0))
                                     blobman.PrimaryPart.AssemblyLinearVelocity = Vector3.zero
                                     blobman.PrimaryPart.AssemblyAngularVelocity = Vector3.zero
                                     blobman.PrimaryPart.Anchored = true
                                 else
-                                    -- 既に固定されているなら掴み状態を維持（念のため再送信）
+                                    -- إذا كان مثبتًا بالفعل، حافظ على حالة الإمساك (أعد الإرسال للاحتياط)
                                     if lDet and lWeld then grabRemote:FireServer(lDet, tRoot, lWeld) end
                                     if rDet and rWeld then grabRemote:FireServer(rDet, tRoot, rWeld) end
                                 end
@@ -3623,13 +3659,13 @@ UIElements.BlobmanKick = ActionSec:AddToggle({
                             task.wait(0.05)
                         end
                         
-                        -- 終了時に固定解除
+                        -- إلغاء التثبيت عند الخروج
                         if blobman and blobman.PrimaryPart then
                             blobman.PrimaryPart.Anchored = false
                         end
                     end)
                 else
-                    -- 詳細なエラー内容を表示
+                    -- عرض محتوى الخطأ التفصيلي
                     local missing = {}
                     if not grabRemote then table.insert(missing, "CreatureGrab") end
                     if not dropRemote then table.insert(missing, "CreatureDrop") end
@@ -3638,7 +3674,7 @@ UIElements.BlobmanKick = ActionSec:AddToggle({
                     OrionLib:MakeNotification({ Name = "خطأ", Content = "مفقود: " .. table.concat(missing, ", "), Time = 5 })
                 end
             else
-                OrionLib:MakeNotification({ Name = "خطأ", Content = "لم يتم العثور على Blobman (يرجى إخراج لعبة)", Time = 3 })
+                OrionLib:MakeNotification({ Name = "خطأ", Content = "Blobman غير موجود (يرجى استدعاء لعبة)", Time = 3 })
             end
         end
     end
@@ -3646,60 +3682,61 @@ UIElements.BlobmanKick = ActionSec:AddToggle({
 
 -- --- TAB: PIANO ---
 local PianoTab = Window:MakeTab({
-	Name = "بيانو",
-	Icon = "rbxassetid://7734020554"
+    Name = "بيانو",
+    Icon = "rbxassetid://7734020554"
 })
 
 local PianoControlSec = PianoTab:AddSection({
-	Name = "تحكم البيانو"
+    Name = "تحكم البيانو"
 })
 
 UIElements.PianoEnabled = PianoControlSec:AddToggle({
-	Name = "تفعيل ميزة البيانو",
-	Default = false,
-	Callback = function(v)
-		pianoEnabled = v
-		if v then
-			-- 機能を有効にするだけ。追従の開始は追従トグルに任せる
-			pianoKeyboard = getMusicKeyboard()
-			
-			if pianoKeyboard then
-				-- 追従がオンの場合のみ開始
-				if pianoFollowEnabled then setupPianoFollow() end
+    Name = "تفعيل البيانو",
+    Default = false,
+    Callback = function(v)
+        pianoEnabled = v
+        if v then
+            -- مجرد تفعيل الميزة. بدء المتابعة متروك لتبديل المتابعة.
+            pianoKeyboard = getMusicKeyboard()
+            
+            if pianoKeyboard then
+                -- البدء فقط إذا كانت المتابعة قيد التشغيل
+                if pianoFollowEnabled then setupPianoFollow() end
 
-				OrionLib:MakeNotification({
-					Name = "ميزة البيانو",
-					Content = "تم اكتشاف MusicKeyboard",
-					Time = 5
-				})
-			else
-				pianoEnabled = false
-				OrionLib:MakeNotification({
-					Name = "خطأ",
-					Content = "لم يتم العثور على MusicKeyboard",
-					Time = 5
-				})
-			end
-		else
-			stopSong()
-			stopPiano() -- 追従を停止
-		end
-	end    
+                OrionLib:MakeNotification({
+                    Name = "ميزة البيانو",
+                    Content = "تم اكتشاف MusicKeyboard",
+                    Time = 5
+                })
+            else
+                pianoEnabled = false
+                UIElements.PianoEnabled:Set(false) -- التراجع عن التبديل عند الفشل
+                OrionLib:MakeNotification({
+                    Name = "خطأ",
+                    Content = "MusicKeyboard غير موجود",
+                    Time = 5
+                })
+            end
+        else
+            stopSong()
+            stopPiano() -- إيقاف المتابعة
+        end
+    end    
 })
 
 UIElements.PianoFollow = PianoControlSec:AddToggle({
-    Name = "تتبع اللاعب",
+    Name = "متابعة اللاعب",
     Default = true,
     Callback = function(v)
         pianoFollowEnabled = v
-        -- ★修正: pianoKeyboardが有効か(Parentを持つか)もチェックする
+        -- ★إصلاح: تحقق أيضًا مما إذا كان pianoKeyboard صالحًا (له أب)
         if pianoEnabled and pianoKeyboard and pianoKeyboard.Parent then
             if v then
                 setupPianoFollow()
             else
                 stopPiano()
             end
-        -- ★追加: ピアノが無効な状態で追従をオンにしたら、再検索して追従を開始
+        -- ★إضافة: إذا تم تشغيل المتابعة بينما البيانو غير صالح، أعد البحث وابدأ المتابعة
         elseif pianoEnabled and v then
             pianoKeyboard = getMusicKeyboard()
             if pianoKeyboard then
@@ -3710,10 +3747,10 @@ UIElements.PianoFollow = PianoControlSec:AddToggle({
 })
 
 local PianoSongSec = PianoTab:AddSection({
-	Name = "تشغيل الأغنية"
+    Name = "تشغيل الأغنية"
 })
 
--- Auto-download Believer.json
+-- تنزيل تلقائي لـ Believer.json
 task.spawn(function()
     local targetFolder = "FTAP_Notes"
     if not isfolder(targetFolder) then makefolder(targetFolder) end
@@ -3725,104 +3762,104 @@ task.spawn(function()
         if success and content then
             writefile(filePath, content)
             OrionLib:MakeNotification({
-                Name = "System",
-                Content = "Downloaded Believer.json",
+                Name = "نظام",
+                Content = "تم تنزيل Believer.json",
                 Time = 5
             })
         end
     end
 end)
 
--- JSONファイル一覧を取得
+-- الحصول على قائمة ملفات JSON
 local function getSongFiles()
-	local files = {}
-	local targetFolder = "FTAP_Notes"
+    local files = {}
+    local targetFolder = "FTAP_Notes"
 
-	-- إنشاء المجلد إذا لم يكن موجوداً
-	if not isfolder(targetFolder) then makefolder(targetFolder) end
-	
-	local success, allFiles = pcall(function()
-		return listfiles(targetFolder)
-	end)
-	
-	if not success or not allFiles then
-		return {"خطأ في الوصول"}
-	end
-	
-	for _, filePath in ipairs(allFiles) do
-		if filePath:lower():match("%.json$") then
-			local fileName = filePath:match("([^/%\\]+)$") or filePath
-			table.insert(files, fileName) -- OrionのDropdown用に名前のみ追加
-		end
-	end
-	
-	if #files == 0 then
-		return {"لا توجد ملفات JSON"}
-	end
-	
-	return files
+    -- إنشاء المجلد إذا لم يكن موجودًا
+    if not isfolder(targetFolder) then makefolder(targetFolder) end
+    
+    local success, allFiles = pcall(function()
+        return listfiles(targetFolder)
+    end)
+    
+    if not success or not allFiles then
+        return {"خطأ في الوصول"}
+    end
+    
+    for _, filePath in ipairs(allFiles) do
+        if filePath:lower():match("%.json$") then
+            local fileName = filePath:match("([^/%\]+)$") or filePath
+            table.insert(files, fileName) -- إضافة الاسم فقط للقائمة المنسدلة في Orion
+        end
+    end
+    
+    if #files == 0 then
+        return {"لا توجد ملفات JSON"}
+    end
+    
+    return files
 end
 
 local songDropdown = PianoSongSec:AddDropdown({
-	Name = "اختر أغنية",
-	Default = "لا شيء",
-	Options = getSongFiles(),
-	Callback = function(v)
-		if v == "لا شيء" or v == "المجلد غير موجود" or v == "لا توجد ملفات JSON" then
-			selectedSongFile = nil
-			selectedSongData = nil
-			return
-		end
-		
-		-- ファイル名からフルパスを作成（環境に合わせて調整してください）
-		local filePath = "FTAP_Notes/" .. v
-		selectedSongFile = filePath
-		
-		local success, fileContent = pcall(function()
-			return readfile(filePath)
-		end)
-		
-		if success then
-			local decodeSuccess, jsonData = pcall(function()
-				return HttpService:JSONDecode(fileContent)
-			end)
-			
-			if decodeSuccess then
-				selectedSongData = jsonData
-				OrionLib:MakeNotification({
-					Name = "اكتمل التحميل",
-					Content = "عدد النغمات: " .. #jsonData,
-					Time = 5
-				})
-			else
-				selectedSongData = nil
-			end
-		end
-	end    
+    Name = "اختر أغنية",
+    Default = "لا شيء",
+    Options = getSongFiles(),
+    Callback = function(v)
+        if v == "لا شيء" or v == "المجلد غير موجود" or v == "لا توجد ملفات JSON" then
+            selectedSongFile = nil
+            selectedSongData = nil
+            return
+        end
+        
+        -- إنشاء المسار الكامل من اسم الملف (يرجى التعديل حسب بيئتك)
+        local filePath = "FTAP_Notes/" .. v
+        selectedSongFile = filePath
+        
+        local success, fileContent = pcall(function()
+            return readfile(filePath)
+        end)
+        
+        if success then
+            local decodeSuccess, jsonData = pcall(function()
+                return HttpService:JSONDecode(fileContent)
+            end)
+            
+            if decodeSuccess then
+                selectedSongData = jsonData
+                OrionLib:MakeNotification({
+                    Name = "اكتمل التحميل",
+                    Content = "عدد النوتات: " .. #jsonData,
+                    Time = 5
+                })
+            else
+                selectedSongData = nil
+            end
+        end
+    end    
 })
 
 PianoSongSec:AddButton({
-	Name = "تحديث قائمة الأغاني",
-	Callback = function()
-		songDropdown:Refresh(getSongFiles(), true)
-		OrionLib:MakeNotification({
-			Name = "اكتمل التحديث",
-			Content = "تم تحديث قائمة ملفات JSON",
-			Time = 5
-		})
-	end
+    Name = "تحديث قائمة الأغاني",
+    Callback = function()
+        songDropdown:Refresh(getSongFiles(), true)
+        OrionLib:MakeNotification({
+            Name = "اكتمل التحديث",
+            Content = "تم تحديث قائمة ملفات JSON",
+            Time = 5
+        })
+    end
 })
 
 PianoSongSec:AddButton({
     Name = "تشغيل الأغنية المختارة",
     Callback = function()
-        -- ピアノ有効化のチェックを「テストボタン」と同じくらい緩くします
+        -- جعل فحص تمكين البيانو متساهلاً مثل "زر الاختبار"
         if not pianoKeyboard then
             pianoKeyboard = getMusicKeyboard()
         end
         
         if not pianoKeyboard then
-            OrionLib:MakeNotification({Name = "خطأ", Content = "لم يتم العثور على MusicKeyboard", Time = 5})
+            OrionLib:MakeNotification({Name = "خطأ", Content = "MusicKeyboard غير موجود", Time = 5})
             return
         end
         
@@ -3831,13 +3868,13 @@ PianoSongSec:AddButton({
             return
         end
         
-        -- ★修正ポイント：JSONEncodeせずに、そのままデータを渡す
-        -- これで playSongFromJSON が正しくループを開始できます
+        -- ★نقطة الإصلاح: تمرير البيانات كما هي، بدون JSONEncode
+        -- هذا يسمح لـ playSongFromJSON ببدء الحلقة بشكل صحيح
         playSongFromJSON(selectedSongData)
         
-        -- ボタンが反応したことを知らせる通知
+        -- إشعار لإظهار أن الزر قد استجاب
         OrionLib:MakeNotification({
-            Name = "عزف تلقائي",
+            Name = "تشغيل تلقائي",
             Content = "بدأ التشغيل",
             Time = 3
         })
@@ -3845,32 +3882,57 @@ PianoSongSec:AddButton({
 })
 
 PianoSongSec:AddButton({
-	Name = "إيقاف التشغيل",
-	Callback = function()
-		stopSong()
-		OrionLib:MakeNotification({
-			Name = "توقف",
-			Content = "تم إيقاف تشغيل الأغنية",
-			Time = 5
-		})
-	end
+    Name = "إيقاف التشغيل",
+    Callback = function()
+        stopSong()
+        OrionLib:MakeNotification({
+            Name = "إيقاف",
+            Content = "توقف تشغيل الأغنية",
+            Time = 5
+        })
+    end
 })
 
 local PianoManualSec = PianoTab:AddSection({
     Name = "تشغيل يدوي واختبار"
 })
 
--- PianoManualSecの下に追加
+UIElements.PianoManualUIToggle = PianoManualSec:AddToggle({
+    Name = "إظهار واجهة العزف اليدوي",
+    Default = false,
+    Callback = function(v)
+        manualPlayEnabled = v
+        if v then
+            pianoKeyboard = getMusicKeyboard()
+            if pianoKeyboard then
+                pianoEnabled = true
+                if UIElements.PianoEnabled then UIElements.PianoEnabled:Set(true) end
+                if not pianoUIGui then createPianoUI() end
+                if pianoUIGui then pianoUIGui.Enabled = true end
+            else
+                pianoEnabled = false
+                manualPlayEnabled = false
+                if UIElements.PianoEnabled then UIElements.PianoEnabled:Set(false) end
+                if UIElements.PianoManualUIToggle then UIElements.PianoManualUIToggle:Set(false) end
+                OrionLib:MakeNotification({Name = "خطأ", Content = "MusicKeyboard غير موجود", Time = 5})
+            end
+        else
+            if pianoUIGui then pianoUIGui.Enabled = false end
+        end
+    end
+})
+
+-- تمت إضافته تحت PianoManualSec
 PianoManualSec:AddButton({
     Name = "اختبار: اضغط مفتاح C",
     Callback = function()
         if pianoKeyboard then
             local testKey = pianoKeyboard:FindFirstChild("Key1C", true)
             if testKey then
-                -- 音を鳴らす命令
+                -- أمر لتشغيل الصوت
                 SetNetworkOwner:FireServer(testKey, testKey.CFrame)
                 
-                --   waitの後にすぐ通知が来るようにします。
+                --   جعل الإشعار يظهر فورًا بعد الانتظار.
                 task.wait(0.1)
                 
                 OrionLib:MakeNotification({
@@ -3879,11 +3941,24 @@ PianoManualSec:AddButton({
                     Time = 2
                 })
             else
-                warn("Key1C not found")
+                warn("Key1C غير موجود")
             end
         end
     end
 })
+
+-- دعم إدخال لوحة مفاتيح الكمبيوتر
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if not pianoEnabled then return end
+    
+    if input.UserInputType == Enum.UserInputType.Keyboard then
+        local char = UserInputService:GetStringForKeyCode(input.KeyCode):lower()
+        if pianoKeyMap[char] then
+           if canPressPianoKey() then pressPianoKey(pianoKeyMap[char]) end
+        end
+    end
+end)
 
 -- --- TAB: GRAB MOD ---
 local GrabTab = Window:MakeTab({
@@ -3892,7 +3967,7 @@ local GrabTab = Window:MakeTab({
 })
 
 GrabTab:AddToggle({
-    Name = "القتل عند الإمساك",
+    Name = "قتل عند الإمساك",
     Default = cfg.GrabMod.Kill,
     Callback = function(v) cfg.GrabMod.Kill = v end
 })
@@ -3906,7 +3981,7 @@ GrabTab:AddToggle({
 GrabTab:AddSection({ Name = "إعدادات الدوران" })
 
 GrabTab:AddToggle({
-    Name = "الدوران عند الإمساك",
+    Name = "دوران عند الإمساك",
     Default = cfg.GrabMod.Spin,
     Callback = function(v) cfg.GrabMod.Spin = v end
 })
@@ -3922,31 +3997,31 @@ GrabTab:AddToggle({
 GrabTab:AddSlider({
     Name = "قوة الرمي",
     Min = 0, Max = 5000, Default = cfg.GrabMod.ThrowPower,
-    Increment = 100, ValueName = "Power",
+    Increment = 100, ValueName = "قوة",
     Callback = function(v) cfg.GrabMod.ThrowPower = v end
 })
 
-local DetailTab = Window:MakeTab({Name = "التفاصيل", Icon = DetailIcon})
+local DetailTab = Window:MakeTab({Name = "تفاصيل", Icon = DetailIcon})
 AddDetailContent(DetailTab)
 
--- 通知（起動時）
+-- إشعار (عند البدء)
 OrionLib:MakeNotification({
-	Name = "Holon HUB",
-	Content = "تم تحميل v1.4.3!",
-	Time = 5
+    Name = "Holon HUB",
+    Content = "!تم تحميل Holon HUB v1.4.3",
+    Time = 5
 })
-    -- 起動時にUIスタイルを適用
+    -- تطبيق نمط واجهة المستخدم عند البدء
     applyCustomStyle()
 
-    -- メイン画面側の初期化
+    -- تهيئة جانب الشاشة الرئيسية
     OrionLib:Init()
 end
 
 if isfile(KeyFileName) and readfile(KeyFileName) == CorrectKey then
-    -- 認証済みなら即メインへ
+    -- إذا تمت المصادقة، انتقل مباشرة إلى الرئيسية
     StartHolonHUB()
 else
-    -- 未認証なら認証UIを作る
+    -- إذا لم تتم المصادقة، قم بإنشاء واجهة مستخدم للمصادقة
     local OrionLib = loadstring(game:HttpGet(OrionUrl))()
     
     local AuthWindow = OrionLib:MakeWindow({
@@ -3955,13 +4030,13 @@ else
         IntroEnabled = false
     })
 
-    local AuthTab = AuthWindow:MakeTab({Name = "المصادقة", Icon = "rbxassetid://7733919526"})
+    local AuthTab = AuthWindow:MakeTab({Name = "مصادقة", Icon = "rbxassetid://7733919526"})
     local KeyInput = ""
 
     AuthTab:AddTextbox({
         Name = "أدخل المفتاح",
         Default = "",
-        TextDisappear = false, -- ここを false に変更
+        TextDisappear = false, -- تم تغيير هذا إلى false
         Callback = function(Value) 
             KeyInput = Value 
         end     
@@ -3971,14 +4046,14 @@ else
         Name = "تحقق",
         Callback = function()
             if KeyInput == CorrectKey then
-                writefile(KeyFileName, CorrectKey) -- ここで保存
-                OrionLib:MakeNotification({Name = "نجاح", Content = "جارٍ البدء!", Time = 2})
+                writefile(KeyFileName, CorrectKey) -- حفظ هنا
+                OrionLib:MakeNotification({Name = "نجاح", Content = "جاري البدء!", Time = 2})
                 task.wait(1)
                 pcall(function() game.CoreGui.Orion:Destroy() end)
                 task.wait(0.5)
                 StartHolonHUB()
             else
-                OrionLib:MakeNotification({Name = "فشل", Content = "المفتاح غير صحيح", Time = 5})
+                OrionLib:MakeNotification({Name = "فشل", Content = "مفتاح غير صحيح", Time = 5})
             end
         end
     })
@@ -3988,8 +4063,8 @@ else
         Callback = function() setclipboard("https://discord.gg/EHBXqgZZYN") end
     })
 
-    -- 詳細タブ
-    local AuthDetailTab = AuthWindow:MakeTab({Name = "التفاصيل", Icon = DetailIcon})
+    -- علامة تبويب التفاصيل
+    local AuthDetailTab = AuthWindow:MakeTab({Name = "تفاصيل", Icon = DetailIcon})
     AddDetailContent(AuthDetailTab)
     
     OrionLib:Init()
