@@ -1,26 +1,26 @@
 --[[ Holon VM v2.0 ]]
-local _B = {{2,1,3,},{1,2,1,},{3,1,1,0,},{2,1,3,},{1,2,2,},{3,1,1,0,},{4,0,0,},} -- Bytecode
-local _C = {"Holon VM Test: 起動成功","仮想マシン上で実行されています...","print",} -- Constants
+local _B = nil
+local _C = {{160,199,196,199,198,120,174,165,120,172,189,203,204,146,120,320,269,271,317,227,237,318,224,232,317,226,247},{316,275,262,318,219,267,315,219,246,315,218,271,315,219,267,316,272,226,315,217,255,317,262,247,320,249,228,315,217,237,315,218,228,315,217,254,315,217,220,315,217,278,315,217,241,134,134,134},{200,202,193,198,204}}
+local _K = 88 -- 復号キー
+
 local function _V(...)
-    local _P = 1 -- PC
-    local _S = {} -- Stack
+    local _P = 1
+    local _S = {}
     local _E = getfenv() or _G
+    
+    -- 【追加】定数テーブルをその場で復号する
+    local _DC = {}
+    for i, v in ipairs(_C) do
+        local s = ""
+        for j = 1, #v do s = s .. string.char(v[j] - _K) end
+        _DC[i] = s
+    end
+
     while true do
         local _I = _B[_P]
-        if not _I then break end
         local _O = _I[1]
         if _O == 2 then -- GETGLOBAL
-            _S[_I[2]] = _E[_C[_I[3]]]
+            _S[_I[2]] = _E[_DC[_I[3]]] -- 復号済みテーブルを使用
         elseif _O == 1 then -- LOADK
-            _S[_I[2]] = _C[_I[3]]
-        elseif _O == 3 then -- CALL
-            local f = _S[_I[2]]
-            local a = _S[_I[2]+1]
-            f(a)
-        elseif _O == 4 then -- RETURN
-            return
-        end
-        _P = _P + 1
-    end
-end
-_V(...)
+            _S[_I[2]] = _DC[_I[3]]
+        -- ... (以下、CALLやRETURNの処理)
