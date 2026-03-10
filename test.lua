@@ -1,52 +1,58 @@
 --[[ Holon VM v5 Secure ]]
-local _thryq = {192,196,198,197,252,199,196,197,47,196,196,197,192,196,198,197,252,199,199,197,47,196,196,197,5,197,197,197}
-local _hiekr = {{141,226,142,225,143,175,249,180,148,192,165,214,162,152,184,80,229,82,183,60,169,79,199,87,178,56,167},{33,154,52,210,81,226,1,130,28,255,125,202,41,170,25,253,69,207,44,173,10,239,65,222,54,151,27,248,121,236,15,141,1,226,99,197,38,167,35,192,65,255,28,157,4,42,4,42},{181,199,174,192,180}}
-local _rsnsk = 197
-local function _yzjfm(...)
-    local _ofboz, _fudyj, _wrcnd = 1, {}, getfenv() or _G
-    local _edyek = {}
-    for i, v in ipairs(_hiekr) do
+local _bxcnd = {250,181,183,180,225,182,181,180,185,181,181,180,63,180,180,180,250,181,183,180,225,182,182,180,185,181,181,180,35,180,180,180}
+local _tohgl = {{252,147,255,144,254,222,136,197,229,177,212,167,211,233,201,33,148,35,198,77,216,62,182,38,195,73,214},{80,235,69,163,32,147,112,243,109,142,12,187,88,219,104,140,52,190,93,220,123,158,48,175,71,230,106,137,8,157,126,252,112,147,18,180,87,214,82,177,48,142,109,236,117,91,117,91},{196,182,223,177,197}}
+local _EH = {[225] = {235,184,227,188,245,174,156,193,156,188,129,161,254,186,249,162,253,180,239,220,129,220},[32] = {235,184,227,188,245,174,156,193,156,188,129,161,254,173,246,169,224,187,136,213,136,168,130,162,253,174,245,170,227,184,140,209,140},[185] = {216,183,212,181,217,249,159,191,130,162,253,174,245,170,227,184,138,215,138,177,145,248,158,190,216,248,140,228,129,239,207,169,129,222,141,214,137,192,155,169,244,223,238,179,154,186,223,177,213},[215] = {235,184,227,188,245,174,156,193,156,188,129,161,254,173,246,169,224,187,136,213,136,168,133,165,250,169,242,173,228,191,139,214,139},[63] = {235,184,227,188,245,174,156,193,156,188,129,161,254,173,246,169,224,187,136,213,136},[250] = {235,184,227,188,245,174,156,193,156,188,129,161,254,187,224,191,251,184,227,188,245,174,157,192,157,192},[202] = {235,184,227,188,245,174,156,193,156,188,129,161,254,173,246,169,224,187,136,213,136,168,131,163,252,175,244,171,226,185,141,208,141},[223] = {235,184,227,188,245,174,156,193,156,188,129,161,254,173,246,169,224,187,136,213,136,168,135,167,248,171,240,175,230,189,137,212,137},[35] = {235,185,153,164,132,240,130,247,146}}
+local _hcmwv = 180
+local function _ncjiw(...)
+    local _nrfvz, _tmldu, _nyjtr = 1, {}, getfenv() or _G
+    local _blfie = {}
+    for i, v in ipairs(_tohgl) do
         local s = ""
-        local last_byte = _rsnsk -- 最初のキーはVMキー
+        local last_byte = _hcmwv -- 最初のキーはVMキー
         for j = 1, #v do
             local enc_byte = v[j]
             local dec_byte = bit32.bxor(enc_byte, last_byte)
             s = s .. string.char(dec_byte)
             last_byte = enc_byte -- 暗号化されたバイトが次の復号キーになる
         end
-        _edyek[i] = s
+        _blfie[i] = s
     end
 
-    local _rdmlj = false
-    local _kjmtu = {}
-    _kjmtu[192] = function(_ewodr) _fudyj[_ewodr[2]] = _wrcnd[_edyek[_ewodr[3]]] end
-    _kjmtu[252]     = function(_ewodr) _fudyj[_ewodr[2]] = _edyek[_ewodr[3]] end
-    _kjmtu[47]      = function(_ewodr) local f = _fudyj[_ewodr[2]]; if f then f(_fudyj[_ewodr[2]+1]) end end
-    _kjmtu[5]    = function() _rdmlj = true end
-    
-    -- NOOP & Math Ops
-    _kjmtu[37]      = function(_ewodr) _fudyj[_ewodr[2]] = _fudyj[_ewodr[3]] end
-    -- 算術演算命令 (R1 = R2 + R3)
-    _kjmtu[168]       = function(_ewodr) _fudyj[_ewodr[2]] = _fudyj[_ewodr[3]] + _fudyj[_ewodr[4]] end
-    _kjmtu[214]       = function(_ewodr) _fudyj[_ewodr[2]] = _fudyj[_ewodr[3]] - _fudyj[_ewodr[4]] end
-    _kjmtu[174]       = function(_ewodr) _fudyj[_ewodr[2]] = _fudyj[_ewodr[3]] * _fudyj[_ewodr[4]] end
-    _kjmtu[43]       = function(_ewodr) _fudyj[_ewodr[2]] = _fudyj[_ewodr[3]] / _fudyj[_ewodr[4]] end
+    local _ahast = false
+    local _mpnvl = {}
+    local _LS = loadstring or load
 
-
-    local _idosb = 4 -- Instruction Width
-    while not _rdmlj and _ofboz <= #_thryq do
-        local _ostzm = _thryq[_ofboz]
-        local handler = _kjmtu[_ostzm]
-        if handler then
-            local _ewodr = {
-                _ostzm,
-                bit32.bxor(_thryq[_ofboz+1], _rsnsk),
-                bit32.bxor(_thryq[_ofboz+2], _rsnsk),
-                bit32.bxor(_thryq[_ofboz+3], _rsnsk)
-            }
-            handler(_ewodr)
+    for op, enc_body in pairs(_EH) do
+        local body_str = ""
+        local last_byte = _hcmwv
+        for j = 1, #enc_body do
+            local enc_byte = enc_body[j]
+            local dec_byte = bit32.bxor(enc_byte, last_byte)
+            body_str = body_str .. string.char(dec_byte)
+            last_byte = enc_byte
         end
-        _ofboz = _ofboz + _idosb
+        local chunk, err = _LS("return function(_gvpvt) " .. body_str .. " end")
+        if chunk then
+            local handler = chunk()
+            setfenv(handler, getfenv(1))
+            _mpnvl[op] = handler
+        end
+    end
+
+    local _ycawl = 4
+    while not _ahast and _nrfvz <= #_bxcnd do
+        local _aicjy = _bxcnd[_nrfvz]
+        local handler = _mpnvl[_aicjy]
+        if handler then
+            local _gvpvt = {
+                _aicjy,
+                bit32.bxor(_bxcnd[_nrfvz+1], _hcmwv),
+                bit32.bxor(_bxcnd[_nrfvz+2], _hcmwv),
+                bit32.bxor(_bxcnd[_nrfvz+3], _hcmwv)
+            }
+            handler(_gvpvt)
+        end
+        _nrfvz = _nrfvz + _ycawl
     end
 end
-_yzjfm(...)
+_ncjiw(...)
