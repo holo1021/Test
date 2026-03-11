@@ -1,116 +1,116 @@
 --[[ Holon VM v5 Secure ]]
-local _zznls = {3233923315,3233988867,3233923270,3233923827,3234054915,3233923782,3233857562}
-local _ktpfs = {{176,194,171,197,177},{136,231,139,228,138,170,252,177,145,197,160,211,167,157,189,85,224,87,178,57,172,74,194,82,183,61,162},{36,159,49,215,84,231,4,135,25,250,120,207,44,175,28,248,64,202,41,168,15,234,68,219,51,146,30,253,124,233,10,136,4,231,102,192,35,162,38,197,68,250,25,152,1,47,1,47}}
-local _ydzeh = 192
-local function _zprgv(_zznls, _ktpfs, ...)
-    local _jwlqv, _vryrr, _okuzu = 1, {}, getfenv() or _G
-    local _args = {...}; for i=1, #_args do _vryrr[i-1] = _args[i] end
-    local _fbsis = {}
-    for i, v in ipairs(_ktpfs) do
+local _wfrut = {303239692,303043367,303239887,303239180,303108391,303239375,303174261}
+local _ptacc = {{98,16,121,23,99},{90,53,89,54,88,120,46,99,67,23,114,1,117,79,111,135,50,133,96,235,126,152,16,128,101,239,112},{246,77,227,5,134,53,214,85,203,40,170,29,254,125,206,42,146,24,251,122,221,56,150,9,225,64,204,47,174,59,216,90,214,53,180,18,241,112,244,23,150,40,203,74,211,253,211,253}}
+local _toznv = 18
+local function _hpyrj(_wfrut, _ptacc, ...)
+    local _jgcjj, _cuzvw, _eouhk = 1, {}, getfenv() or _G
+    local _args = {...}; for i=1, #_args do _cuzvw[i-1] = _args[i] end
+    local _vcgai = {}
+    for i, v in ipairs(_ptacc) do
         local t = {}
-        local last_byte = _ydzeh -- 最初のキーはVMキー
+        local last_byte = _toznv -- 最初のキーはVMキー
         for j = 1, #v do
             local enc_byte = v[j]
             local dec_byte = bit32.bxor(enc_byte, last_byte)
             table.insert(t, string.char(dec_byte))
             last_byte = enc_byte -- 暗号化されたバイトが次の復号キーになる
         end
-        _fbsis[i] = table.concat(t)
+        _vcgai[i] = table.concat(t)
     end
 
-    local _ppyoz = false
+    local _xmnis = false
 
-    local _kpmlq = 1 -- Instruction Width
-    local _ST = 4420
-    local _IN, _iydvk = 0, 0
-    while not _ppyoz do
-        if _ST == 4420 then
-            if _jwlqv > #_zznls then _ppyoz = true else
-                _IN = _zznls[_jwlqv]
-                _iydvk = _IN % 256
-                _ST = 3824
+    local _fvidc = 1 -- Instruction Width
+    local _ST = 9382
+    local _IN, _ldrpc = 0, 0
+    while not _xmnis do
+        if _ST == 9382 then
+            if _jgcjj > #_wfrut then _xmnis = true else
+                _IN = _wfrut[_jgcjj]
+                _ldrpc = _IN % 256
+                _ST = 3226
             end
-        elseif _ST == 3824 then
-            if _iydvk == (22 * 2 - -35 + -44) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _qgwde = { _iydvk, bit32.bxor(_rA, _ydzeh), bit32.bxor(_rB, _ydzeh), bit32.bxor(_rC, _ydzeh) };
-_vryrr[_qgwde[2]] = _vryrr[_qgwde[3]]
-_ST = 4571
-elseif _iydvk == (-82 * 2 - -119 + 121) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _qgwde = { _iydvk, bit32.bxor(_rA, _ydzeh), bit32.bxor(_rB, _ydzeh), bit32.bxor(_rC, _ydzeh) };
-_jwlqv = _jwlqv + _qgwde[4] * _kpmlq
-_ST = 4571
-elseif _iydvk == (123 * 2 - -103 + -342) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _qgwde = { _iydvk, bit32.bxor(_rA, _ydzeh), bit32.bxor(_rB, _ydzeh), bit32.bxor(_rC, _ydzeh) };
-_vryrr[_qgwde[2]] = _vryrr[_qgwde[3]] + _vryrr[_qgwde[4]]
-_ST = 4571
-elseif _iydvk == (31 * 2 - 86 + 111) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _qgwde = { _iydvk, bit32.bxor(_rA, _ydzeh), bit32.bxor(_rB, _ydzeh), bit32.bxor(_rC, _ydzeh) };
-_vryrr[_qgwde[2]] = _vryrr[_qgwde[3]][_fbsis[_qgwde[4]]]
-_ST = 4571
-elseif _iydvk == (-10 * 2 - -106 + 81) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _qgwde = { _iydvk, bit32.bxor(_rA, _ydzeh), bit32.bxor(_rB, _ydzeh), bit32.bxor(_rC, _ydzeh) };
-_vryrr[_qgwde[2]] = _vryrr[_qgwde[3]] * _vryrr[_qgwde[4]]
-_ST = 4571
-elseif _iydvk == (-59 * 2 - 14 + 330) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _qgwde = { _iydvk, bit32.bxor(_rA, _ydzeh), bit32.bxor(_rB, _ydzeh), bit32.bxor(_rC, _ydzeh) };
-            local f = _vryrr[_qgwde[2]]
-            if f then
-                local nargs = _qgwde[3]
-                local args = {}
-                for i = 1, nargs do
-                    table.insert(args, _vryrr[_qgwde[2] + i])
-                end
-                f(unpack(args))
-            end
-_ST = 4571
-elseif _iydvk == (-31 * 2 - -48 + 184) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _qgwde = { _iydvk, bit32.bxor(_rA, _ydzeh), bit32.bxor(_rB, _ydzeh), bit32.bxor(_rC, _ydzeh) };
-_vryrr[_qgwde[2]] = _vryrr[_qgwde[3]] == _vryrr[_qgwde[4]]
-_ST = 4571
-elseif _iydvk == (124 * 2 - -16 + -83) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _qgwde = { _iydvk, bit32.bxor(_rA, _ydzeh), bit32.bxor(_rB, _ydzeh), bit32.bxor(_rC, _ydzeh) };
-local proto_src = _fbsis[_qgwde[3]]
+        elseif _ST == 3226 then
+            if _ldrpc == (-29 * 2 - -104 + 51) then
+-- no-op
+_ST = 7971
+elseif _ldrpc == (84 * 2 - -59 + -24) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _czget = { _ldrpc, bit32.bxor(_rA, _toznv), bit32.bxor(_rB, _toznv), bit32.bxor(_rC, _toznv) };
+_cuzvw[_czget[2]] = _cuzvw[_czget[3]] + _cuzvw[_czget[4]]
+_ST = 7971
+elseif _ldrpc == (5 * 2 - 74 + 180) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _czget = { _ldrpc, bit32.bxor(_rA, _toznv), bit32.bxor(_rB, _toznv), bit32.bxor(_rC, _toznv) };
+_cuzvw[_czget[2]][_vcgai[_czget[3]]] = _cuzvw[_czget[4]]
+_ST = 7971
+elseif _ldrpc == (40 * 2 - -124 + -173) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _czget = { _ldrpc, bit32.bxor(_rA, _toznv), bit32.bxor(_rB, _toznv), bit32.bxor(_rC, _toznv) };
+local proto_src = _vcgai[_czget[3]]
                 local p_func = loadstring(proto_src)
                 if p_func then
                     local p = p_func() -- returns the Proto table
-                    _vryrr[_qgwde[2]] = function(...) return _zprgv(p.B, p.C, ...) end
+                    _cuzvw[_czget[2]] = function(...) return _hpyrj(p.B, p.C, ...) end
                 end
-_ST = 4571
-elseif _iydvk == (-53 * 2 - -120 + 147) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _qgwde = { _iydvk, bit32.bxor(_rA, _ydzeh), bit32.bxor(_rB, _ydzeh), bit32.bxor(_rC, _ydzeh) };
-if not _vryrr[_qgwde[2]] then _jwlqv = _jwlqv + _qgwde[4] * _kpmlq end
-_ST = 4571
-elseif _iydvk == (-77 * 2 - 61 + 349) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _qgwde = { _iydvk, bit32.bxor(_rA, _ydzeh), bit32.bxor(_rB, _ydzeh), bit32.bxor(_rC, _ydzeh) };
-_vryrr[_qgwde[2]][_fbsis[_qgwde[3]]] = _vryrr[_qgwde[4]]
-_ST = 4571
-elseif _iydvk == (23 * 2 - 101 + 298) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _qgwde = { _iydvk, bit32.bxor(_rA, _ydzeh), bit32.bxor(_rB, _ydzeh), bit32.bxor(_rC, _ydzeh) };
-_vryrr[_qgwde[2]] = _okuzu[_fbsis[_qgwde[3]]]
-_ST = 4571
-elseif _iydvk == (94 * 2 - 15 + 62) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _qgwde = { _iydvk, bit32.bxor(_rA, _ydzeh), bit32.bxor(_rB, _ydzeh), bit32.bxor(_rC, _ydzeh) };
-_vryrr[_qgwde[2]] = _vryrr[_qgwde[3]] - _vryrr[_qgwde[4]]
-_ST = 4571
-elseif _iydvk == (-47 * 2 - -82 + 38) then
-_ppyoz = true
-_ST = 4571
-elseif _iydvk == (4 * 2 - 49 + 44) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _qgwde = { _iydvk, bit32.bxor(_rA, _ydzeh), bit32.bxor(_rB, _ydzeh), bit32.bxor(_rC, _ydzeh) };
-_vryrr[_qgwde[2]] = _fbsis[_qgwde[3]]
-_ST = 4571
-elseif _iydvk == (59 * 2 - -24 + -32) then
--- no-op
-_ST = 4571
-elseif _iydvk == (120 * 2 - 30 + 45) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _qgwde = { _iydvk, bit32.bxor(_rA, _ydzeh), bit32.bxor(_rB, _ydzeh), bit32.bxor(_rC, _ydzeh) };
-_vryrr[_qgwde[2]] = _vryrr[_qgwde[3]] / _vryrr[_qgwde[4]]
-_ST = 4571
+_ST = 7971
+elseif _ldrpc == (109 * 2 - 122 + -31) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _czget = { _ldrpc, bit32.bxor(_rA, _toznv), bit32.bxor(_rB, _toznv), bit32.bxor(_rC, _toznv) };
+_cuzvw[_czget[2]] = _cuzvw[_czget[3]] * _cuzvw[_czget[4]]
+_ST = 7971
+elseif _ldrpc == (14 * 2 - -58 + -47) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _czget = { _ldrpc, bit32.bxor(_rA, _toznv), bit32.bxor(_rB, _toznv), bit32.bxor(_rC, _toznv) };
+_cuzvw[_czget[2]] = _vcgai[_czget[3]]
+_ST = 7971
+elseif _ldrpc == (-96 * 2 - 5 + 415) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _czget = { _ldrpc, bit32.bxor(_rA, _toznv), bit32.bxor(_rB, _toznv), bit32.bxor(_rC, _toznv) };
+_cuzvw[_czget[2]] = _cuzvw[_czget[3]] - _cuzvw[_czget[4]]
+_ST = 7971
+elseif _ldrpc == (67 * 2 - -81 + -203) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _czget = { _ldrpc, bit32.bxor(_rA, _toznv), bit32.bxor(_rB, _toznv), bit32.bxor(_rC, _toznv) };
+_cuzvw[_czget[2]] = _eouhk[_vcgai[_czget[3]]]
+_ST = 7971
+elseif _ldrpc == (52 * 2 - -48 + 77) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _czget = { _ldrpc, bit32.bxor(_rA, _toznv), bit32.bxor(_rB, _toznv), bit32.bxor(_rC, _toznv) };
+_cuzvw[_czget[2]] = _cuzvw[_czget[3]] == _cuzvw[_czget[4]]
+_ST = 7971
+elseif _ldrpc == (-95 * 2 - 70 + 446) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _czget = { _ldrpc, bit32.bxor(_rA, _toznv), bit32.bxor(_rB, _toznv), bit32.bxor(_rC, _toznv) };
+_cuzvw[_czget[2]] = _cuzvw[_czget[3]] / _cuzvw[_czget[4]]
+_ST = 7971
+elseif _ldrpc == (63 * 2 - 114 + 224) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _czget = { _ldrpc, bit32.bxor(_rA, _toznv), bit32.bxor(_rB, _toznv), bit32.bxor(_rC, _toznv) };
+_cuzvw[_czget[2]] = _cuzvw[_czget[3]][_vcgai[_czget[4]]]
+_ST = 7971
+elseif _ldrpc == (-65 * 2 - -65 + 158) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _czget = { _ldrpc, bit32.bxor(_rA, _toznv), bit32.bxor(_rB, _toznv), bit32.bxor(_rC, _toznv) };
+_jgcjj = _jgcjj + _czget[4] * _fvidc
+_ST = 7971
+elseif _ldrpc == (-39 * 2 - 67 + 352) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _czget = { _ldrpc, bit32.bxor(_rA, _toznv), bit32.bxor(_rB, _toznv), bit32.bxor(_rC, _toznv) };
+            local f = _cuzvw[_czget[2]]
+            if f then
+                local nargs = _czget[3]
+                local args = {}
+                for i = 1, nargs do
+                    table.insert(args, _cuzvw[_czget[2] + i])
+                end
+                f(unpack(args))
+            end
+_ST = 7971
+elseif _ldrpc == (-76 * 2 - 116 + 385) then
+_xmnis = true
+_ST = 7971
+elseif _ldrpc == (-24 * 2 - 103 + 217) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _czget = { _ldrpc, bit32.bxor(_rA, _toznv), bit32.bxor(_rB, _toznv), bit32.bxor(_rC, _toznv) };
+_cuzvw[_czget[2]] = _cuzvw[_czget[3]]
+_ST = 7971
+elseif _ldrpc == (120 * 2 - 125 + -54) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _czget = { _ldrpc, bit32.bxor(_rA, _toznv), bit32.bxor(_rB, _toznv), bit32.bxor(_rC, _toznv) };
+if not _cuzvw[_czget[2]] then _jgcjj = _jgcjj + _czget[4] * _fvidc end
+_ST = 7971
 end
-        elseif _ST == 4571 then
-            _jwlqv = _jwlqv + _kpmlq
-            _ST = 4420
+        elseif _ST == 7971 then
+            _jgcjj = _jgcjj + _fvidc
+            _ST = 9382
         end
     end
 end
-_zprgv(_zznls, _ktpfs, ...)
+_hpyrj(_wfrut, _ptacc, ...)
