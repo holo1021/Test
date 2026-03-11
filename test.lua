@@ -1,180 +1,180 @@
 --[[ Holon VM v5 Secure ]]
-local _nmxwa = {33751688,33555434,642,33751176,33620458,130,33686092}
-local _qkrve = {{114,0,105,7,115},{74,37,73,38,72,104,62,115,83,7,98,17,101,95,127,151,34,149,112,251,110,136,0,144,117,255,96},{230,93,243,21,150,37,198,69,219,56,186,13,238,109,222,58,130,8,235,106,205,40,134,25,241,80,220,63,190,43,200,74,198,37,164,2,225,96,228,7,134,56,219,90,195,237,195,237}}
-local _sbogw = 2
-local function _vylwj(_nmxwa, _qkrve, _afjkx, ...)
-    local _buqam, _alqae = 1, getfenv() or _G
-    local _args = {...}; for i=1, #_args do _afjkx[i-1] = _args[i] end
-    local _njnjr = {}
-    for i, v in ipairs(_qkrve) do
+local _lfxmd = {2088598692,2088664357,2122218731,2088599204,2088730405,2122219243,2088533008}
+local _vtwqy = {{12,126,23,121,13},{52,91,55,88,54,22,64,13,45,121,28,111,27,33,1,233,92,235,14,133,16,246,126,238,11,129,30},{152,35,141,107,232,91,184,59,165,70,196,115,144,19,160,68,252,118,149,20,179,86,248,103,143,46,162,65,192,85,182,52,184,91,218,124,159,30,154,121,248,70,165,36,189,147,189,147}}
+local _xbnki = 124
+local function _fwveu(_lfxmd, _vtwqy, _gptro, ...)
+    local _xxshe, _gaupp = 1, getfenv() or _G
+    local _args = {...}; for i=1, #_args do _gptro[i-1] = _args[i] end
+    local _bkjwh = {}
+    for i, v in ipairs(_vtwqy) do
         local t = {}
-        local last_byte = _sbogw -- 最初のキーはVMキー
+        local last_byte = _xbnki -- 最初のキーはVMキー
         for j = 1, #v do
             local enc_byte = v[j]
             local dec_byte = bit32.bxor(enc_byte, last_byte)
             table.insert(t, string.char(dec_byte))
             last_byte = enc_byte -- 暗号化されたバイトが次の復号キーになる
         end
-        _njnjr[i] = table.concat(t)
+        _bkjwh[i] = table.concat(t)
     end
 
-    local _ciwjj = nil
+    local _fasuj = nil
 
-    local _pghhl = 1 -- Instruction Width
-    local _ST = 9579
-    local _IN, _biqyd = 0, 0
-    while _ciwjj == nil do
-        if _ST == 9579 then
-            if _buqam > #_nmxwa then _ciwjj = {} else
-                _IN = _nmxwa[_buqam]
-                _biqyd = _IN % 256
-                _ST = 6588
+    local _kszse = 1 -- Instruction Width
+    local _ST = 8375
+    local _IN, _sqmni = 0, 0
+    while _fasuj == nil do
+        if _ST == 8375 then
+            if _xxshe > #_lfxmd then _fasuj = {} else
+                _IN = _lfxmd[_xxshe]
+                _sqmni = _IN % 256
+                _ST = 9046
             end
-        elseif _ST == 6588 then
-            if _biqyd == (-15 * 2 - 106 + 370) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _sbhic = { _biqyd, bit32.bxor(_rA, _sbogw), bit32.bxor(_rB, _sbogw), bit32.bxor(_rC, _sbogw) };
-_afjkx[_sbhic[2]] = _njnjr[_sbhic[3]]
-_ST = 9960
-elseif _biqyd == (127 * 2 - 10 + -108) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _sbhic = { _biqyd, bit32.bxor(_rA, _sbogw), bit32.bxor(_rB, _sbogw), bit32.bxor(_rC, _sbogw) };
-_afjkx[_sbhic[2]] = _alqae[_njnjr[_sbhic[3]]]
-_ST = 9960
-elseif _biqyd == (-76 * 2 - 79 + 339) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _sbhic = { _biqyd, bit32.bxor(_rA, _sbogw), bit32.bxor(_rB, _sbogw), bit32.bxor(_rC, _sbogw) };
-_afjkx[_sbhic[2]] = not _afjkx[_sbhic[3]]
-_ST = 9960
-elseif _biqyd == (43 * 2 - 99 + 76) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _sbhic = { _biqyd, bit32.bxor(_rA, _sbogw), bit32.bxor(_rB, _sbogw), bit32.bxor(_rC, _sbogw) };
-_afjkx[_sbhic[2]] = _afjkx[_sbhic[3]] - _afjkx[_sbhic[4]]
-_ST = 9960
-elseif _biqyd == (-68 * 2 - 93 + 480) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _sbhic = { _biqyd, bit32.bxor(_rA, _sbogw), bit32.bxor(_rB, _sbogw), bit32.bxor(_rC, _sbogw) };
-_afjkx[_sbhic[2]][_afjkx[_sbhic[3]]] = _afjkx[_sbhic[4]]
-_ST = 9960
-elseif _biqyd == (-94 * 2 - 28 + 290) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _sbhic = { _biqyd, bit32.bxor(_rA, _sbogw), bit32.bxor(_rB, _sbogw), bit32.bxor(_rC, _sbogw) };
-_afjkx[_sbhic[2]] = _afjkx[_sbhic[3]]
-_ST = 9960
-elseif _biqyd == (11 * 2 - -72 + -86) then
+        elseif _ST == 9046 then
+            if _sqmni == (-27 * 2 - 116 + 334) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _kgxas = { _sqmni, bit32.bxor(_rA, _xbnki), bit32.bxor(_rB, _xbnki), bit32.bxor(_rC, _xbnki) };
+_gptro[_kgxas[2]] = _gaupp[_bkjwh[_kgxas[3]]]
+_ST = 6866
+elseif _sqmni == (114 * 2 - -90 + -82) then
 -- no-op
-_ST = 9960
-elseif _biqyd == (14 * 2 - 54 + 158) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _sbhic = { _biqyd, bit32.bxor(_rA, _sbogw), bit32.bxor(_rB, _sbogw), bit32.bxor(_rC, _sbogw) };
-                    local target_S = _afjkx
-                    for i=1, _sbhic[3] do target_S = target_S.parent end
-                    target_S[_sbhic[2]] = _afjkx[_sbhic[4]]
-                
-_ST = 9960
-elseif _biqyd == (31 * 2 - -63 + 111) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _sbhic = { _biqyd, bit32.bxor(_rA, _sbogw), bit32.bxor(_rB, _sbogw), bit32.bxor(_rC, _sbogw) };
-_alqae[_njnjr[_sbhic[2]]] = _afjkx[_sbhic[3]]
-_ST = 9960
-elseif _biqyd == (87 * 2 - -40 + 14) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _sbhic = { _biqyd, bit32.bxor(_rA, _sbogw), bit32.bxor(_rB, _sbogw), bit32.bxor(_rC, _sbogw) };
-_afjkx[_sbhic[2]] = _afjkx[_sbhic[3]] * _afjkx[_sbhic[4]]
-_ST = 9960
-elseif _biqyd == (-13 * 2 - -10 + 70) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _sbhic = { _biqyd, bit32.bxor(_rA, _sbogw), bit32.bxor(_rB, _sbogw), bit32.bxor(_rC, _sbogw) };
-if not _afjkx[_sbhic[2]] then _buqam = _buqam + _sbhic[4] * _pghhl end
-_ST = 9960
-elseif _biqyd == (-84 * 2 - 90 + 281) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _sbhic = { _biqyd, bit32.bxor(_rA, _sbogw), bit32.bxor(_rB, _sbogw), bit32.bxor(_rC, _sbogw) };
-_afjkx[_sbhic[2]] = _afjkx[_sbhic[3]] + _afjkx[_sbhic[4]]
-_ST = 9960
-elseif _biqyd == (121 * 2 - 22 + -147) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _sbhic = { _biqyd, bit32.bxor(_rA, _sbogw), bit32.bxor(_rB, _sbogw), bit32.bxor(_rC, _sbogw) };
-_afjkx[_sbhic[2]] = _afjkx[_sbhic[3]][_afjkx[_sbhic[4]]]
-_ST = 9960
-elseif _biqyd == (8 * 2 - 66 + 70) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _sbhic = { _biqyd, bit32.bxor(_rA, _sbogw), bit32.bxor(_rB, _sbogw), bit32.bxor(_rC, _sbogw) };
-_afjkx[_sbhic[2]] = -_afjkx[_sbhic[3]]
-_ST = 9960
-elseif _biqyd == (-26 * 2 - 125 + 228) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _sbhic = { _biqyd, bit32.bxor(_rA, _sbogw), bit32.bxor(_rB, _sbogw), bit32.bxor(_rC, _sbogw) };
-local proto_src = _njnjr[_sbhic[3]]
+_ST = 6866
+elseif _sqmni == (107 * 2 - -61 + -185) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _kgxas = { _sqmni, bit32.bxor(_rA, _xbnki), bit32.bxor(_rB, _xbnki), bit32.bxor(_rC, _xbnki) };
+_gptro[_kgxas[2]][_gptro[_kgxas[3]]] = _gptro[_kgxas[4]]
+_ST = 6866
+elseif _sqmni == (-15 * 2 - -4 + 66) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _kgxas = { _sqmni, bit32.bxor(_rA, _xbnki), bit32.bxor(_rB, _xbnki), bit32.bxor(_rC, _xbnki) };
+_gptro[_kgxas[2]] = _gptro[_kgxas[3]] * _gptro[_kgxas[4]]
+_ST = 6866
+elseif _sqmni == (50 * 2 - -56 + -140) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _kgxas = { _sqmni, bit32.bxor(_rA, _xbnki), bit32.bxor(_rB, _xbnki), bit32.bxor(_rC, _xbnki) };
+local n = _kgxas[3] - 1; local t = {}; for i=0, n-1 do t[i+1] = _gptro[_kgxas[2]+i] end; _fasuj = t
+_ST = 6866
+elseif _sqmni == (104 * 2 - -92 + -175) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _kgxas = { _sqmni, bit32.bxor(_rA, _xbnki), bit32.bxor(_rB, _xbnki), bit32.bxor(_rC, _xbnki) };
+_gptro[_kgxas[2]] = _gptro[_kgxas[3]]
+_ST = 6866
+elseif _sqmni == (-62 * 2 - -33 + 106) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _kgxas = { _sqmni, bit32.bxor(_rA, _xbnki), bit32.bxor(_rB, _xbnki), bit32.bxor(_rC, _xbnki) };
+_gptro[_kgxas[2]][_bkjwh[_kgxas[3]]] = _gptro[_kgxas[4]]
+_ST = 6866
+elseif _sqmni == (22 * 2 - -115 + -105) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _kgxas = { _sqmni, bit32.bxor(_rA, _xbnki), bit32.bxor(_rB, _xbnki), bit32.bxor(_rC, _xbnki) };
+if _gptro[_kgxas[2]] then _xxshe = _xxshe + _kgxas[4] * _kszse end
+_ST = 6866
+elseif _sqmni == (-27 * 2 - -122 + 167) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _kgxas = { _sqmni, bit32.bxor(_rA, _xbnki), bit32.bxor(_rB, _xbnki), bit32.bxor(_rC, _xbnki) };
+            local f = _gptro[_kgxas[2]]
+            if f then
+                local nargs = _kgxas[3] - 1
+                local args = {}
+                for i = 1, nargs do
+                    table.insert(args, _gptro[_kgxas[2] + i])
+                end
+                local results = { f(unpack(args)) }
+                local nRes = _kgxas[4] - 1
+                if nRes > 0 then
+                    for i = 1, nRes do _gptro[_kgxas[2] + i - 1] = results[i] end
+                end
+            end
+_ST = 6866
+elseif _sqmni == (36 * 2 - -36 + 90) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _kgxas = { _sqmni, bit32.bxor(_rA, _xbnki), bit32.bxor(_rB, _xbnki), bit32.bxor(_rC, _xbnki) };
+_gptro[_kgxas[2]] = _gptro[_kgxas[3]][_gptro[_kgxas[4]]]
+_ST = 6866
+elseif _sqmni == (82 * 2 - 55 + -12) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _kgxas = { _sqmni, bit32.bxor(_rA, _xbnki), bit32.bxor(_rB, _xbnki), bit32.bxor(_rC, _xbnki) };
+_gptro[_kgxas[2]] = {}
+_ST = 6866
+elseif _sqmni == (-125 * 2 - 5 + 358) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _kgxas = { _sqmni, bit32.bxor(_rA, _xbnki), bit32.bxor(_rB, _xbnki), bit32.bxor(_rC, _xbnki) };
+local proto_src = _bkjwh[_kgxas[3]]
                 local p_func = loadstring(proto_src)
                 if p_func then
                     local p = p_func()
-                    _afjkx[_sbhic[2]] = function(...)
+                    _gptro[_kgxas[2]] = function(...)
                         local new_S = {}
-                        new_S.parent = _afjkx
-                        return _vylwj(p.B, p.C, new_S, ...)
+                        new_S.parent = _gptro
+                        return _fwveu(p.B, p.C, new_S, ...)
                     end
                 end
-_ST = 9960
-elseif _biqyd == (95 * 2 - 25 + -34) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _sbhic = { _biqyd, bit32.bxor(_rA, _sbogw), bit32.bxor(_rB, _sbogw), bit32.bxor(_rC, _sbogw) };
-_buqam = _buqam + _sbhic[4] * _pghhl
-_ST = 9960
-elseif _biqyd == (0 * 2 - 79 + 101) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _sbhic = { _biqyd, bit32.bxor(_rA, _sbogw), bit32.bxor(_rB, _sbogw), bit32.bxor(_rC, _sbogw) };
-_afjkx[_sbhic[2]] = _afjkx[_sbhic[3]] ~= _afjkx[_sbhic[4]]
-_ST = 9960
-elseif _biqyd == (67 * 2 - 83 + 25) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _sbhic = { _biqyd, bit32.bxor(_rA, _sbogw), bit32.bxor(_rB, _sbogw), bit32.bxor(_rC, _sbogw) };
-local n = _sbhic[3] - 1; local t = {}; for i=0, n-1 do t[i+1] = _afjkx[_sbhic[2]+i] end; _ciwjj = t
-_ST = 9960
-elseif _biqyd == (-126 * 2 - 20 + 475) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _sbhic = { _biqyd, bit32.bxor(_rA, _sbogw), bit32.bxor(_rB, _sbogw), bit32.bxor(_rC, _sbogw) };
-if _afjkx[_sbhic[2]] then _buqam = _buqam + _sbhic[4] * _pghhl end
-_ST = 9960
-elseif _biqyd == (-114 * 2 - -39 + 319) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _sbhic = { _biqyd, bit32.bxor(_rA, _sbogw), bit32.bxor(_rB, _sbogw), bit32.bxor(_rC, _sbogw) };
-            local f = _afjkx[_sbhic[2]]
-            if f then
-                local nargs = _sbhic[3] - 1
-                local args = {}
-                for i = 1, nargs do
-                    table.insert(args, _afjkx[_sbhic[2] + i])
-                end
-                local results = { f(unpack(args)) }
-                local nRes = _sbhic[4] - 1
-                if nRes > 0 then
-                    for i = 1, nRes do _afjkx[_sbhic[2] + i - 1] = results[i] end
-                end
-            end
-_ST = 9960
-elseif _biqyd == (-19 * 2 - -82 + 78) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _sbhic = { _biqyd, bit32.bxor(_rA, _sbogw), bit32.bxor(_rB, _sbogw), bit32.bxor(_rC, _sbogw) };
-_afjkx[_sbhic[2]][_njnjr[_sbhic[3]]] = _afjkx[_sbhic[4]]
-_ST = 9960
-elseif _biqyd == (6 * 2 - -72 + 69) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _sbhic = { _biqyd, bit32.bxor(_rA, _sbogw), bit32.bxor(_rB, _sbogw), bit32.bxor(_rC, _sbogw) };
-_afjkx[_sbhic[2]] = _afjkx[_sbhic[3]] <= _afjkx[_sbhic[4]]
-_ST = 9960
-elseif _biqyd == (33 * 2 - 23 + -28) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _sbhic = { _biqyd, bit32.bxor(_rA, _sbogw), bit32.bxor(_rB, _sbogw), bit32.bxor(_rC, _sbogw) };
-_afjkx[_sbhic[2]] = _afjkx[_sbhic[3]][_njnjr[_sbhic[4]]]
-_ST = 9960
-elseif _biqyd == (48 * 2 - -109 + 41) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _sbhic = { _biqyd, bit32.bxor(_rA, _sbogw), bit32.bxor(_rB, _sbogw), bit32.bxor(_rC, _sbogw) };
-_afjkx[_sbhic[2]] = {}
-_ST = 9960
-elseif _biqyd == (23 * 2 - -91 + -133) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _sbhic = { _biqyd, bit32.bxor(_rA, _sbogw), bit32.bxor(_rB, _sbogw), bit32.bxor(_rC, _sbogw) };
-_afjkx[_sbhic[2]] = _afjkx[_sbhic[3]] / _afjkx[_sbhic[4]]
-_ST = 9960
-elseif _biqyd == (64 * 2 - -110 + -51) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _sbhic = { _biqyd, bit32.bxor(_rA, _sbogw), bit32.bxor(_rB, _sbogw), bit32.bxor(_rC, _sbogw) };
-                    local target_S = _afjkx
-                    for i=1, _sbhic[4] do target_S = target_S.parent end
-                    _afjkx[_sbhic[2]] = target_S[_sbhic[3]]
+_ST = 6866
+elseif _sqmni == (3 * 2 - 29 + 60) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _kgxas = { _sqmni, bit32.bxor(_rA, _xbnki), bit32.bxor(_rB, _xbnki), bit32.bxor(_rC, _xbnki) };
+_gptro[_kgxas[2]] = _bkjwh[_kgxas[3]]
+_ST = 6866
+elseif _sqmni == (-19 * 2 - -63 + 180) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _kgxas = { _sqmni, bit32.bxor(_rA, _xbnki), bit32.bxor(_rB, _xbnki), bit32.bxor(_rC, _xbnki) };
+_gptro[_kgxas[2]] = _gptro[_kgxas[3]] ~= _gptro[_kgxas[4]]
+_ST = 6866
+elseif _sqmni == (60 * 2 - -84 + 45) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _kgxas = { _sqmni, bit32.bxor(_rA, _xbnki), bit32.bxor(_rB, _xbnki), bit32.bxor(_rC, _xbnki) };
+_gptro[_kgxas[2]] = _gptro[_kgxas[3]] <= _gptro[_kgxas[4]]
+_ST = 6866
+elseif _sqmni == (73 * 2 - 67 + 143) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _kgxas = { _sqmni, bit32.bxor(_rA, _xbnki), bit32.bxor(_rB, _xbnki), bit32.bxor(_rC, _xbnki) };
+_gptro[_kgxas[2]] = _gptro[_kgxas[3]] < _gptro[_kgxas[4]]
+_ST = 6866
+elseif _sqmni == (-85 * 2 - 116 + 532) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _kgxas = { _sqmni, bit32.bxor(_rA, _xbnki), bit32.bxor(_rB, _xbnki), bit32.bxor(_rC, _xbnki) };
+_gptro[_kgxas[2]] = _gptro[_kgxas[3]] / _gptro[_kgxas[4]]
+_ST = 6866
+elseif _sqmni == (25 * 2 - -92 + 65) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _kgxas = { _sqmni, bit32.bxor(_rA, _xbnki), bit32.bxor(_rB, _xbnki), bit32.bxor(_rC, _xbnki) };
+_gptro[_kgxas[2]] = _gptro[_kgxas[3]] - _gptro[_kgxas[4]]
+_ST = 6866
+elseif _sqmni == (63 * 2 - -91 + -204) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _kgxas = { _sqmni, bit32.bxor(_rA, _xbnki), bit32.bxor(_rB, _xbnki), bit32.bxor(_rC, _xbnki) };
+_gptro[_kgxas[2]] = _gptro[_kgxas[3]] + _gptro[_kgxas[4]]
+_ST = 6866
+elseif _sqmni == (-125 * 2 - -87 + 206) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _kgxas = { _sqmni, bit32.bxor(_rA, _xbnki), bit32.bxor(_rB, _xbnki), bit32.bxor(_rC, _xbnki) };
+_xxshe = _xxshe + _kgxas[4] * _kszse
+_ST = 6866
+elseif _sqmni == (-111 * 2 - 78 + 506) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _kgxas = { _sqmni, bit32.bxor(_rA, _xbnki), bit32.bxor(_rB, _xbnki), bit32.bxor(_rC, _xbnki) };
+_gaupp[_bkjwh[_kgxas[2]]] = _gptro[_kgxas[3]]
+_ST = 6866
+elseif _sqmni == (6 * 2 - -108 + 43) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _kgxas = { _sqmni, bit32.bxor(_rA, _xbnki), bit32.bxor(_rB, _xbnki), bit32.bxor(_rC, _xbnki) };
+                    local target_S = _gptro
+                    for i=1, _kgxas[4] do target_S = target_S.parent end
+                    _gptro[_kgxas[2]] = target_S[_kgxas[3]]
                 
-_ST = 9960
-elseif _biqyd == (-77 * 2 - 104 + 498) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _sbhic = { _biqyd, bit32.bxor(_rA, _sbogw), bit32.bxor(_rB, _sbogw), bit32.bxor(_rC, _sbogw) };
-_afjkx[_sbhic[2]] = _afjkx[_sbhic[3]] == _afjkx[_sbhic[4]]
-_ST = 9960
-elseif _biqyd == (93 * 2 - 26 + -45) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _sbhic = { _biqyd, bit32.bxor(_rA, _sbogw), bit32.bxor(_rB, _sbogw), bit32.bxor(_rC, _sbogw) };
-_afjkx[_sbhic[2]] = _afjkx[_sbhic[3]] < _afjkx[_sbhic[4]]
-_ST = 9960
+_ST = 6866
+elseif _sqmni == (94 * 2 - -1 + -184) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _kgxas = { _sqmni, bit32.bxor(_rA, _xbnki), bit32.bxor(_rB, _xbnki), bit32.bxor(_rC, _xbnki) };
+if not _gptro[_kgxas[2]] then _xxshe = _xxshe + _kgxas[4] * _kszse end
+_ST = 6866
+elseif _sqmni == (-100 * 2 - -69 + 299) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _kgxas = { _sqmni, bit32.bxor(_rA, _xbnki), bit32.bxor(_rB, _xbnki), bit32.bxor(_rC, _xbnki) };
+_gptro[_kgxas[2]] = _gptro[_kgxas[3]][_bkjwh[_kgxas[4]]]
+_ST = 6866
+elseif _sqmni == (93 * 2 - -84 + -104) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _kgxas = { _sqmni, bit32.bxor(_rA, _xbnki), bit32.bxor(_rB, _xbnki), bit32.bxor(_rC, _xbnki) };
+                    local target_S = _gptro
+                    for i=1, _kgxas[3] do target_S = target_S.parent end
+                    target_S[_kgxas[2]] = _gptro[_kgxas[4]]
+                
+_ST = 6866
+elseif _sqmni == (41 * 2 - 38 + 17) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _kgxas = { _sqmni, bit32.bxor(_rA, _xbnki), bit32.bxor(_rB, _xbnki), bit32.bxor(_rC, _xbnki) };
+_gptro[_kgxas[2]] = -_gptro[_kgxas[3]]
+_ST = 6866
+elseif _sqmni == (-51 * 2 - -68 + 174) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _kgxas = { _sqmni, bit32.bxor(_rA, _xbnki), bit32.bxor(_rB, _xbnki), bit32.bxor(_rC, _xbnki) };
+_gptro[_kgxas[2]] = _gptro[_kgxas[3]] == _gptro[_kgxas[4]]
+_ST = 6866
+elseif _sqmni == (70 * 2 - 64 + -41) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _kgxas = { _sqmni, bit32.bxor(_rA, _xbnki), bit32.bxor(_rB, _xbnki), bit32.bxor(_rC, _xbnki) };
+_gptro[_kgxas[2]] = not _gptro[_kgxas[3]]
+_ST = 6866
 end
-        elseif _ST == 9960 then
-            _buqam = _buqam + _pghhl
-            _ST = 9579
+        elseif _ST == 6866 then
+            _xxshe = _xxshe + _kszse
+            _ST = 8375
         end
     end
-    return unpack(_ciwjj or {})
+    return unpack(_fasuj or {})
 end
-return _vylwj(_nmxwa, _qkrve, {}, ...)
+return _fwveu(_lfxmd, _vtwqy, {}, ...)
