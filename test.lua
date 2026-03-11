@@ -1,196 +1,196 @@
 --[[ Holon VM v5 Secure ]]
-local _kteiv = {84149667,84345877,117900657,84150179,84280853,117901169,84215205,84215189}
-local _gvcyf = {{117,7,110,0,116},{77,34,78,33,79,111,57,116,84,0,101,22,98,88,120,144,37,146,119,252,105,143,7,151,114,248,103},{225,90,244,18,145,34,193,66,220,63,189,10,233,106,217,61,133,15,236,109,202,47,129,30,246,87,219,56,185,44,207,77,193,34,163,5,230,103,227,0,129,63,220,93,196,234,196,234}}
-local _xoaxk = 5
-local function _wfpxo(_kteiv, _gvcyf, _qnxfa, ...)
-    local _ubiuo, _ekeqa = 1, getfenv() or _G
-    local _args = {...}; for i=1, #_args do _qnxfa[i-1] = _args[i] end
-    local _hazrb = {}
-    for i, v in ipairs(_gvcyf) do
+local _mnsbq = {3065493212,3065296886,3031742143,3065492700,3065427620,3065361910,3031741631,3065427617}
+local _xywce = {{198,180,221,179,199},{254,145,253,146,252,220,138,199,231,179,214,165,209,235,203,35,150,33,196,79,218,60,180,36,193,75,212},{82,233,71,161,34,145,114,241,111,140,14,185,90,217,106,142,54,188,95,222,121,156,50,173,69,228,104,139,10,159,124,254,114,145,16,182,85,212,80,179,50,140,111,238,119,89,119,89}}
+local _ufpce = 182
+local function _pzcev(_mnsbq, _xywce, _ohxtb, ...)
+    local _snejk, _jtwec = 1, getfenv() or _G
+    local _args = {...}; for i=1, #_args do _ohxtb[i-1] = _args[i] end
+    local _wtkzc = {}
+    for i, v in ipairs(_xywce) do
         local t = {}
-        local last_byte = _xoaxk -- 最初のキーはVMキー
+        local last_byte = _ufpce -- 最初のキーはVMキー
         for j = 1, #v do
             local enc_byte = v[j]
             local dec_byte = bit32.bxor(enc_byte, last_byte)
             table.insert(t, string.char(dec_byte))
             last_byte = enc_byte -- 暗号化されたバイトが次の復号キーになる
         end
-        _hazrb[i] = table.concat(t)
+        _wtkzc[i] = table.concat(t)
     end
 
-    local _askqu = nil
+    local _fmade = nil
 
-    local _nwqsk = 1 -- Instruction Width
-    local _ST = 9626
-    local _IN, _axumu = 0, 0
-    while _askqu == nil do
-        if _ST == 9626 then
-            if _ubiuo > #_kteiv then _askqu = {} else
-                _IN = _kteiv[_ubiuo]
-                _axumu = _IN % 256
-                _ST = 8820
+    local _dydbi = 1 -- Instruction Width
+    local _ST = 2356
+    local _IN, _uybye = 0, 0
+    while _fmade == nil do
+        if _ST == 2356 then
+            if _snejk > #_mnsbq then _fmade = {} else
+                _IN = _mnsbq[_snejk]
+                _uybye = _IN % 256
+                _ST = 9907
             end
-        elseif _ST == 8820 then
-            if _axumu == (9 * 2 - -60 + 92) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _vpbis = { _axumu, bit32.bxor(_rA, _xoaxk), bit32.bxor(_rB, _xoaxk), bit32.bxor(_rC, _xoaxk) };
-_qnxfa[_vpbis[2]] = _qnxfa[_vpbis[3]]
-_ST = 1561
-elseif _axumu == (-9 * 2 - -6 + 161) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _vpbis = { _axumu, bit32.bxor(_rA, _xoaxk), bit32.bxor(_rB, _xoaxk), bit32.bxor(_rC, _xoaxk) };
-local n = _vpbis[3] - 1; local t = {}; for i=0, n-1 do t[i+1] = _qnxfa[_vpbis[2]+i] end; _askqu = t
-_ST = 1561
-elseif _axumu == (-98 * 2 - 101 + 511) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _vpbis = { _axumu, bit32.bxor(_rA, _xoaxk), bit32.bxor(_rB, _xoaxk), bit32.bxor(_rC, _xoaxk) };
-if not _qnxfa[_vpbis[2]] then _ubiuo = _ubiuo + _vpbis[4] * _nwqsk end
-_ST = 1561
-elseif _axumu == (-80 * 2 - -9 + 177) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _vpbis = { _axumu, bit32.bxor(_rA, _xoaxk), bit32.bxor(_rB, _xoaxk), bit32.bxor(_rC, _xoaxk) };
-_qnxfa[_vpbis[2]][_hazrb[_vpbis[3]]] = _qnxfa[_vpbis[4]]
-_ST = 1561
-elseif _axumu == (-19 * 2 - -22 + 223) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _vpbis = { _axumu, bit32.bxor(_rA, _xoaxk), bit32.bxor(_rB, _xoaxk), bit32.bxor(_rC, _xoaxk) };
-_qnxfa[_vpbis[2]] = _qnxfa[_vpbis[3]] * _qnxfa[_vpbis[4]]
-_ST = 1561
-elseif _axumu == (14 * 2 - -73 + -70) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _vpbis = { _axumu, bit32.bxor(_rA, _xoaxk), bit32.bxor(_rB, _xoaxk), bit32.bxor(_rC, _xoaxk) };
-_ubiuo = _ubiuo + _vpbis[4] * _nwqsk
-_ST = 1561
-elseif _axumu == (-24 * 2 - -82 + 123) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _vpbis = { _axumu, bit32.bxor(_rA, _xoaxk), bit32.bxor(_rB, _xoaxk), bit32.bxor(_rC, _xoaxk) };
-_qnxfa[_vpbis[2]] = _qnxfa[_vpbis[3]] == _qnxfa[_vpbis[4]]
-_ST = 1561
-elseif _axumu == (57 * 2 - -16 + -11) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _vpbis = { _axumu, bit32.bxor(_rA, _xoaxk), bit32.bxor(_rB, _xoaxk), bit32.bxor(_rC, _xoaxk) };
-_qnxfa[_vpbis[2]] = -_qnxfa[_vpbis[3]]
-_ST = 1561
-elseif _axumu == (-95 * 2 - 20 + 271) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _vpbis = { _axumu, bit32.bxor(_rA, _xoaxk), bit32.bxor(_rB, _xoaxk), bit32.bxor(_rC, _xoaxk) };
-                    local target_S = _qnxfa
-                    for i=1, _vpbis[4] do target_S = target_S.parent end
-                    _qnxfa[_vpbis[2]] = target_S[_vpbis[3]]
-                
-_ST = 1561
-elseif _axumu == (-11 * 2 - 117 + 278) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _vpbis = { _axumu, bit32.bxor(_rA, _xoaxk), bit32.bxor(_rB, _xoaxk), bit32.bxor(_rC, _xoaxk) };
+        elseif _ST == 9907 then
+            if _uybye == (93 * 2 - -70 + -36) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _urnfe = { _uybye, bit32.bxor(_rA, _ufpce), bit32.bxor(_rB, _ufpce), bit32.bxor(_rC, _ufpce) };
+_ohxtb[_urnfe[2]] = _jtwec[_wtkzc[_urnfe[3]]]
+_ST = 1776
+elseif _uybye == (-112 * 2 - 5 + 380) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _urnfe = { _uybye, bit32.bxor(_rA, _ufpce), bit32.bxor(_rB, _ufpce), bit32.bxor(_rC, _ufpce) };
+_snejk = _snejk + _urnfe[4] * _dydbi
+_ST = 1776
+elseif _uybye == (-71 * 2 - 63 + 231) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _urnfe = { _uybye, bit32.bxor(_rA, _ufpce), bit32.bxor(_rB, _ufpce), bit32.bxor(_rC, _ufpce) };
 
-_ST = 1561
-elseif _axumu == (69 * 2 - 117 + 142) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _vpbis = { _axumu, bit32.bxor(_rA, _xoaxk), bit32.bxor(_rB, _xoaxk), bit32.bxor(_rC, _xoaxk) };
-_qnxfa[_vpbis[2]] = _ekeqa[_hazrb[_vpbis[3]]]
-_ST = 1561
-elseif _axumu == (-4 * 2 - -19 + 154) then
+_ST = 1776
+elseif _uybye == (-120 * 2 - 51 + 388) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _urnfe = { _uybye, bit32.bxor(_rA, _ufpce), bit32.bxor(_rB, _ufpce), bit32.bxor(_rC, _ufpce) };
+_ohxtb[_urnfe[2]] = _ohxtb[_urnfe[3]] < _ohxtb[_urnfe[4]]
+_ST = 1776
+elseif _uybye == (86 * 2 - -16 + 19) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _urnfe = { _uybye, bit32.bxor(_rA, _ufpce), bit32.bxor(_rB, _ufpce), bit32.bxor(_rC, _ufpce) };
+_ohxtb[_urnfe[2]][_ohxtb[_urnfe[3]]] = _ohxtb[_urnfe[4]]
+_ST = 1776
+elseif _uybye == (52 * 2 - 113 + 14) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _urnfe = { _uybye, bit32.bxor(_rA, _ufpce), bit32.bxor(_rB, _ufpce), bit32.bxor(_rC, _ufpce) };
+_ohxtb[_urnfe[2]] = _ohxtb[_urnfe[3]]
+_ST = 1776
+elseif _uybye == (40 * 2 - 89 + 150) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _urnfe = { _uybye, bit32.bxor(_rA, _ufpce), bit32.bxor(_rB, _ufpce), bit32.bxor(_rC, _ufpce) };
+_ohxtb[_urnfe[2]] = not _ohxtb[_urnfe[3]]
+_ST = 1776
+elseif _uybye == (60 * 2 - -33 + -84) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _urnfe = { _uybye, bit32.bxor(_rA, _ufpce), bit32.bxor(_rB, _ufpce), bit32.bxor(_rC, _ufpce) };
+if _ohxtb[_urnfe[2]+1] ~= nil then _ohxtb[_urnfe[2]] = _ohxtb[_urnfe[2]+1]; _snejk = _snejk + _urnfe[4] * _dydbi else _ohxtb[_urnfe[2]] = nil end
+_ST = 1776
+elseif _uybye == (120 * 2 - 105 + -84) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _urnfe = { _uybye, bit32.bxor(_rA, _ufpce), bit32.bxor(_rB, _ufpce), bit32.bxor(_rC, _ufpce) };
+_ohxtb[_urnfe[2]] = _ohxtb[_urnfe[3]] + _ohxtb[_urnfe[4]]
+_ST = 1776
+elseif _uybye == (-3 * 2 - -33 + 26) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _urnfe = { _uybye, bit32.bxor(_rA, _ufpce), bit32.bxor(_rB, _ufpce), bit32.bxor(_rC, _ufpce) };
+_ohxtb[_urnfe[2]] = {}
+_ST = 1776
+elseif _uybye == (78 * 2 - -2 + 6) then
 -- no-op
-_ST = 1561
-elseif _axumu == (-13 * 2 - 9 + 79) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _vpbis = { _axumu, bit32.bxor(_rA, _xoaxk), bit32.bxor(_rB, _xoaxk), bit32.bxor(_rC, _xoaxk) };
-_qnxfa[_vpbis[2]] = _qnxfa[_vpbis[3]] / _qnxfa[_vpbis[4]]
-_ST = 1561
-elseif _axumu == (-86 * 2 - -99 + 201) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _vpbis = { _axumu, bit32.bxor(_rA, _xoaxk), bit32.bxor(_rB, _xoaxk), bit32.bxor(_rC, _xoaxk) };
-                    local target_S = _qnxfa
-                    for i=1, _vpbis[3] do target_S = target_S.parent end
-                    target_S[_vpbis[2]] = _qnxfa[_vpbis[4]]
+_ST = 1776
+elseif _uybye == (13 * 2 - -10 + 199) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _urnfe = { _uybye, bit32.bxor(_rA, _ufpce), bit32.bxor(_rB, _ufpce), bit32.bxor(_rC, _ufpce) };
+_ohxtb[_urnfe[2]] = _ohxtb[_urnfe[3]] ~= _ohxtb[_urnfe[4]]
+_ST = 1776
+elseif _uybye == (33 * 2 - 17 + 121) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _urnfe = { _uybye, bit32.bxor(_rA, _ufpce), bit32.bxor(_rB, _ufpce), bit32.bxor(_rC, _ufpce) };
+_ohxtb[_urnfe[2]] = _ohxtb[_urnfe[3]] <= _ohxtb[_urnfe[4]]
+_ST = 1776
+elseif _uybye == (-31 * 2 - 86 + 372) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _urnfe = { _uybye, bit32.bxor(_rA, _ufpce), bit32.bxor(_rB, _ufpce), bit32.bxor(_rC, _ufpce) };
+if not _ohxtb[_urnfe[2]] then _snejk = _snejk + _urnfe[4] * _dydbi end
+_ST = 1776
+elseif _uybye == (-14 * 2 - -22 + 71) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _urnfe = { _uybye, bit32.bxor(_rA, _ufpce), bit32.bxor(_rB, _ufpce), bit32.bxor(_rC, _ufpce) };
+                    local target_S = _ohxtb
+                    for i=1, _urnfe[4] do target_S = target_S.parent end
+                    _ohxtb[_urnfe[2]] = target_S[_urnfe[3]]
                 
-_ST = 1561
-elseif _axumu == (-88 * 2 - -3 + 357) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _vpbis = { _axumu, bit32.bxor(_rA, _xoaxk), bit32.bxor(_rB, _xoaxk), bit32.bxor(_rC, _xoaxk) };
-_qnxfa[_vpbis[2]] = _qnxfa[_vpbis[3]] <= _qnxfa[_vpbis[4]]
-_ST = 1561
-elseif _axumu == (-110 * 2 - 40 + 344) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _vpbis = { _axumu, bit32.bxor(_rA, _xoaxk), bit32.bxor(_rB, _xoaxk), bit32.bxor(_rC, _xoaxk) };
-_qnxfa[_vpbis[2]] = _qnxfa[_vpbis[3]][_hazrb[_vpbis[4]]]
-_ST = 1561
-elseif _axumu == (-53 * 2 - -82 + 92) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _vpbis = { _axumu, bit32.bxor(_rA, _xoaxk), bit32.bxor(_rB, _xoaxk), bit32.bxor(_rC, _xoaxk) };
-_qnxfa[_vpbis[2]] = {}
-_ST = 1561
-elseif _axumu == (-48 * 2 - -10 + 193) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _vpbis = { _axumu, bit32.bxor(_rA, _xoaxk), bit32.bxor(_rB, _xoaxk), bit32.bxor(_rC, _xoaxk) };
-_qnxfa[_vpbis[2]] = _qnxfa[_vpbis[3]][_qnxfa[_vpbis[4]]]
-_ST = 1561
-elseif _axumu == (-66 * 2 - -29 + 335) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _vpbis = { _axumu, bit32.bxor(_rA, _xoaxk), bit32.bxor(_rB, _xoaxk), bit32.bxor(_rC, _xoaxk) };
-_qnxfa[_vpbis[2]] = _qnxfa[_vpbis[3]] + _qnxfa[_vpbis[4]]
-_ST = 1561
-elseif _axumu == (70 * 2 - -55 + -34) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _vpbis = { _axumu, bit32.bxor(_rA, _xoaxk), bit32.bxor(_rB, _xoaxk), bit32.bxor(_rC, _xoaxk) };
-_qnxfa[_vpbis[2]] = _qnxfa[_vpbis[3]] - _qnxfa[_vpbis[4]]
-_ST = 1561
-elseif _axumu == (118 * 2 - -14 + -137) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _vpbis = { _axumu, bit32.bxor(_rA, _xoaxk), bit32.bxor(_rB, _xoaxk), bit32.bxor(_rC, _xoaxk) };
-            local f = _qnxfa[_vpbis[2]]
+_ST = 1776
+elseif _uybye == (-118 * 2 - 13 + 495) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _urnfe = { _uybye, bit32.bxor(_rA, _ufpce), bit32.bxor(_rB, _ufpce), bit32.bxor(_rC, _ufpce) };
+_ohxtb[_urnfe[2]] = _wtkzc[_urnfe[3]]
+_ST = 1776
+elseif _uybye == (-114 * 2 - -61 + 370) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _urnfe = { _uybye, bit32.bxor(_rA, _ufpce), bit32.bxor(_rB, _ufpce), bit32.bxor(_rC, _ufpce) };
+_ohxtb[_urnfe[2]] = _ohxtb[_urnfe[3]] / _ohxtb[_urnfe[4]]
+_ST = 1776
+elseif _uybye == (29 * 2 - 23 + -28) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _urnfe = { _uybye, bit32.bxor(_rA, _ufpce), bit32.bxor(_rB, _ufpce), bit32.bxor(_rC, _ufpce) };
+_ohxtb[_urnfe[2]] = _ohxtb[_urnfe[3]] - _ohxtb[_urnfe[4]]
+_ST = 1776
+elseif _uybye == (118 * 2 - 45 + -4) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _urnfe = { _uybye, bit32.bxor(_rA, _ufpce), bit32.bxor(_rB, _ufpce), bit32.bxor(_rC, _ufpce) };
+_ohxtb[_urnfe[2]] = _ohxtb[_urnfe[3]][_ohxtb[_urnfe[4]]]
+_ST = 1776
+elseif _uybye == (-62 * 2 - -22 + 250) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _urnfe = { _uybye, bit32.bxor(_rA, _ufpce), bit32.bxor(_rB, _ufpce), bit32.bxor(_rC, _ufpce) };
+_ohxtb[_urnfe[2]] = -_ohxtb[_urnfe[3]]
+_ST = 1776
+elseif _uybye == (-75 * 2 - 44 + 355) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _urnfe = { _uybye, bit32.bxor(_rA, _ufpce), bit32.bxor(_rB, _ufpce), bit32.bxor(_rC, _ufpce) };
+local n = _urnfe[3] - 1; local t = {}; for i=0, n-1 do t[i+1] = _ohxtb[_urnfe[2]+i] end; _fmade = t
+_ST = 1776
+elseif _uybye == (113 * 2 - 21 + -39) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _urnfe = { _uybye, bit32.bxor(_rA, _ufpce), bit32.bxor(_rB, _ufpce), bit32.bxor(_rC, _ufpce) };
+_ohxtb[_urnfe[2]] = _ohxtb[_urnfe[3]][_wtkzc[_urnfe[4]]]
+_ST = 1776
+elseif _uybye == (-14 * 2 - 90 + 309) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _urnfe = { _uybye, bit32.bxor(_rA, _ufpce), bit32.bxor(_rB, _ufpce), bit32.bxor(_rC, _ufpce) };
+            local f = _ohxtb[_urnfe[2]]
             if f then
-                local nargs = _vpbis[3] - 1
+                local nargs = _urnfe[3] - 1
                 local args = {}
                 for i = 1, nargs do
-                    table.insert(args, _qnxfa[_vpbis[2] + i])
+                    table.insert(args, _ohxtb[_urnfe[2] + i])
                 end
                 local results = { f(unpack(args)) }
-                local nRes = _vpbis[4] - 1
+                local nRes = _urnfe[4] - 1
                 if nRes > 0 then
-                    for i = 1, nRes do _qnxfa[_vpbis[2] + i - 1] = results[i] end
+                    for i = 1, nRes do _ohxtb[_urnfe[2] + i - 1] = results[i] end
                 end
             end
-_ST = 1561
-elseif _axumu == (-5 * 2 - 54 + 319) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _vpbis = { _axumu, bit32.bxor(_rA, _xoaxk), bit32.bxor(_rB, _xoaxk), bit32.bxor(_rC, _xoaxk) };
-_qnxfa[_vpbis[2]] = _qnxfa[_vpbis[3]] ~= _qnxfa[_vpbis[4]]
-_ST = 1561
-elseif _axumu == (115 * 2 - 109 + 55) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _vpbis = { _axumu, bit32.bxor(_rA, _xoaxk), bit32.bxor(_rB, _xoaxk), bit32.bxor(_rC, _xoaxk) };
-_qnxfa[_vpbis[2]] = not _qnxfa[_vpbis[3]]
-_ST = 1561
-elseif _axumu == (-119 * 2 - 39 + 393) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _vpbis = { _axumu, bit32.bxor(_rA, _xoaxk), bit32.bxor(_rB, _xoaxk), bit32.bxor(_rC, _xoaxk) };
-_qnxfa[_vpbis[2]] = _qnxfa[_vpbis[3]] < _qnxfa[_vpbis[4]]
-_ST = 1561
-elseif _axumu == (121 * 2 - 126 + 12) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _vpbis = { _axumu, bit32.bxor(_rA, _xoaxk), bit32.bxor(_rB, _xoaxk), bit32.bxor(_rC, _xoaxk) };
+_ST = 1776
+elseif _uybye == (-78 * 2 - 44 + 259) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _urnfe = { _uybye, bit32.bxor(_rA, _ufpce), bit32.bxor(_rB, _ufpce), bit32.bxor(_rC, _ufpce) };
+_ohxtb[_urnfe[2]][_wtkzc[_urnfe[3]]] = _ohxtb[_urnfe[4]]
+_ST = 1776
+elseif _uybye == (65 * 2 - 115 + 5) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _urnfe = { _uybye, bit32.bxor(_rA, _ufpce), bit32.bxor(_rB, _ufpce), bit32.bxor(_rC, _ufpce) };
+_ohxtb[_urnfe[2]] = _ohxtb[_urnfe[3]] == _ohxtb[_urnfe[4]]
+_ST = 1776
+elseif _uybye == (-109 * 2 - -59 + 342) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _urnfe = { _uybye, bit32.bxor(_rA, _ufpce), bit32.bxor(_rB, _ufpce), bit32.bxor(_rC, _ufpce) };
+if _ohxtb[_urnfe[2]] then _snejk = _snejk + _urnfe[4] * _dydbi end
+_ST = 1776
+elseif _uybye == (52 * 2 - 32 + 47) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _urnfe = { _uybye, bit32.bxor(_rA, _ufpce), bit32.bxor(_rB, _ufpce), bit32.bxor(_rC, _ufpce) };
 
-_ST = 1561
-elseif _axumu == (108 * 2 - -97 + -112) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _vpbis = { _axumu, bit32.bxor(_rA, _xoaxk), bit32.bxor(_rB, _xoaxk), bit32.bxor(_rC, _xoaxk) };
-_qnxfa[_vpbis[2]][_qnxfa[_vpbis[3]]] = _qnxfa[_vpbis[4]]
-_ST = 1561
-elseif _axumu == (103 * 2 - -21 + -189) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _vpbis = { _axumu, bit32.bxor(_rA, _xoaxk), bit32.bxor(_rB, _xoaxk), bit32.bxor(_rC, _xoaxk) };
-local proto_src = _hazrb[_vpbis[3]]
+_ST = 1776
+elseif _uybye == (10 * 2 - -118 + 61) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _urnfe = { _uybye, bit32.bxor(_rA, _ufpce), bit32.bxor(_rB, _ufpce), bit32.bxor(_rC, _ufpce) };
+local args = {}; for i=1, _urnfe[3]-1 do args[i] = _ohxtb[_urnfe[2]+i] end; local res = {_ohxtb[_urnfe[2]](unpack(args))}; for i=1, _urnfe[4] do _ohxtb[_urnfe[2]+i-1] = res[i] end
+_ST = 1776
+elseif _uybye == (21 * 2 - 95 + 93) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _urnfe = { _uybye, bit32.bxor(_rA, _ufpce), bit32.bxor(_rB, _ufpce), bit32.bxor(_rC, _ufpce) };
+_ohxtb[_urnfe[2]] = _ohxtb[_urnfe[3]] * _ohxtb[_urnfe[4]]
+_ST = 1776
+elseif _uybye == (-125 * 2 - 17 + 381) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _urnfe = { _uybye, bit32.bxor(_rA, _ufpce), bit32.bxor(_rB, _ufpce), bit32.bxor(_rC, _ufpce) };
+_jtwec[_wtkzc[_urnfe[2]]] = _ohxtb[_urnfe[3]]
+_ST = 1776
+elseif _uybye == (-19 * 2 - -106 + 51) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _urnfe = { _uybye, bit32.bxor(_rA, _ufpce), bit32.bxor(_rB, _ufpce), bit32.bxor(_rC, _ufpce) };
+                    local target_S = _ohxtb
+                    for i=1, _urnfe[3] do target_S = target_S.parent end
+                    target_S[_urnfe[2]] = _ohxtb[_urnfe[4]]
+                
+_ST = 1776
+elseif _uybye == (-63 * 2 - -87 + 232) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _urnfe = { _uybye, bit32.bxor(_rA, _ufpce), bit32.bxor(_rB, _ufpce), bit32.bxor(_rC, _ufpce) };
+local proto_src = _wtkzc[_urnfe[3]]
                 local p_func = loadstring(proto_src)
                 if p_func then
                     local p = p_func()
-                    _qnxfa[_vpbis[2]] = function(...)
+                    _ohxtb[_urnfe[2]] = function(...)
                         local new_S = {}
-                        new_S.parent = _qnxfa
-                        return _wfpxo(p.B, p.C, new_S, ...)
+                        new_S.parent = _ohxtb
+                        return _pzcev(p.B, p.C, new_S, ...)
                     end
                 end
-_ST = 1561
-elseif _axumu == (-95 * 2 - -119 + 92) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _vpbis = { _axumu, bit32.bxor(_rA, _xoaxk), bit32.bxor(_rB, _xoaxk), bit32.bxor(_rC, _xoaxk) };
-_qnxfa[_vpbis[2]] = _hazrb[_vpbis[3]]
-_ST = 1561
-elseif _axumu == (13 * 2 - -7 + 186) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _vpbis = { _axumu, bit32.bxor(_rA, _xoaxk), bit32.bxor(_rB, _xoaxk), bit32.bxor(_rC, _xoaxk) };
-_ekeqa[_hazrb[_vpbis[2]]] = _qnxfa[_vpbis[3]]
-_ST = 1561
-elseif _axumu == (38 * 2 - -115 + 8) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _vpbis = { _axumu, bit32.bxor(_rA, _xoaxk), bit32.bxor(_rB, _xoaxk), bit32.bxor(_rC, _xoaxk) };
-
-_ST = 1561
-elseif _axumu == (-57 * 2 - 125 + 254) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _vpbis = { _axumu, bit32.bxor(_rA, _xoaxk), bit32.bxor(_rB, _xoaxk), bit32.bxor(_rC, _xoaxk) };
-if _qnxfa[_vpbis[2]] then _ubiuo = _ubiuo + _vpbis[4] * _nwqsk end
-_ST = 1561
-elseif _axumu == (-26 * 2 - -75 + 179) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _vpbis = { _axumu, bit32.bxor(_rA, _xoaxk), bit32.bxor(_rB, _xoaxk), bit32.bxor(_rC, _xoaxk) };
-
-_ST = 1561
+_ST = 1776
 end
-        elseif _ST == 1561 then
-            _ubiuo = _ubiuo + _nwqsk
-            _ST = 9626
+        elseif _ST == 1776 then
+            _snejk = _snejk + _dydbi
+            _ST = 2356
         end
     end
-    return unpack(_askqu or {})
+    return unpack(_fmade or {})
 end
-return _wfpxo(_kteiv, _gvcyf, {}, ...)
+return _pzcev(_mnsbq, _xywce, {}, ...)
