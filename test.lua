@@ -1,77 +1,83 @@
 --[[ Holon VM v5 Secure ]]
-local _ptuhr = {168495781,168299456,168495786,168495269,168364480,168495274,168430278}
-local _ywbxw = {{122,8,97,15,123},{66,45,65,46,64,96,54,123,91,15,106,25,109,87,119,159,42,157,120,243,102,128,8,152,125,247,104},{238,85,251,29,158,45,206,77,211,48,178,5,230,101,214,50,138,0,227,98,197,32,142,17,249,88,212,55,182,35,192,66,206,45,172,10,233,104,236,15,142,48,211,82,203,229,203,229}}
-local _nzfnb = 10
-local function _rzcog(...)
-    local _piqgo, _tsrko, _ombfg = 1, {}, getfenv() or _G
-    local _nrcbg = {}
-    for i, v in ipairs(_ywbxw) do
+local _zczcq = {858927917,858862242,858928121,858927405,858796194,858927609,858993470,858993601}
+local _jlffn = {{67,49,88,54,66},{123,20,120,23,121,89,15,66,98,54,83,32,84,110,78,166,19,164,65,202,95,185,49,161,68,206,81},{215,108,194,36,167,20,247,116,234,9,139,60,223,92,239,11,179,57,218,91,252,25,183,40,192,97,237,14,143,26,249,123,247,20,149,51,208,81,213,54,183,9,234,107,242,220,242,220}}
+local _zxymt = 51
+local function _wvpla(...)
+    local _salie, _xnald, _zvbuf = 1, {}, getfenv() or _G
+    local _hlsmg = {}
+    for i, v in ipairs(_jlffn) do
         local t = {}
-        local last_byte = _nzfnb -- 最初のキーはVMキー
+        local last_byte = _zxymt -- 最初のキーはVMキー
         for j = 1, #v do
             local enc_byte = v[j]
             local dec_byte = bit32.bxor(enc_byte, last_byte)
             table.insert(t, string.char(dec_byte))
             last_byte = enc_byte -- 暗号化されたバイトが次の復号キーになる
         end
-        _nrcbg[i] = table.concat(t)
+        _hlsmg[i] = table.concat(t)
     end
 
-    local _mhgqt = false
+    local _jmiyu = false
 
-    local _ukwly = 1 -- Instruction Width
-    while not _mhgqt and _piqgo <= #_ptuhr do
-        local _IN = _ptuhr[_piqgo]
-        local _mgfcb = _IN % 256
+    local _wdvhq = 1 -- Instruction Width
+    while not _jmiyu and _salie <= #_zczcq do
+        local _IN = _zczcq[_salie]
+        local _rvgvq = _IN % 256
         
-        if _mgfcb == (80 * 2 - 24 + -59) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _cdxwm = { _mgfcb, bit32.bxor(_rA, _nzfnb), bit32.bxor(_rB, _nzfnb), bit32.bxor(_rC, _nzfnb) };
-_tsrko[_cdxwm[2]] = _tsrko[_cdxwm[3]] * _tsrko[_cdxwm[4]]
-elseif _mgfcb == (-37 * 2 - 121 + 255) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _cdxwm = { _mgfcb, bit32.bxor(_rA, _nzfnb), bit32.bxor(_rB, _nzfnb), bit32.bxor(_rC, _nzfnb) };
-_tsrko[_cdxwm[2]] = _tsrko[_cdxwm[3]] + _tsrko[_cdxwm[4]]
-elseif _mgfcb == (-99 * 2 - -41 + 197) then
--- no-op
-elseif _mgfcb == (-40 * 2 - 106 + 321) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _cdxwm = { _mgfcb, bit32.bxor(_rA, _nzfnb), bit32.bxor(_rB, _nzfnb), bit32.bxor(_rC, _nzfnb) };
-_tsrko[_cdxwm[2]] = _tsrko[_cdxwm[3]]
-elseif _mgfcb == (25 * 2 - -84 + 85) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _cdxwm = { _mgfcb, bit32.bxor(_rA, _nzfnb), bit32.bxor(_rB, _nzfnb), bit32.bxor(_rC, _nzfnb) };
-_tsrko[_cdxwm[2]] = _tsrko[_cdxwm[3]] / _tsrko[_cdxwm[4]]
-elseif _mgfcb == (29 * 2 - -117 + 56) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _cdxwm = { _mgfcb, bit32.bxor(_rA, _nzfnb), bit32.bxor(_rB, _nzfnb), bit32.bxor(_rC, _nzfnb) };
-if not _tsrko[_cdxwm[2]] then _piqgo = _piqgo + _cdxwm[4] * _ukwly end
-elseif _mgfcb == (-34 * 2 - -108 + 152) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _cdxwm = { _mgfcb, bit32.bxor(_rA, _nzfnb), bit32.bxor(_rB, _nzfnb), bit32.bxor(_rC, _nzfnb) };
-_tsrko[_cdxwm[2]] = _nrcbg[_cdxwm[3]]
-elseif _mgfcb == (63 * 2 - 61 + 105) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _cdxwm = { _mgfcb, bit32.bxor(_rA, _nzfnb), bit32.bxor(_rB, _nzfnb), bit32.bxor(_rC, _nzfnb) };
-            local f = _tsrko[_cdxwm[2]]
+        if _rvgvq == (67 * 2 - -38 + 69) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _ribiz = { _rvgvq, bit32.bxor(_rA, _zxymt), bit32.bxor(_rB, _zxymt), bit32.bxor(_rC, _zxymt) };
+_xnald[_ribiz[2]] = _xnald[_ribiz[3]][_hlsmg[_ribiz[4]]]
+elseif _rvgvq == (40 * 2 - -74 + 95) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _ribiz = { _rvgvq, bit32.bxor(_rA, _zxymt), bit32.bxor(_rB, _zxymt), bit32.bxor(_rC, _zxymt) };
+            local f = _xnald[_ribiz[2]]
             if f then
-                local nargs = _cdxwm[3]
+                local nargs = _ribiz[3]
                 local args = {}
                 for i = 1, nargs do
-                    table.insert(args, _tsrko[_cdxwm[2] + i])
+                    table.insert(args, _xnald[_ribiz[2] + i])
                 end
                 f(unpack(args))
             end
-elseif _mgfcb == (-39 * 2 - 45 + 288) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _cdxwm = { _mgfcb, bit32.bxor(_rA, _nzfnb), bit32.bxor(_rB, _nzfnb), bit32.bxor(_rC, _nzfnb) };
-_tsrko[_cdxwm[2]] = _ombfg[_nrcbg[_cdxwm[3]]]
-elseif _mgfcb == (78 * 2 - -82 + -83) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _cdxwm = { _mgfcb, bit32.bxor(_rA, _nzfnb), bit32.bxor(_rB, _nzfnb), bit32.bxor(_rC, _nzfnb) };
-_piqgo = _piqgo + _cdxwm[4] * _ukwly
-elseif _mgfcb == (97 * 2 - 8 + -75) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _cdxwm = { _mgfcb, bit32.bxor(_rA, _nzfnb), bit32.bxor(_rB, _nzfnb), bit32.bxor(_rC, _nzfnb) };
-_tsrko[_cdxwm[2]] = _tsrko[_cdxwm[3]] - _tsrko[_cdxwm[4]]
-elseif _mgfcb == (-21 * 2 - -103 + 137) then
-_mhgqt = true
-elseif _mgfcb == (43 * 2 - -71 + 93) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _cdxwm = { _mgfcb, bit32.bxor(_rA, _nzfnb), bit32.bxor(_rB, _nzfnb), bit32.bxor(_rC, _nzfnb) };
-_tsrko[_cdxwm[2]] = _tsrko[_cdxwm[3]] == _tsrko[_cdxwm[4]]
+elseif _rvgvq == (-57 * 2 - 16 + 174) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _ribiz = { _rvgvq, bit32.bxor(_rA, _zxymt), bit32.bxor(_rB, _zxymt), bit32.bxor(_rC, _zxymt) };
+_xnald[_ribiz[2]][_hlsmg[_ribiz[3]]] = _xnald[_ribiz[4]]
+elseif _rvgvq == (91 * 2 - 72 + 52) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _ribiz = { _rvgvq, bit32.bxor(_rA, _zxymt), bit32.bxor(_rB, _zxymt), bit32.bxor(_rC, _zxymt) };
+_xnald[_ribiz[2]] = _hlsmg[_ribiz[3]]
+elseif _rvgvq == (31 * 2 - 33 + 157) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _ribiz = { _rvgvq, bit32.bxor(_rA, _zxymt), bit32.bxor(_rB, _zxymt), bit32.bxor(_rC, _zxymt) };
+_salie = _salie + _ribiz[4] * _wdvhq
+elseif _rvgvq == (-21 * 2 - -63 + 172) then
+-- no-op
+elseif _rvgvq == (19 * 2 - 19 + 110) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _ribiz = { _rvgvq, bit32.bxor(_rA, _zxymt), bit32.bxor(_rB, _zxymt), bit32.bxor(_rC, _zxymt) };
+_xnald[_ribiz[2]] = _xnald[_ribiz[3]] + _xnald[_ribiz[4]]
+elseif _rvgvq == (38 * 2 - -11 + 2) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _ribiz = { _rvgvq, bit32.bxor(_rA, _zxymt), bit32.bxor(_rB, _zxymt), bit32.bxor(_rC, _zxymt) };
+_xnald[_ribiz[2]] = _xnald[_ribiz[3]] == _xnald[_ribiz[4]]
+elseif _rvgvq == (121 * 2 - 82 + 42) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _ribiz = { _rvgvq, bit32.bxor(_rA, _zxymt), bit32.bxor(_rB, _zxymt), bit32.bxor(_rC, _zxymt) };
+_xnald[_ribiz[2]] = _xnald[_ribiz[3]] / _xnald[_ribiz[4]]
+elseif _rvgvq == (-85 * 2 - -74 + 233) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _ribiz = { _rvgvq, bit32.bxor(_rA, _zxymt), bit32.bxor(_rB, _zxymt), bit32.bxor(_rC, _zxymt) };
+_xnald[_ribiz[2]] = _xnald[_ribiz[3]] * _xnald[_ribiz[4]]
+elseif _rvgvq == (-86 * 2 - -31 + 333) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _ribiz = { _rvgvq, bit32.bxor(_rA, _zxymt), bit32.bxor(_rB, _zxymt), bit32.bxor(_rC, _zxymt) };
+_xnald[_ribiz[2]] = _xnald[_ribiz[3]] - _xnald[_ribiz[4]]
+elseif _rvgvq == (38 * 2 - -86 + 34) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _ribiz = { _rvgvq, bit32.bxor(_rA, _zxymt), bit32.bxor(_rB, _zxymt), bit32.bxor(_rC, _zxymt) };
+_xnald[_ribiz[2]] = _xnald[_ribiz[3]]
+elseif _rvgvq == (105 * 2 - 43 + -122) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _ribiz = { _rvgvq, bit32.bxor(_rA, _zxymt), bit32.bxor(_rB, _zxymt), bit32.bxor(_rC, _zxymt) };
+_xnald[_ribiz[2]] = _zvbuf[_hlsmg[_ribiz[3]]]
+elseif _rvgvq == (-65 * 2 - -70 + 122) then
+_jmiyu = true
+elseif _rvgvq == (84 * 2 - -21 + 34) then
+local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _ribiz = { _rvgvq, bit32.bxor(_rA, _zxymt), bit32.bxor(_rB, _zxymt), bit32.bxor(_rC, _zxymt) };
+if not _xnald[_ribiz[2]] then _salie = _salie + _ribiz[4] * _wdvhq end
 end
         
-        _piqgo = _piqgo + _ukwly
+        _salie = _salie + _wdvhq
     end
 end
-_rzcog(...)
+_wvpla(...)
