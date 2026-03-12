@@ -224,7 +224,7 @@ local function startEffect()
                 fw.AP.Position = worldPos
 
                 local side = (i % 2 == 1) and -1 or 1
-                local wingRotation = CFrame.Angles(0, math.rad(side == 1 and -90 or 90), 0)
+                local wingRotation = CFrame.Angles(0, math.rad(side == 1 and 90 or -90), 0)
                 fw.AO.CFrame = baseCF * wingRotation
             end
         end
