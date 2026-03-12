@@ -10,7 +10,6 @@ local LocalPlayer = Players.LocalPlayer
 
 local defaultConfig = {
     Wing = { Size = 30, Gap = 3.0, Speed = 6, Height = 0.5, Back = 0, Joints = 3, Strength = 15, Curve = false, CurveAmount = 10 },
-    Global = { MaxToys = 30 },
 }
 
 local function deepCopy(target)
@@ -29,7 +28,6 @@ local originalCollisions = {}
 local updateConnection = nil
 
 local targetMain = LocalPlayer
-local followPlayer = true
 
 local function getPositionForMode(i, count, time)
     local c = cfg.Wing
@@ -226,7 +224,7 @@ local function startEffect()
                 fw.AP.Position = worldPos
 
                 local side = (i % 2 == 1) and -1 or 1
-                local wingRotation = CFrame.Angles(0, math.rad(side == 1 and 90 or -90), 0)
+                local wingRotation = CFrame.Angles(0, math.rad(side == 1 and -90 or 90), 0)
                 fw.AO.CFrame = baseCF * wingRotation
             end
         end
