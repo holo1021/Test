@@ -223,8 +223,14 @@ local function startEffect()
                 local worldPos = baseCF:PointToWorldSpace(relativePos)
                 fw.AP.Position = worldPos
 
-                -- 全てのおもちゃをX軸中心に90度回転
-                fw.AO.CFrame = baseCF * CFrame.Angles(math.rad(90), 0, 0)
+                local side = (i % 2 == 1) and -1 or 1
+                local baseRotation = CFrame.Angles(math.rad(90), 0, 0)
+                if side == -1 then
+                    -- 左側（奇数）は向きを反転（Y軸180度回転）
+                    fw.AO.CFrame = baseCF * baseRotation * CFrame.Angles(0, math.rad(180), 0)
+                else
+                    fw.AO.CFrame = baseCF * baseRotation
+                end
             end
         end
     end)
