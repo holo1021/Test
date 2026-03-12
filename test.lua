@@ -3,21 +3,16 @@ local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
--- test.luaから持ってきたイベント定義
 local GrabEvents = ReplicatedStorage:WaitForChild("GrabEvents")
 local SetNetworkOwner = GrabEvents:WaitForChild("SetNetworkOwner")
 
 local LocalPlayer = Players.LocalPlayer
 
---------------------------------------------------------------------------------
--- [コンフィグ & 変数管理]
---------------------------------------------------------------------------------
 local defaultConfig = {
     Wing = { Size = 30, Gap = 3.0, Speed = 6, Height = 0.5, Back = 0, Joints = 3, Strength = 15, Curve = false, CurveAmount = 10 },
     Global = { MaxToys = 30 },
 }
 
--- Deep Copy Helper
 local function deepCopy(target)
     local copy = {}
     for k, v in pairs(target) do copy[k] = (type(v) == "table") and deepCopy(v) or v end
@@ -29,23 +24,16 @@ local detectedItems = {}
 
 local cfg = deepCopy(defaultConfig)
 local isEnabled = false
-local activeToys = {}        -- {A0, A1, AP, AO, Part}
-local originalCollisions = {} -- {Part: Boolean}
+local activeToys = {}
+local originalCollisions = {}
 local updateConnection = nil
 
--- 常に自分を対象、追従は常にオン
 local targetMain = LocalPlayer
 local followPlayer = true
 
---------------------------------------------------------------------------------
--- [計算ロジック] 翼(Wing)の座標計算
---------------------------------------------------------------------------------
 local function getPositionForMode(i, count, time)
     local c = cfg.Wing
-    
     local ratio = (i-1) / (count > 1 and count-1 or 1)
-    
-    -- 単体モード（合体なし）の翼計算
     local side = (i % 2 == 1) and -1 or 1
     local idx = math.ceil(i / 2)
     local totalSide = math.ceil(count / 2)
@@ -58,16 +46,13 @@ local function getPositionForMode(i, count, time)
     end
 
     local flap = math.sin(flapPhase) * c.Strength
-    -- RootFixed は常に true 扱い（設定から削除したため固定）
     flap = flap * distRatio
     
     local horizontalOffset = c.Gap + (c.Size * distRatio)
     local pos = Vector3.new(horizontalOffset * side, flap, 0)
     
-    -- V_Angle と Tilt は削除したため 0 固定
     local rotCF = CFrame.Angles(0, 0, 0)
 
-    -- カーブ（反り）の計算：羽ばたきに連動させる
     if c.Curve then
         local curve_amount = c.CurveAmount or 10
         local flap_ratio = math.sin(flapPhase)
@@ -78,9 +63,6 @@ local function getPositionForMode(i, count, time)
     return (rotCF * pos) + Vector3.new(0, c.Height, c.Back)
 end
 
---------------------------------------------------------------------------------
--- [メイン機能] エフェクト制御 (Start / Stop / Update)
---------------------------------------------------------------------------------
 local function stopEffect()
     isEnabled = false
     if updateConnection then 
@@ -88,7 +70,6 @@ local function stopEffect()
         updateConnection = nil 
     end
     
-    -- アタッチメント削除 & 固定化
     for _, v in ipairs(activeToys) do
         pcall(function() 
             v.Part.Anchored = false 
@@ -100,7 +81,6 @@ local function stopEffect()
     end
     activeToys = {}
     
-    -- 当たり判定復元
     for part, val in pairs(originalCollisions) do
         if part and part.Parent then 
             part.CanCollide = val 
@@ -119,14 +99,11 @@ local function startEffect()
     
     local fws = {}
     local myName = LocalPlayer.Name
-    
-    local maxCount = cfg.Global.MaxToys or 30
 
     local allMyItems = {}
     local plotsFolder = Workspace:FindFirstChild("Plots")
     local plotItemsFolder = Workspace:FindFirstChild("PlotItems")
 
-    -- 自分のおもちゃのみを対象（他人のは使用しない）
     local spawnedToys = Workspace:FindFirstChild(myName .. "SpawnedInToys")
     if spawnedToys then
         for _, item in ipairs(spawnedToys:GetChildren()) do
@@ -134,7 +111,6 @@ local function startEffect()
         end
     end
 
-    -- 自分のプロットからおもちゃを取得
     if plotsFolder and plotItemsFolder then
         for _, plot in ipairs(plotsFolder:GetChildren()) do
             local sign = plot:FindFirstChild("PlotSign")
@@ -157,7 +133,6 @@ local function startEffect()
         end
     end
 
-    -- Workspace内の自分所有のおもちゃ
     for _, item in ipairs(Workspace:GetChildren()) do
         local ownerValue = item:FindFirstChild("Owner") or item:FindFirstChild("PartOwner")
         if item:IsA("Model") and ownerValue and ownerValue:IsA("StringValue") and ownerValue.Value == myName then
@@ -167,15 +142,12 @@ local function startEffect()
         end
     end
 
-    -- フィルタリング
     for _, item in ipairs(allMyItems) do
-        if #fws >= maxCount then break end
         if item:IsA("Model") and item.PrimaryPart and (selectedItemName == "全てのおもちゃ" or item.Name == selectedItemName) then
             table.insert(fws, item)
         end
     end
 
-    -- ネットワークオーナーシップ確保
     for _, item in ipairs(fws) do
         for _, part in ipairs(item:GetDescendants()) do
             if part:IsA("BasePart") then
@@ -189,13 +161,9 @@ local function startEffect()
         return
     end
 
-    print("おもちゃを " .. #fws .. " 個捕捉しました。 (目標数: " .. maxCount .. ")")
-
-    -- 各おもちゃを設定
     for i, model in ipairs(fws) do
         local pp = model.PrimaryPart
         
-        -- 勢いを殺す
         for _, d in ipairs(model:GetDescendants()) do 
             if d:IsA("BasePart") then
                 d.AssemblyLinearVelocity = Vector3.zero
@@ -204,7 +172,6 @@ local function startEffect()
             end
         end
         
-        -- 初期位置を計算して配置
         if root then
             local relativePos = getPositionForMode(i, #fws, tick())
             pp.CFrame = root.CFrame:ToWorldSpace(CFrame.new(relativePos))
@@ -213,7 +180,6 @@ local function startEffect()
         pp.Anchored = false
         pcall(function() pp:SetNetworkOwner(LocalPlayer) end)
 
-        -- 当たり判定無効化
         for _, d in ipairs(model:GetDescendants()) do 
             if d:IsA("BasePart") then 
                 if originalCollisions[d] == nil then originalCollisions[d] = d.CanCollide end
@@ -223,7 +189,6 @@ local function startEffect()
             end 
         end
         
-        -- AttachmentとAlign
         local a0 = Instance.new("Attachment", pp)
         local ap = Instance.new("AlignPosition", pp)
         ap.Attachment0 = a0
@@ -247,9 +212,7 @@ local function startEffect()
         local rootPart = char and char:FindFirstChild("HumanoidRootPart")
         if not rootPart then return end
 
-        -- 常にプレイヤーに追従
         local baseCF = rootPart.CFrame
-
         local t = tick()
         
         for i, fw in ipairs(activeToys) do
@@ -261,16 +224,15 @@ local function startEffect()
                 local relativePos = getPositionForMode(i, #activeToys, t)
                 local worldPos = baseCF:PointToWorldSpace(relativePos)
                 fw.AP.Position = worldPos
-                -- 向きはプレイヤーと同じ（回転設定は削除）
-                fw.AO.CFrame = baseCF
+
+                local side = (i % 2 == 1) and -1 or 1
+                local wingRotation = CFrame.Angles(0, math.rad(side == 1 and 90 or -90), 0)
+                fw.AO.CFrame = baseCF * wingRotation
             end
         end
     end)
 end
 
---------------------------------------------------------------------------------
--- [UI 構築] orion lib
---------------------------------------------------------------------------------
 local OrionUrl = "https://raw.githubusercontent.com/hololove1021/HolonHUB/refs/heads/main/source.txt"
 
 local function StartHolonHUB()
@@ -291,13 +253,8 @@ local function StartHolonHUB()
         IntroText = "Holon HUB Load!"
     })
 
-    -- UI要素管理
     local UIElements = {}
-
-    -- --- メインタブ ---
     local MainTab = Window:MakeTab({ Name = "メイン", Icon = "rbxassetid://7733960981" })
-
-    -- エフェクト制御セクション
     local MainSec = MainTab:AddSection({ Name = "エフェクト制御" })
 
     UIElements.EffectToggle = MainSec:AddToggle({
@@ -308,7 +265,6 @@ local function StartHolonHUB()
         end    
     })
 
-    -- 制御対象ドロップダウン
     local itemDropdown
     UIElements.ItemDropdown = MainSec:AddDropdown({
         Name = "制御対象の選択",
@@ -318,7 +274,6 @@ local function StartHolonHUB()
     })
     itemDropdown = UIElements.ItemDropdown
 
-    -- おもちゃリスト更新
     local function refreshToyList()
         detectedItems = {}
         local myName = LocalPlayer.Name
@@ -326,7 +281,6 @@ local function StartHolonHUB()
         local plotsFolder = Workspace:FindFirstChild("Plots")
         local plotItemsFolder = Workspace:FindFirstChild("PlotItems")
 
-        -- 自分のおもちゃのみを収集
         local spawnedToys = Workspace:FindFirstChild(myName .. "SpawnedInToys")
         if spawnedToys then
             for _, item in ipairs(spawnedToys:GetChildren()) do
@@ -388,14 +342,6 @@ local function StartHolonHUB()
 
     task.spawn(refreshToyList)
 
-    -- 最大おもちゃ数スライダー
-    UIElements.MaxToysSlider = MainSec:AddSlider({
-        Name = "使用するおもちゃの最大数",
-        Min = 1, Max = 200, Default = cfg.Global.MaxToys or 100,
-        Callback = function(v) cfg.Global.MaxToys = v end
-    })
-
-    -- 翼設定セクション（RootFixed, V_Angle, Tilt を削除）
     local WingSec = MainTab:AddSection({ Name = "翼設定" })
 
     WingSec:AddSlider({ Name = "サイズ (Size)", Min = 1, Max = 150, Default = cfg.Wing.Size, Callback = function(v) cfg.Wing.Size = v end })
