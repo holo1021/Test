@@ -1,4 +1,4 @@
--- Holon HUB - Wing Only (OrionUI版)
+-- Holon HUB - Wing Only (OrionUI版) - 家のおもちゃのみ対象
 -- 必要なサービスの取得
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -89,22 +89,13 @@ local function getWingPosition(i, count, time)
     return (rotCF * pos) + Vector3.new(0, c.Height, c.Back)
 end
 
--- ===== 自分のおもちゃを取得 =====
+-- ===== 自分の家（プロット）にあるおもちゃのみを取得 =====
 local function getPlayerToys(maxCount)
     local toys = {}
     local myName = LocalPlayer.Name
-    local spawnedToys = Workspace:FindFirstChild(myName .. "SpawnedInToys")
-    if spawnedToys then
-        for _, item in ipairs(spawnedToys:GetChildren()) do
-            if item:IsA("Model") and item.PrimaryPart then
-                table.insert(toys, item)
-                if #toys >= maxCount then break end
-            end
-        end
-    end
-
     local plots = Workspace:FindFirstChild("Plots")
     local plotItems = Workspace:FindFirstChild("PlotItems")
+
     if plots and plotItems then
         for _, plot in ipairs(plots:GetChildren()) do
             local sign = plot:FindFirstChild("PlotSign")
@@ -117,11 +108,12 @@ local function getPlayerToys(maxCount)
                     if targetFolder then
                         for _, item in ipairs(targetFolder:GetChildren()) do
                             if item:IsA("Model") and item.PrimaryPart then
-                                 table.insert(toys, item)
+                                table.insert(toys, item)
                                 if #toys >= maxCount then break end
                             end
                         end
                     end
+                    break -- 自分のプロットは1つなので、見つけたら終了
                 end
             end
         end
@@ -136,108 +128,100 @@ local function startEffect()
 
     local toys = getPlayerToys(MaxToys)
     if #toys == 0 then
-        OrionLib:MakeNotification({Name="エラー", Content="おもちゃが見つかりません", Time=3})
+        OrionLib:MakeNotification({Name="エラー", Content="家におもちゃが見つかりません", Time=3})
         return
     end
     print("[Wing] 使用おもちゃ数:", #toys)
 
     for i, model in ipairs(toys) do
-    local pp = model.PrimaryPart
-    pp.AssemblyLinearVelocity = Vector3.zero
-    pp.AssemblyAngularVelocity = Vector3.zero
+        local pp = model.PrimaryPart
+        pp.AssemblyLinearVelocity = Vector3.zero
+        pp.AssemblyAngularVelocity = Vector3.zero
 
-    pcall(function() pp:SetNetworkOwner(LocalPlayer) end)
-    if SetNetworkOwner then
-        pcall(function() SetNetworkOwner:FireServer(pp, pp.CFrame) end)
-    end
-
-    -- ★★★ 初期位置を設定（hub.lua と同じ処理）★★★
-    local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-    if root then
-        -- 現在のプレイヤー位置を基準に、翼の位置を計算して直接移動
-        local relPos = getWingPosition(i, #toys, tick())  -- 現在時刻で計算
-        pp.CFrame = root.CFrame:ToWorldSpace(CFrame.new(relPos))
-    end
-
-    -- 当たり判定無効化（既存コード）
-    for _, part in ipairs(model:GetDescendants()) do
-        if part:IsA("BasePart") then
-            if originalCollisions[part] == nil then
-                originalCollisions[part] = part.CanCollide
-            end
-            part.CanCollide = false
-            part.CanTouch = false
-            part.CanQuery = false
+        pcall(function() pp:SetNetworkOwner(LocalPlayer) end)
+        if SetNetworkOwner then
+            pcall(function() SetNetworkOwner:FireServer(pp, pp.CFrame) end)
         end
+
+        -- 初期位置を設定（hub.lua と同じ処理）
+        local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if root then
+            local relPos = getWingPosition(i, #toys, tick())
+            pp.CFrame = root.CFrame:ToWorldSpace(CFrame.new(relPos))
+        end
+
+        -- 当たり判定無効化
+        for _, part in ipairs(model:GetDescendants()) do
+            if part:IsA("BasePart") then
+                if originalCollisions[part] == nil then
+                    originalCollisions[part] = part.CanCollide
+                end
+                part.CanCollide = false
+                part.CanTouch = false
+                part.CanQuery = false
+            end
+        end
+
+        -- AlignPosition / AlignOrientation 作成
+        local a0 = Instance.new("Attachment", pp)
+        local ap = Instance.new("AlignPosition", pp)
+        ap.Attachment0 = a0
+        ap.Mode = Enum.PositionAlignmentMode.OneAttachment
+        ap.MaxForce = 1e9
+        ap.Responsiveness = 200
+
+        local ao = Instance.new("AlignOrientation", pp)
+        ao.Attachment0 = a0
+        ao.Mode = Enum.OrientationAlignmentMode.OneAttachment
+        ao.MaxTorque = 1e9
+        ao.Responsiveness = 200
+
+        table.insert(activeToys, {A0=a0, AP=ap, AO=ao, Part=pp, Model=model})
     end
-
-    -- AlignPosition / AlignOrientation 作成（既存コード）
-    local a0 = Instance.new("Attachment", pp)
-    local ap = Instance.new("AlignPosition", pp)
-    ap.Attachment0 = a0
-    ap.Mode = Enum.PositionAlignmentMode.OneAttachment
-    ap.MaxForce = 1e9
-    ap.Responsiveness = 200
-
-    local ao = Instance.new("AlignOrientation", pp)
-    ao.Attachment0 = a0
-    ao.Mode = Enum.OrientationAlignmentMode.OneAttachment
-    ao.MaxTorque = 1e9
-    ao.Responsiveness = 200
-
-    table.insert(activeToys, {A0=a0, AP=ap, AO=ao, Part=pp, Model=model})
-end
 
     isEnabled = true
     lastBaseCF = nil
 
-updateConnection = RunService.RenderStepped:Connect(function()
-    local char = LocalPlayer.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    if not root then return end
+    updateConnection = RunService.RenderStepped:Connect(function()
+        local char = LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if not root then return end
 
-    -- ★ 所有権維持（hub.lua と同じ処理）
-    if math.random() < 0.05 then
-        for _, toy in ipairs(activeToys) do
-            pcall(function() toy.Part:SetNetworkOwner(LocalPlayer) end)
+        -- 所有権維持（hub.lua と同じ）
+        if math.random() < 0.05 then
+            for _, toy in ipairs(activeToys) do
+                pcall(function() toy.Part:SetNetworkOwner(LocalPlayer) end)
+            end
         end
-    end
 
-    local baseCF
-    if FollowPlayer then
-        baseCF = root.CFrame
-        lastBaseCF = baseCF
-    else
-        if not lastBaseCF then lastBaseCF = root.CFrame end
-        baseCF = lastBaseCF
-    end
-
-    local t = tick()
-
-    for i, toy in ipairs(activeToys) do
-        local part = toy.Part
-        if part.Position.Y <= -90 then
-            part.Anchored = true
+        local baseCF
+        if FollowPlayer then
+            baseCF = root.CFrame
+            lastBaseCF = baseCF
         else
-            part.Anchored = false
-            local relPos = getWingPosition(i, #activeToys, t)
-            local worldPos = baseCF:PointToWorldSpace(relPos)
-            toy.AP.Position = worldPos
-
-            -- 左右の判定（左:-1, 右:1）
-            local side = (i % 2 == 1) and -1 or 1
-
-            -- おもちゃ自体を横向きにする回転（hub.lua の IndividualRotation 相当）
-            local individualRot = CFrame.Angles(0, math.rad(-90), 0)
-
-            -- 左右の羽が互いに向き合うための追加回転（必要に応じて調整）
-            local extraRot = CFrame.Angles(0, math.rad(side * 90), 0)
-
-            -- 最終的な向き
-            toy.AO.CFrame = baseCF * individualRot * extraRot
+            if not lastBaseCF then lastBaseCF = root.CFrame end
+            baseCF = lastBaseCF
         end
-    end
-end)
+
+        local t = tick()
+
+        for i, toy in ipairs(activeToys) do
+            local part = toy.Part
+            -- 奈落判定（一時的に無効化。問題なければ戻す）
+            -- if part.Position.Y <= -90 then
+            --     part.Anchored = true
+            -- else
+                part.Anchored = false
+                local relPos = getWingPosition(i, #activeToys, t)
+                local worldPos = baseCF:PointToWorldSpace(relPos)
+                toy.AP.Position = worldPos
+
+                -- ★ hub.lua 準拠の向き：プレイヤーの向き * 個別回転（Y軸-90度）
+                local individualRot = CFrame.Angles(0, math.rad(-90), 0)
+                toy.AO.CFrame = baseCF * individualRot
+            -- end
+        end
+    end)
 end
 
 -- ===== エフェクト停止 =====
@@ -267,7 +251,7 @@ end
 
 -- ===== UI構築 =====
 local Window = OrionLib:MakeWindow({
-    Name = "Holon HUB - Wing Only",
+    Name = "Holon HUB - Wing Only (家のおもちゃ限定)",
     HidePremium = false,
     SaveConfig = true,
     ConfigFolder = "HolonWing",
@@ -325,7 +309,7 @@ WingSec:AddToggle({ Name = "付け根固定", Default = WingConfig.RootFixed, Ca
 WingSec:AddToggle({ Name = "反り有効", Default = WingConfig.Curve, Callback = function(v) WingConfig.Curve = v end })
 WingSec:AddSlider({ Name = "反り強度", Min = -50, Max = 50, Default = WingConfig.CurveAmount, Callback = function(v) WingConfig.CurveAmount = v end })
 
--- 詳細タブ（左右の向き調整用）
+-- 詳細タブ（左右の向き調整用）は不要なので削除しても良いが、残しておく
 local DetailTab = Window:MakeTab({
     Name = "詳細",
     Icon = "rbxassetid://7733771472"
@@ -333,21 +317,20 @@ local DetailTab = Window:MakeTab({
 
 local RotSec = DetailTab:AddSection({ Name = "向き調整" })
 
-local currentExtraRot = 0  -- 追加のY軸回転（度）
+local currentExtraRot = 0
 RotSec:AddSlider({
-    Name = "追加Y軸回転",
+    Name = "追加Y軸回転（現在未使用）",
     Min = -180, Max = 180, Default = 0,
     Callback = function(v)
         currentExtraRot = v
-        -- リアルタイム反映はupdate内で行うため、ここでは設定だけ保持
+        -- 現在のコードでは使用していない
     end
 })
-
 
 -- 起動メッセージ
 OrionLib:MakeNotification({
     Name = "Holon HUB",
-    Content = "Wing Only 版が読み込まれました",
+    Content = "Wing Only 版（家のおもちゃ限定）が読み込まれました",
     Time = 3
 })
 
