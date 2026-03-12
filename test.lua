@@ -183,45 +183,44 @@ local function startEffect()
     lastBaseCF = nil
 
     updateConnection = RunService.RenderStepped:Connect(function()
-        local char = LocalPlayer.Character
-        local root = char and char:FindFirstChild("HumanoidRootPart")
-        if not root then return end
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
 
-        -- 所有権維持（hub.lua と同じ）
-        if math.random() < 0.05 then
-            for _, toy in ipairs(activeToys) do
-                pcall(function() toy.Part:SetNetworkOwner(LocalPlayer) end)
-            end
+    -- ★ 所有権維持：毎フレーム実行（hub.lua よりも高頻度）
+    for _, toy in ipairs(activeToys) do
+        local part = toy.Part
+        pcall(function() part:SetNetworkOwner(LocalPlayer) end)
+        -- ★ サーバーへも毎フレーム通知（負荷注意）
+        if SetNetworkOwner then
+            pcall(function() SetNetworkOwner:FireServer(part, part.CFrame) end)
         end
+    end
 
-        local baseCF
-        if FollowPlayer then
-            baseCF = root.CFrame
-            lastBaseCF = baseCF
-        else
-            if not lastBaseCF then lastBaseCF = root.CFrame end
-            baseCF = lastBaseCF
-        end
+    local baseCF
+    if FollowPlayer then
+        baseCF = root.CFrame
+        lastBaseCF = baseCF
+    else
+        if not lastBaseCF then lastBaseCF = root.CFrame end
+        baseCF = lastBaseCF
+    end
 
-        local t = tick()
+    local t = tick()
 
-        for i, toy in ipairs(activeToys) do
-            local part = toy.Part
-            -- 奈落判定（一時的に無効化。問題なければ戻す）
-            -- if part.Position.Y <= -90 then
-            --     part.Anchored = true
-            -- else
-                part.Anchored = false
-                local relPos = getWingPosition(i, #activeToys, t)
-                local worldPos = baseCF:PointToWorldSpace(relPos)
-                toy.AP.Position = worldPos
+    for i, toy in ipairs(activeToys) do
+        local part = toy.Part
+        part.Anchored = false  -- 奈落判定は完全に削除
 
-                -- ★ hub.lua 準拠の向き：プレイヤーの向き * 個別回転（Y軸-90度）
-                local individualRot = CFrame.Angles(0, math.rad(-90), 0)
-                toy.AO.CFrame = baseCF * individualRot
-            -- end
-        end
-    end)
+        local relPos = getWingPosition(i, #activeToys, t)
+        local worldPos = baseCF:PointToWorldSpace(relPos)
+        toy.AP.Position = worldPos
+
+        -- hub.lua 準拠の向き
+        local individualRot = CFrame.Angles(0, math.rad(-90), 0)
+        toy.AO.CFrame = baseCF * individualRot
+    end
+end)
 end
 
 -- ===== エフェクト停止 =====
