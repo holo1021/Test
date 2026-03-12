@@ -1,7 +1,6 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
-local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 -- test.luaから持ってきたイベント定義
@@ -9,13 +8,12 @@ local GrabEvents = ReplicatedStorage:WaitForChild("GrabEvents")
 local SetNetworkOwner = GrabEvents:WaitForChild("SetNetworkOwner")
 
 local LocalPlayer = Players.LocalPlayer
-local Camera = Workspace.CurrentCamera
 
 --------------------------------------------------------------------------------
 -- [コンフィグ & 変数管理]
 --------------------------------------------------------------------------------
 local defaultConfig = {
-    Wing = { Size = 30, Gap = 3.0, Speed = 6, Height = 0.5, Back = 0, Joints = 3, V_Angle = 0, Tilt = 0, Strength = 15, RootFixed = true, Curve = false, CurveAmount = 10 },
+    Wing = { Size = 30, Gap = 3.0, Speed = 6, Height = 0.5, Back = 0, Joints = 3, Strength = 15, Curve = false, CurveAmount = 10 },
     Global = { MaxToys = 30 },
 }
 
@@ -60,18 +58,14 @@ local function getPositionForMode(i, count, time)
     end
 
     local flap = math.sin(flapPhase) * c.Strength
-    if c.RootFixed then
-        flap = flap * distRatio
-    end
+    -- RootFixed は常に true 扱い（設定から削除したため固定）
+    flap = flap * distRatio
     
     local horizontalOffset = c.Gap + (c.Size * distRatio)
     local pos = Vector3.new(horizontalOffset * side, flap, 0)
     
-    local rotCF = CFrame.Angles(
-        math.rad(c.Tilt), 
-        math.rad(c.V_Angle * side), 
-        0
-    )
+    -- V_Angle と Tilt は削除したため 0 固定
+    local rotCF = CFrame.Angles(0, 0, 0)
 
     -- カーブ（反り）の計算：羽ばたきに連動させる
     if c.Curve then
@@ -297,6 +291,9 @@ local function StartHolonHUB()
         IntroText = "Holon HUB Load!"
     })
 
+    -- UI要素管理
+    local UIElements = {}
+
     -- --- メインタブ ---
     local MainTab = Window:MakeTab({ Name = "メイン", Icon = "rbxassetid://7733960981" })
 
@@ -329,7 +326,7 @@ local function StartHolonHUB()
         local plotsFolder = Workspace:FindFirstChild("Plots")
         local plotItemsFolder = Workspace:FindFirstChild("PlotItems")
 
-        -- 自分のおもちゃのみを収集（他人のは使わない）
+        -- 自分のおもちゃのみを収集
         local spawnedToys = Workspace:FindFirstChild(myName .. "SpawnedInToys")
         if spawnedToys then
             for _, item in ipairs(spawnedToys:GetChildren()) do
@@ -391,23 +388,25 @@ local function StartHolonHUB()
 
     task.spawn(refreshToyList)
 
+    -- 最大おもちゃ数スライダー
     UIElements.MaxToysSlider = MainSec:AddSlider({
         Name = "使用するおもちゃの最大数",
         Min = 1, Max = 200, Default = cfg.Global.MaxToys or 100,
         Callback = function(v) cfg.Global.MaxToys = v end
     })
 
-    -- 翼固有設定セクション
+    -- 翼設定セクション（RootFixed, V_Angle, Tilt を削除）
     local WingSec = MainTab:AddSection({ Name = "翼設定" })
 
-    WingSec:AddToggle({ Name = "付け根を固定 (Root Fixed)", Default = cfg.Wing.RootFixed, Callback = function(v) cfg.Wing.RootFixed = v end })
+    WingSec:AddSlider({ Name = "サイズ (Size)", Min = 1, Max = 150, Default = cfg.Wing.Size, Callback = function(v) cfg.Wing.Size = v end })
+    WingSec:AddSlider({ Name = "速度 (Speed)", Min = 0, Max = 100, Default = cfg.Wing.Speed, Callback = function(v) cfg.Wing.Speed = v end })
+    WingSec:AddSlider({ Name = "高さ (Height)", Min = -50, Max = 50, Default = cfg.Wing.Height, Callback = function(v) cfg.Wing.Height = v end })
+    WingSec:AddSlider({ Name = "奥行き (Back)", Min = -50, Max = 50, Default = cfg.Wing.Back, Callback = function(v) cfg.Wing.Back = v end })
     WingSec:AddSlider({ Name = "体との距離 (Gap)", Min = 0, Max = 50, Default = cfg.Wing.Gap, Callback = function(v) cfg.Wing.Gap = v end })
-    WingSec:AddSlider({ Name = "関節数", Min = 0, Max = 10, Default = cfg.Wing.Joints, Callback = function(v) cfg.Wing.Joints = v end })
-    WingSec:AddSlider({ Name = "V字角度 (前後方向)", Min = -180, Max = 180, Default = cfg.Wing.V_Angle, Callback = function(v) cfg.Wing.V_Angle = v end })
-    WingSec:AddSlider({ Name = "上下傾斜", Min = -90, Max = 90, Default = cfg.Wing.Tilt, Callback = function(v) cfg.Wing.Tilt = v end })
-    WingSec:AddSlider({ Name = "羽ばたき強度", Min = 0, Max = 50, Default = cfg.Wing.Strength, Callback = function(v) cfg.Wing.Strength = v end })
-    WingSec:AddToggle({ Name = "カーブ (反り)", Default = cfg.Wing.Curve, Callback = function(v) cfg.Wing.Curve = v end })
-    WingSec:AddSlider({ Name = "カーブ強度 (反り)", Min = -50, Max = 50, Default = cfg.Wing.CurveAmount, Callback = function(v) cfg.Wing.CurveAmount = v end })
+    WingSec:AddSlider({ Name = "関節数 (Joints)", Min = 0, Max = 10, Default = cfg.Wing.Joints, Callback = function(v) cfg.Wing.Joints = v end })
+    WingSec:AddSlider({ Name = "羽ばたき強度 (Strength)", Min = 0, Max = 50, Default = cfg.Wing.Strength, Callback = function(v) cfg.Wing.Strength = v end })
+    WingSec:AddToggle({ Name = "カーブ (Curve)", Default = cfg.Wing.Curve, Callback = function(v) cfg.Wing.Curve = v end })
+    WingSec:AddSlider({ Name = "カーブ強度 (Curve Amount)", Min = -50, Max = 50, Default = cfg.Wing.CurveAmount, Callback = function(v) cfg.Wing.CurveAmount = v end })
 
     OrionLib:MakeNotification({ Name = "Holon HUB", Content = "v1.4.3 [Wing Only] が読み込まれました！", Time = 5 })
     OrionLib:Init()
