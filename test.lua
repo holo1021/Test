@@ -1,196 +1,354 @@
---[[ Holon VM v5 Secure ]]
-local _cmbzf = {875902191,875967956,909521975,875902703,876034004,909522487,875836605}
-local _qofbb = {{68,54,95,49,69},{124,19,127,16,126,94,8,69,101,49,84,39,83,105,73,161,20,163,70,205,88,190,54,166,67,201,86},{208,107,197,35,160,19,240,115,237,14,140,59,216,91,232,12,180,62,221,92,251,30,176,47,199,102,234,9,136,29,254,124,240,19,146,52,215,86,210,49,176,14,237,108,245,219,245,219}}
-local _lcyii = 52
-local function _uerke(_cmbzf, _qofbb, _arqzf, ...)
-    local _rxaqx, _jctij = 1, getfenv() or _G
-    local _args = {...}; for i=1, #_args do _arqzf[i-1] = _args[i] end
-    local _esjgo = {}
-    for i, v in ipairs(_qofbb) do
-        local t = {}
-        local last_byte = _lcyii -- 最初のキーはVMキー
-        for j = 1, #v do
-            local enc_byte = v[j]
-            local dec_byte = bit32.bxor(enc_byte, last_byte)
-            table.insert(t, string.char(dec_byte))
-            last_byte = enc_byte -- 暗号化されたバイトが次の復号キーになる
-        end
-        _esjgo[i] = table.concat(t)
+-- Holon HUB - Wing Only (OrionUI版)
+-- 必要なサービスの取得
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
+local HttpService = game:GetService("HttpService")
+local LocalPlayer = Players.LocalPlayer
+
+-- OrionLibの読み込み
+local OrionUrl = "https://raw.githubusercontent.com/hololove1021/HolonHUB/refs/heads/main/source.txt"
+local OrionLib = loadstring(game:HttpGet(OrionUrl))()
+
+-- 既存のUIを削除
+pcall(function()
+    if game:GetService("CoreGui"):FindFirstChild("Orion") then
+        game:GetService("CoreGui").Orion:Destroy()
+    end
+end)
+
+-- ネットワーク所有権設定用イベント（あれば）
+local SetNetworkOwner
+pcall(function()
+    local GrabEvents = ReplicatedStorage:WaitForChild("GrabEvents")
+    SetNetworkOwner = GrabEvents:WaitForChild("SetNetworkOwner")
+end)
+
+-- ===== 設定 =====
+local WingConfig = {
+    Size = 30,          -- 翼の大きさ
+    Gap = 3.0,          -- 胴体からの距離
+    Speed = 6,          -- 羽ばたく速さ
+    Height = 0.5,       -- 高さオフセット
+    Back = 0,           -- 前後オフセット
+    Joints = 3,         -- 関節数（羽ばたきの位相ズレ）
+    V_Angle = 0,        -- V字角度（前後方向）
+    Tilt = 0,           -- 上下傾斜
+    Strength = 15,      -- 羽ばたき強度
+    RootFixed = true,   -- 根元を固定するか
+    Curve = false,      -- 反りを有効にするか
+    CurveAmount = 10,   -- 反りの強さ
+}
+local MaxToys = 30          -- 使用するおもちゃの最大数
+local FollowPlayer = true   -- プレイヤーに追従するか
+
+-- 内部変数
+local isEnabled = false
+local activeToys = {}       -- {A0, AP, AO, Part, Model}
+local originalCollisions = {}
+local updateConnection = nil
+local lastBaseCF = nil
+
+-- ===== 翼の位置計算（Wing専用） =====
+local function getWingPosition(i, count, time)
+    local c = WingConfig
+    local side = (i % 2 == 1) and -1 or 1          -- 左(-1) / 右(1)
+    local idx = math.ceil(i / 2)                   -- 翼の段数
+    local totalSide = math.ceil(count / 2)          -- 片翼あたりの総段数
+
+    local distRatio = idx / math.max(1, totalSide)
+
+    local flapPhase = time * c.Speed
+    if c.Joints > 0 then
+        flapPhase = flapPhase - (idx * (0.5 / math.max(1, c.Joints)))
     end
 
-    local _hwrjz = nil
+    local flap = math.sin(flapPhase) * c.Strength
+    if c.RootFixed then
+        flap = flap * distRatio
+    end
 
-    local _injoc = 1 -- Instruction Width
-    local _ST = 2211
-    local _IN, _ppyjj = 0, 0
-    while _hwrjz == nil do
-        if _ST == 2211 then
-            if _rxaqx > #_cmbzf then _hwrjz = {} else
-                _IN = _cmbzf[_rxaqx]
-                _ppyjj = _IN % 256
-                _ST = 7135
+    local horizontalOffset = c.Gap + (c.Size * distRatio)
+    local pos = Vector3.new(horizontalOffset * side, flap, 0)
+
+    local rotCF = CFrame.Angles(
+        math.rad(c.Tilt),
+        math.rad(c.V_Angle * side),
+        0
+    )
+
+    if c.Curve then
+        local curve_amount = c.CurveAmount or 10
+        local flap_ratio = math.sin(flapPhase)
+        local soar_angle = math.rad(flap_ratio * curve_amount * distRatio)
+        rotCF = rotCF * CFrame.Angles(0, 0, soar_angle * side)
+    end
+
+    return (rotCF * pos) + Vector3.new(0, c.Height, c.Back)
+end
+
+-- ===== 自分のおもちゃを取得 =====
+local function getPlayerToys(maxCount)
+    local toys = {}
+    local myName = LocalPlayer.Name
+    local spawnedToys = Workspace:FindFirstChild(myName .. "SpawnedInToys")
+    if spawnedToys then
+        for _, item in ipairs(spawnedToys:GetChildren()) do
+            if item:IsA("Model") and item.PrimaryPart then
+                table.insert(toys, item)
+                if #toys >= maxCount then break end
             end
-        elseif _ST == 7135 then
-            if _ppyjj == (-34 * 2 - 10 + 100) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _ysnhp = { _ppyjj, bit32.bxor(_rA, _lcyii), bit32.bxor(_rB, _lcyii), bit32.bxor(_rC, _lcyii) };
-_arqzf[_ysnhp[2]] = _arqzf[_ysnhp[3]][_esjgo[_ysnhp[4]]]
-_ST = 7984
-elseif _ppyjj == (14 * 2 - -6 + -33) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _ysnhp = { _ppyjj, bit32.bxor(_rA, _lcyii), bit32.bxor(_rB, _lcyii), bit32.bxor(_rC, _lcyii) };
-_arqzf[_ysnhp[2]] = -_arqzf[_ysnhp[3]]
-_ST = 7984
-elseif _ppyjj == (-64 * 2 - 17 + 203) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _ysnhp = { _ppyjj, bit32.bxor(_rA, _lcyii), bit32.bxor(_rB, _lcyii), bit32.bxor(_rC, _lcyii) };
-_arqzf[_ysnhp[2]] = not _arqzf[_ysnhp[3]]
-_ST = 7984
-elseif _ppyjj == (49 * 2 - -6 + 150) then
--- no-op
-_ST = 7984
-elseif _ppyjj == (-68 * 2 - 82 + 286) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _ysnhp = { _ppyjj, bit32.bxor(_rA, _lcyii), bit32.bxor(_rB, _lcyii), bit32.bxor(_rC, _lcyii) };
-_rxaqx = _rxaqx + _ysnhp[4] * _injoc
-_ST = 7984
-elseif _ppyjj == (-25 * 2 - -125 + 102) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _ysnhp = { _ppyjj, bit32.bxor(_rA, _lcyii), bit32.bxor(_rB, _lcyii), bit32.bxor(_rC, _lcyii) };
-_arqzf[_ysnhp[2]] = _arqzf[_ysnhp[3]]
-_ST = 7984
-elseif _ppyjj == (39 * 2 - 45 + 202) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _ysnhp = { _ppyjj, bit32.bxor(_rA, _lcyii), bit32.bxor(_rB, _lcyii), bit32.bxor(_rC, _lcyii) };
-local proto_src = _esjgo[_ysnhp[3]]
-                local p_func = loadstring(proto_src)
-                if p_func then
-                    local p = p_func()
-                    _arqzf[_ysnhp[2]] = function(...)
-                        local new_S = {}
-                        new_S.parent = _arqzf
-                        return _uerke(p.B, p.C, new_S, ...)
+        end
+    end
+
+    local plots = Workspace:FindFirstChild("Plots")
+    local plotItems = Workspace:FindFirstChild("PlotItems")
+    if plots and plotItems then
+        for _, plot in ipairs(plots:GetChildren()) do
+            local sign = plot:FindFirstChild("PlotSign")
+            local ownerObj = sign and (sign:FindFirstChild("ThisPlotsOwners") or sign:FindFirstChild("Owner"))
+            if ownerObj then
+                local val = ownerObj:FindFirstChild("Value") or ownerObj
+                local data = val:FindFirstChild("Data") or val
+                if data:IsA("StringValue") and data.Value == myName then
+                    local targetFolder = plotItems:FindFirstChild(plot.Name)
+                    if targetFolder then
+                        for _, item in ipairs(targetFolder:GetChildren()) do
+                            if item:IsA("Model") and item.PrimaryPart then
+                                 table.insert(toys, item)
+                                if #toys >= maxCount then break end
+                            end
+                        end
                     end
                 end
-_ST = 7984
-elseif _ppyjj == (0 * 2 - -95 + 27) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _ysnhp = { _ppyjj, bit32.bxor(_rA, _lcyii), bit32.bxor(_rB, _lcyii), bit32.bxor(_rC, _lcyii) };
-                    local target_S = _arqzf
-                    for i=1, _ysnhp[3] do target_S = target_S.parent end
-                    target_S[_ysnhp[2]] = _arqzf[_ysnhp[4]]
-                
-_ST = 7984
-elseif _ppyjj == (127 * 2 - -21 + -256) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _ysnhp = { _ppyjj, bit32.bxor(_rA, _lcyii), bit32.bxor(_rB, _lcyii), bit32.bxor(_rC, _lcyii) };
-local args = {}; for i=1, _ysnhp[3]-1 do args[i] = _arqzf[_ysnhp[2]+i] end; local res = {_arqzf[_ysnhp[2]](unpack(args))}; for i=1, _ysnhp[4] do _arqzf[_ysnhp[2]+i-1] = res[i] end
-_ST = 7984
-elseif _ppyjj == (124 * 2 - -63 + -157) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _ysnhp = { _ppyjj, bit32.bxor(_rA, _lcyii), bit32.bxor(_rB, _lcyii), bit32.bxor(_rC, _lcyii) };
-if _arqzf[_ysnhp[2]+1] ~= nil then _arqzf[_ysnhp[2]] = _arqzf[_ysnhp[2]+1]; _rxaqx = _rxaqx + _ysnhp[4] * _injoc else _arqzf[_ysnhp[2]] = nil end
-_ST = 7984
-elseif _ppyjj == (118 * 2 - 69 + -141) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _ysnhp = { _ppyjj, bit32.bxor(_rA, _lcyii), bit32.bxor(_rB, _lcyii), bit32.bxor(_rC, _lcyii) };
-_arqzf[_ysnhp[2]] = _arqzf[_ysnhp[3]] ~= _arqzf[_ysnhp[4]]
-_ST = 7984
-elseif _ppyjj == (-121 * 2 - 53 + 502) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _ysnhp = { _ppyjj, bit32.bxor(_rA, _lcyii), bit32.bxor(_rB, _lcyii), bit32.bxor(_rC, _lcyii) };
-_arqzf[_ysnhp[2]] = _arqzf[_ysnhp[3]] * _arqzf[_ysnhp[4]]
-_ST = 7984
-elseif _ppyjj == (-22 * 2 - -48 + 143) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _ysnhp = { _ppyjj, bit32.bxor(_rA, _lcyii), bit32.bxor(_rB, _lcyii), bit32.bxor(_rC, _lcyii) };
-_arqzf[_ysnhp[2]] = _arqzf[_ysnhp[3]] <= _arqzf[_ysnhp[4]]
-_ST = 7984
-elseif _ppyjj == (106 * 2 - 110 + -17) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _ysnhp = { _ppyjj, bit32.bxor(_rA, _lcyii), bit32.bxor(_rB, _lcyii), bit32.bxor(_rC, _lcyii) };
-_arqzf[_ysnhp[2]] = _arqzf[_ysnhp[3]] + _arqzf[_ysnhp[4]]
-_ST = 7984
-elseif _ppyjj == (-52 * 2 - -77 + 78) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _ysnhp = { _ppyjj, bit32.bxor(_rA, _lcyii), bit32.bxor(_rB, _lcyii), bit32.bxor(_rC, _lcyii) };
-_jctij[_esjgo[_ysnhp[2]]] = _arqzf[_ysnhp[3]]
-_ST = 7984
-elseif _ppyjj == (-45 * 2 - 104 + 277) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _ysnhp = { _ppyjj, bit32.bxor(_rA, _lcyii), bit32.bxor(_rB, _lcyii), bit32.bxor(_rC, _lcyii) };
-_arqzf[_ysnhp[2]][_esjgo[_ysnhp[3]]] = _arqzf[_ysnhp[4]]
-_ST = 7984
-elseif _ppyjj == (-39 * 2 - 35 + 302) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _ysnhp = { _ppyjj, bit32.bxor(_rA, _lcyii), bit32.bxor(_rB, _lcyii), bit32.bxor(_rC, _lcyii) };
-local n = _ysnhp[3] - 1; local t = {}; for i=0, n-1 do t[i+1] = _arqzf[_ysnhp[2]+i] end; _hwrjz = t
-_ST = 7984
-elseif _ppyjj == (-37 * 2 - -78 + 92) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _ysnhp = { _ppyjj, bit32.bxor(_rA, _lcyii), bit32.bxor(_rB, _lcyii), bit32.bxor(_rC, _lcyii) };
-_arqzf[_ysnhp[2]] = _arqzf[_ysnhp[3]] < _arqzf[_ysnhp[4]]
-_ST = 7984
-elseif _ppyjj == (-113 * 2 - -20 + 218) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _ysnhp = { _ppyjj, bit32.bxor(_rA, _lcyii), bit32.bxor(_rB, _lcyii), bit32.bxor(_rC, _lcyii) };
-
-_ST = 7984
-elseif _ppyjj == (37 * 2 - 8 + 162) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _ysnhp = { _ppyjj, bit32.bxor(_rA, _lcyii), bit32.bxor(_rB, _lcyii), bit32.bxor(_rC, _lcyii) };
-_arqzf[_ysnhp[2]] = _arqzf[_ysnhp[3]] == _arqzf[_ysnhp[4]]
-_ST = 7984
-elseif _ppyjj == (-58 * 2 - -101 + 67) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _ysnhp = { _ppyjj, bit32.bxor(_rA, _lcyii), bit32.bxor(_rB, _lcyii), bit32.bxor(_rC, _lcyii) };
-                    local target_S = _arqzf
-                    for i=1, _ysnhp[4] do target_S = target_S.parent end
-                    _arqzf[_ysnhp[2]] = target_S[_ysnhp[3]]
-                
-_ST = 7984
-elseif _ppyjj == (-93 * 2 - -98 + 327) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _ysnhp = { _ppyjj, bit32.bxor(_rA, _lcyii), bit32.bxor(_rB, _lcyii), bit32.bxor(_rC, _lcyii) };
-_arqzf[_ysnhp[2]] = _jctij[_esjgo[_ysnhp[3]]]
-_ST = 7984
-elseif _ppyjj == (56 * 2 - -6 + 4) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _ysnhp = { _ppyjj, bit32.bxor(_rA, _lcyii), bit32.bxor(_rB, _lcyii), bit32.bxor(_rC, _lcyii) };
-
-_ST = 7984
-elseif _ppyjj == (87 * 2 - 0 + 67) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _ysnhp = { _ppyjj, bit32.bxor(_rA, _lcyii), bit32.bxor(_rB, _lcyii), bit32.bxor(_rC, _lcyii) };
-if _arqzf[_ysnhp[2]] then _rxaqx = _rxaqx + _ysnhp[4] * _injoc end
-_ST = 7984
-elseif _ppyjj == (-101 * 2 - -116 + 322) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _ysnhp = { _ppyjj, bit32.bxor(_rA, _lcyii), bit32.bxor(_rB, _lcyii), bit32.bxor(_rC, _lcyii) };
-_arqzf[_ysnhp[2]][_arqzf[_ysnhp[3]]] = _arqzf[_ysnhp[4]]
-_ST = 7984
-elseif _ppyjj == (-19 * 2 - 36 + 320) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _ysnhp = { _ppyjj, bit32.bxor(_rA, _lcyii), bit32.bxor(_rB, _lcyii), bit32.bxor(_rC, _lcyii) };
-_arqzf[_ysnhp[2]] = _arqzf[_ysnhp[3]] - _arqzf[_ysnhp[4]]
-_ST = 7984
-elseif _ppyjj == (-68 * 2 - -38 + 184) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _ysnhp = { _ppyjj, bit32.bxor(_rA, _lcyii), bit32.bxor(_rB, _lcyii), bit32.bxor(_rC, _lcyii) };
-_arqzf[_ysnhp[2]] = _arqzf[_ysnhp[3]][_arqzf[_ysnhp[4]]]
-_ST = 7984
-elseif _ppyjj == (-47 * 2 - -73 + 233) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _ysnhp = { _ppyjj, bit32.bxor(_rA, _lcyii), bit32.bxor(_rB, _lcyii), bit32.bxor(_rC, _lcyii) };
-_arqzf[_ysnhp[2]] = _esjgo[_ysnhp[3]]
-_ST = 7984
-elseif _ppyjj == (-87 * 2 - 97 + 279) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _ysnhp = { _ppyjj, bit32.bxor(_rA, _lcyii), bit32.bxor(_rB, _lcyii), bit32.bxor(_rC, _lcyii) };
-_arqzf[_ysnhp[2]] = tostring(_arqzf[_ysnhp[3]]) .. tostring(_arqzf[_ysnhp[4]])
-_ST = 7984
-elseif _ppyjj == (-2 * 2 - 88 + 147) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _ysnhp = { _ppyjj, bit32.bxor(_rA, _lcyii), bit32.bxor(_rB, _lcyii), bit32.bxor(_rC, _lcyii) };
-            local f = _arqzf[_ysnhp[2]]
-            if f then
-                local nargs = _ysnhp[3] - 1
-                local args = {}
-                for i = 1, nargs do
-                    table.insert(args, _arqzf[_ysnhp[2] + i])
-                end
-                local results = { f(unpack(args)) }
-                local nRes = _ysnhp[4] - 1
-                if nRes > 0 then
-                    for i = 1, nRes do _arqzf[_ysnhp[2] + i - 1] = results[i] end
-                end
             end
-_ST = 7984
-elseif _ppyjj == (-15 * 2 - 84 + 352) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _ysnhp = { _ppyjj, bit32.bxor(_rA, _lcyii), bit32.bxor(_rB, _lcyii), bit32.bxor(_rC, _lcyii) };
-_arqzf[_ysnhp[2]] = {}
-_ST = 7984
-elseif _ppyjj == (-18 * 2 - 10 + 162) then
-local _rA = math.floor(_IN / 256) % 256; local _rB = math.floor(_IN / 65536) % 256; local _rC = math.floor(_IN / 16777216) % 256; local _ysnhp = { _ppyjj, bit32.bxor(_rA, _lcyii), bit32.bxor(_rB, _lcyii), bit32.bxor(_rC, _lcyii) };
-if not _arqzf[_ysnhp[2]] then _rxaqx = _rxaqx + _ysnhp[4] * _injoc end
-_ST = 7984
-end
-        elseif _ST == 7984 then
-            _rxaqx = _rxaqx + _injoc
-            _ST = 2211
         end
     end
-    return unpack(_hwrjz or {})
+
+    return toys
 end
-return _uerke(_cmbzf, _qofbb, {}, ...)
+
+-- ===== エフェクト開始 =====
+local function startEffect()
+    if isEnabled then stopEffect() end
+
+    local toys = getPlayerToys(MaxToys)
+    if #toys == 0 then
+        OrionLib:MakeNotification({Name="エラー", Content="おもちゃが見つかりません", Time=3})
+        return
+    end
+    print("[Wing] 使用おもちゃ数:", #toys)
+
+    for i, model in ipairs(toys) do
+    local pp = model.PrimaryPart
+    pp.AssemblyLinearVelocity = Vector3.zero
+    pp.AssemblyAngularVelocity = Vector3.zero
+
+    pcall(function() pp:SetNetworkOwner(LocalPlayer) end)
+    if SetNetworkOwner then
+        pcall(function() SetNetworkOwner:FireServer(pp, pp.CFrame) end)
+    end
+
+    -- ★★★ 初期位置を設定（hub.lua と同じ処理）★★★
+    local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if root then
+        -- 現在のプレイヤー位置を基準に、翼の位置を計算して直接移動
+        local relPos = getWingPosition(i, #toys, tick())  -- 現在時刻で計算
+        pp.CFrame = root.CFrame:ToWorldSpace(CFrame.new(relPos))
+    end
+
+    -- 当たり判定無効化（既存コード）
+    for _, part in ipairs(model:GetDescendants()) do
+        if part:IsA("BasePart") then
+            if originalCollisions[part] == nil then
+                originalCollisions[part] = part.CanCollide
+            end
+            part.CanCollide = false
+            part.CanTouch = false
+            part.CanQuery = false
+        end
+    end
+
+    -- AlignPosition / AlignOrientation 作成（既存コード）
+    local a0 = Instance.new("Attachment", pp)
+    local ap = Instance.new("AlignPosition", pp)
+    ap.Attachment0 = a0
+    ap.Mode = Enum.PositionAlignmentMode.OneAttachment
+    ap.MaxForce = 1e9
+    ap.Responsiveness = 200
+
+    local ao = Instance.new("AlignOrientation", pp)
+    ao.Attachment0 = a0
+    ao.Mode = Enum.OrientationAlignmentMode.OneAttachment
+    ao.MaxTorque = 1e9
+    ao.Responsiveness = 200
+
+    table.insert(activeToys, {A0=a0, AP=ap, AO=ao, Part=pp, Model=model})
+end
+
+    isEnabled = true
+    lastBaseCF = nil
+
+updateConnection = RunService.RenderStepped:Connect(function()
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+
+    -- ★ 所有権維持（hub.lua と同じ処理）
+    if math.random() < 0.05 then
+        for _, toy in ipairs(activeToys) do
+            pcall(function() toy.Part:SetNetworkOwner(LocalPlayer) end)
+        end
+    end
+
+    local baseCF
+    if FollowPlayer then
+        baseCF = root.CFrame
+        lastBaseCF = baseCF
+    else
+        if not lastBaseCF then lastBaseCF = root.CFrame end
+        baseCF = lastBaseCF
+    end
+
+    local t = tick()
+
+    for i, toy in ipairs(activeToys) do
+        local part = toy.Part
+        if part.Position.Y <= -90 then
+            part.Anchored = true
+        else
+            part.Anchored = false
+            local relPos = getWingPosition(i, #activeToys, t)
+            local worldPos = baseCF:PointToWorldSpace(relPos)
+            toy.AP.Position = worldPos
+
+            -- 左右の判定（左:-1, 右:1）
+            local side = (i % 2 == 1) and -1 or 1
+
+            -- おもちゃ自体を横向きにする回転（hub.lua の IndividualRotation 相当）
+            local individualRot = CFrame.Angles(0, math.rad(-90), 0)
+
+            -- 左右の羽が互いに向き合うための追加回転（必要に応じて調整）
+            local extraRot = CFrame.Angles(0, math.rad(side * 90), 0)
+
+            -- 最終的な向き
+            toy.AO.CFrame = baseCF * individualRot * extraRot
+        end
+    end
+end)
+end
+
+-- ===== エフェクト停止 =====
+local function stopEffect()
+    isEnabled = false
+    if updateConnection then
+        updateConnection:Disconnect()
+        updateConnection = nil
+    end
+
+    for _, toy in ipairs(activeToys) do
+        pcall(function()
+            toy.A0:Destroy()
+            toy.AP:Destroy()
+            toy.AO:Destroy()
+        end)
+    end
+    activeToys = {}
+
+    for part, coll in pairs(originalCollisions) do
+        if part and part.Parent then
+            pcall(function() part.CanCollide = coll end)
+        end
+    end
+    originalCollisions = {}
+end
+
+-- ===== UI構築 =====
+local Window = OrionLib:MakeWindow({
+    Name = "Holon HUB - Wing Only",
+    HidePremium = false,
+    SaveConfig = true,
+    ConfigFolder = "HolonWing",
+    IntroEnabled = true,
+    IntroText = "Wing Mode Loaded"
+})
+
+-- メインタブ
+local MainTab = Window:MakeTab({
+    Name = "メイン",
+    Icon = "rbxassetid://7733960981"
+})
+
+local MainSec = MainTab:AddSection({ Name = "制御" })
+
+MainSec:AddToggle({
+    Name = "エフェクト有効",
+    Default = false,
+    Callback = function(v)
+        if v then startEffect() else stopEffect() end
+    end
+})
+
+MainSec:AddToggle({
+    Name = "プレイヤー追従",
+    Default = FollowPlayer,
+    Callback = function(v) FollowPlayer = v end
+})
+
+MainSec:AddSlider({
+    Name = "使用おもちゃ数",
+    Min = 1, Max = 100, Default = MaxToys,
+    Callback = function(v) MaxToys = v end
+})
+
+-- 設定タブ
+local ConfigTab = Window:MakeTab({
+    Name = "設定",
+    Icon = "rbxassetid://10734950309"
+})
+
+local WingSec = ConfigTab:AddSection({ Name = "羽パラメータ" })
+
+WingSec:AddSlider({ Name = "サイズ", Min = 1, Max = 150, Default = WingConfig.Size, Callback = function(v) WingConfig.Size = v end })
+WingSec:AddSlider({ Name = "速度", Min = 0, Max = 50, Default = WingConfig.Speed, Callback = function(v) WingConfig.Speed = v end })
+WingSec:AddSlider({ Name = "高さ", Min = -50, Max = 50, Default = WingConfig.Height, Callback = function(v) WingConfig.Height = v end })
+WingSec:AddSlider({ Name = "奥行き", Min = -50, Max = 50, Default = WingConfig.Back, Callback = function(v) WingConfig.Back = v end })
+WingSec:AddSlider({ Name = "羽ばたき強度", Min = 0, Max = 50, Default = WingConfig.Strength, Callback = function(v) WingConfig.Strength = v end })
+WingSec:AddSlider({ Name = "体との距離", Min = 0, Max = 50, Default = WingConfig.Gap, Callback = function(v) WingConfig.Gap = v end })
+WingSec:AddSlider({ Name = "関節数", Min = 0, Max = 10, Default = WingConfig.Joints, Callback = function(v) WingConfig.Joints = v end })
+WingSec:AddSlider({ Name = "V字角度", Min = -180, Max = 180, Default = WingConfig.V_Angle, Callback = function(v) WingConfig.V_Angle = v end })
+WingSec:AddSlider({ Name = "上下傾斜", Min = -90, Max = 90, Default = WingConfig.Tilt, Callback = function(v) WingConfig.Tilt = v end })
+
+WingSec:AddToggle({ Name = "付け根固定", Default = WingConfig.RootFixed, Callback = function(v) WingConfig.RootFixed = v end })
+WingSec:AddToggle({ Name = "反り有効", Default = WingConfig.Curve, Callback = function(v) WingConfig.Curve = v end })
+WingSec:AddSlider({ Name = "反り強度", Min = -50, Max = 50, Default = WingConfig.CurveAmount, Callback = function(v) WingConfig.CurveAmount = v end })
+
+-- 詳細タブ（左右の向き調整用）
+local DetailTab = Window:MakeTab({
+    Name = "詳細",
+    Icon = "rbxassetid://7733771472"
+})
+
+local RotSec = DetailTab:AddSection({ Name = "向き調整" })
+
+local currentExtraRot = 0  -- 追加のY軸回転（度）
+RotSec:AddSlider({
+    Name = "追加Y軸回転",
+    Min = -180, Max = 180, Default = 0,
+    Callback = function(v)
+        currentExtraRot = v
+        -- リアルタイム反映はupdate内で行うため、ここでは設定だけ保持
+    end
+})
+
+
+-- 起動メッセージ
+OrionLib:MakeNotification({
+    Name = "Holon HUB",
+    Content = "Wing Only 版が読み込まれました",
+    Time = 3
+})
+
+OrionLib:Init()
