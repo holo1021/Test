@@ -1,5 +1,4 @@
 -- Holon HUB - Wing Only (OrionUI版) - 家のおもちゃのみ対象
--- 必要なサービスの取得
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
@@ -187,16 +186,18 @@ local function startEffect()
     local root = char and char:FindFirstChild("HumanoidRootPart")
     if not root then return end
 
-    -- ★ 所有権維持：毎フレーム実行（hub.lua よりも高頻度）
+    -- ★★★ 所有権の完全掌握（毎フレーム、全パーツ、サーバー通知付き）★★★
     for _, toy in ipairs(activeToys) do
         local part = toy.Part
+        -- ローカルでの所有権設定
         pcall(function() part:SetNetworkOwner(LocalPlayer) end)
-        -- ★ サーバーへも毎フレーム通知（負荷注意）
+        -- サーバーへの所有権通知（hub.lua と同じリモートを使用）
         if SetNetworkOwner then
             pcall(function() SetNetworkOwner:FireServer(part, part.CFrame) end)
         end
     end
 
+    -- 基準座標（プレイヤー追従ON/OFF対応）
     local baseCF
     if FollowPlayer then
         baseCF = root.CFrame
@@ -210,13 +211,13 @@ local function startEffect()
 
     for i, toy in ipairs(activeToys) do
         local part = toy.Part
-        part.Anchored = false  -- 奈落判定は完全に削除
+        part.Anchored = false  -- 絶対に固定しない
 
         local relPos = getWingPosition(i, #activeToys, t)
         local worldPos = baseCF:PointToWorldSpace(relPos)
         toy.AP.Position = worldPos
 
-        -- hub.lua 準拠の向き
+        -- ★ hub.lua 準拠の向き：Y軸-90度のみ（左右反転は individualRot だけで十分）
         local individualRot = CFrame.Angles(0, math.rad(-90), 0)
         toy.AO.CFrame = baseCF * individualRot
     end
