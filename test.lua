@@ -338,7 +338,6 @@ local function StartHolonHUB()
         Name = "おもちゃリスト更新",
         Callback = function()
             refreshToyList()
-            OrionLib:MakeNotification({ Name = "更新", Content = "おもちゃリストを再スキャンしました", Time = 3 })
         end
     })
 
