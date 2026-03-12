@@ -1,4 +1,5 @@
--- Holon HUB - Wing Only (OrionUI版) - 家のおもちゃのみ対象
+-- Holon HUB - Wing Only (OrionUI版) - BodyPosition/BodyGyro使用
+-- 必要なサービスの取得
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
@@ -45,7 +46,7 @@ local FollowPlayer = true   -- プレイヤーに追従するか
 
 -- 内部変数
 local isEnabled = false
-local activeToys = {}       -- {A0, AP, AO, Part, Model}
+local activeToys = {}       -- {BP, BG, Part, Model}
 local originalCollisions = {}
 local updateConnection = nil
 local lastBaseCF = nil
@@ -161,67 +162,72 @@ local function startEffect()
             end
         end
 
-        -- AlignPosition / AlignOrientation 作成
-        local a0 = Instance.new("Attachment", pp)
-        local ap = Instance.new("AlignPosition", pp)
-        ap.Attachment0 = a0
-        ap.Mode = Enum.PositionAlignmentMode.OneAttachment
-        ap.MaxForce = 1e9
-        ap.Responsiveness = 200
+        -- ★★★ BodyPosition / BodyGyro を作成（hub.lua の createBodyMovers と同様）★★★
+        -- 既存のMoverがあれば削除
+        for _, child in ipairs(pp:GetChildren()) do
+            if child:IsA("BodyPosition") or child:IsA("BodyGyro") then
+                child:Destroy()
+            end
+        end
 
-        local ao = Instance.new("AlignOrientation", pp)
-        ao.Attachment0 = a0
-        ao.Mode = Enum.OrientationAlignmentMode.OneAttachment
-        ao.MaxTorque = 1e9
-        ao.Responsiveness = 200
+        local bp = Instance.new("BodyPosition")
+        bp.P = 20000
+        bp.D = 500
+        bp.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+        bp.Parent = pp
 
-        table.insert(activeToys, {A0=a0, AP=ap, AO=ao, Part=pp, Model=model})
+        local bg = Instance.new("BodyGyro")
+        bg.P = 3000
+        bg.D = 100
+        bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+        bg.Parent = pp
+
+        table.insert(activeToys, {BP=bp, BG=bg, Part=pp, Model=model})
     end
 
     isEnabled = true
     lastBaseCF = nil
 
     updateConnection = RunService.RenderStepped:Connect(function()
-    local char = LocalPlayer.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    if not root then return end
+        local char = LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if not root then return end
 
-    -- ★★★ 所有権の完全掌握（毎フレーム、全パーツ、サーバー通知付き）★★★
-    for _, toy in ipairs(activeToys) do
-        local part = toy.Part
-        -- ローカルでの所有権設定
-        pcall(function() part:SetNetworkOwner(LocalPlayer) end)
-        -- サーバーへの所有権通知（hub.lua と同じリモートを使用）
-        if SetNetworkOwner then
-            pcall(function() SetNetworkOwner:FireServer(part, part.CFrame) end)
+        -- ★★★ 所有権の完全掌握（毎フレーム、全パーツ、サーバー通知付き）★★★
+        for _, toy in ipairs(activeToys) do
+            local part = toy.Part
+            pcall(function() part:SetNetworkOwner(LocalPlayer) end)
+            if SetNetworkOwner then
+                pcall(function() SetNetworkOwner:FireServer(part, part.CFrame) end)
+            end
         end
-    end
 
-    -- 基準座標（プレイヤー追従ON/OFF対応）
-    local baseCF
-    if FollowPlayer then
-        baseCF = root.CFrame
-        lastBaseCF = baseCF
-    else
-        if not lastBaseCF then lastBaseCF = root.CFrame end
-        baseCF = lastBaseCF
-    end
+        local baseCF
+        if FollowPlayer then
+            baseCF = root.CFrame
+            lastBaseCF = baseCF
+        else
+            if not lastBaseCF then lastBaseCF = root.CFrame end
+            baseCF = lastBaseCF
+        end
 
-    local t = tick()
+        local t = tick()
 
-    for i, toy in ipairs(activeToys) do
-        local part = toy.Part
-        part.Anchored = false  -- 絶対に固定しない
+        for i, toy in ipairs(activeToys) do
+            local part = toy.Part
+            part.Anchored = false
 
-        local relPos = getWingPosition(i, #activeToys, t)
-        local worldPos = baseCF:PointToWorldSpace(relPos)
-        toy.AP.Position = worldPos
+            local relPos = getWingPosition(i, #activeToys, t)
+            local worldPos = baseCF:PointToWorldSpace(relPos)
 
-        -- ★ hub.lua 準拠の向き：Y軸-90度のみ（左右反転は individualRot だけで十分）
-        local individualRot = CFrame.Angles(0, math.rad(-90), 0)
-        toy.AO.CFrame = baseCF * individualRot
-    end
-end)
+            -- BodyPosition で位置を設定
+            toy.BP.Position = worldPos
+
+            -- BodyGyro で向きを設定（hub.lua 準拠：Y軸-90度）
+            local individualRot = CFrame.Angles(0, math.rad(-90), 0)
+            toy.BG.CFrame = baseCF * individualRot
+        end
+    end)
 end
 
 -- ===== エフェクト停止 =====
@@ -234,9 +240,8 @@ local function stopEffect()
 
     for _, toy in ipairs(activeToys) do
         pcall(function()
-            toy.A0:Destroy()
-            toy.AP:Destroy()
-            toy.AO:Destroy()
+            toy.BP:Destroy()
+            toy.BG:Destroy()
         end)
     end
     activeToys = {}
@@ -249,9 +254,9 @@ local function stopEffect()
     originalCollisions = {}
 end
 
--- ===== UI構築 =====
+-- ===== UI構築（変更なし） =====
 local Window = OrionLib:MakeWindow({
-    Name = "Holon HUB - Wing Only (家のおもちゃ限定)",
+    Name = "Holon HUB - Wing Only (BodyPosition版)",
     HidePremium = false,
     SaveConfig = true,
     ConfigFolder = "HolonWing",
@@ -330,7 +335,7 @@ RotSec:AddSlider({
 -- 起動メッセージ
 OrionLib:MakeNotification({
     Name = "Holon HUB",
-    Content = "Wing Only 版（家のおもちゃ限定）が読み込まれました",
+    Content = "Wing Only 版（BodyPosition版）が読み込まれました",
     Time = 3
 })
 
