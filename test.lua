@@ -102,13 +102,6 @@ local function startEffect()
     local plotsFolder = Workspace:FindFirstChild("Plots")
     local plotItemsFolder = Workspace:FindFirstChild("PlotItems")
 
-    local spawnedToys = Workspace:FindFirstChild(myName .. "SpawnedInToys")
-    if spawnedToys then
-        for _, item in ipairs(spawnedToys:GetChildren()) do
-            table.insert(allMyItems, item)
-        end
-    end
-
     if plotsFolder and plotItemsFolder then
         for _, plot in ipairs(plotsFolder:GetChildren()) do
             local sign = plot:FindFirstChild("PlotSign")
