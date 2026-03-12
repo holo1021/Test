@@ -357,8 +357,9 @@ local function StartHolonHUB()
     WingSec:AddToggle({ Name = "カーブ (Curve)", Default = cfg.Wing.Curve, Callback = function(v) cfg.Wing.Curve = v end })
     WingSec:AddSlider({ Name = "カーブ強度 (Curve Amount)", Min = -50, Max = 50, Default = cfg.Wing.CurveAmount, Callback = function(v) cfg.Wing.CurveAmount = v end })
 
-    OrionLib:MakeNotification({ Name = "Holon HUB", Content = "Wing Only が読み込まれました！", Time = 5 })
+    OrionLib:MakeNotification({ Name = "Wing HUB", Content = "Wing Only が読み込まれました！", Time = 5 })
     OrionLib:Init()
 end
 
 StartHolonHUB()
+
