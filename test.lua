@@ -1156,11 +1156,8 @@ end
 --------------------------------------------------------------------------------
 -- [UI 構築] orion lib
 --------------------------------------------------------------------------------
-local KeyFileName = "HolonHub_Key.txt"
-local CorrectKey = "holox"
 local OrionUrl = "https://raw.githubusercontent.com/hololove1021/HolonHUB/refs/heads/main/source.txt"
 
--- [[ 1. メイン画面の関数 ]]
 local function StartHolonHUB()
     -- スマホ対策：OrionLibを関数内で読み込み直す
     local OrionLib = loadstring(game:HttpGet(OrionUrl))()
@@ -1413,95 +1410,58 @@ UIElements.AnimSpeedSlider = MainSec:AddSlider({
     Callback = function(v) cfg.AnimSpeed = v/10 end
 })
 
--- --- アニメーションセクション ---
-local AnimSec = MainTab:AddSection({
-	Name = "アニメーション"
+-- エフェクト全体の向きセクション
+local EffectRotSec = MainTab:AddSection({ Name = "エフェクト全体の向き" })
+UIElements.EffectRotationX = EffectRotSec:AddSlider({
+    Name = "X軸 (Pitch)", Min = -180, Max = 180, Default = 0,
+    Callback = function(v) cfg.Global.EffectRotation = Vector3.new(v, cfg.Global.EffectRotation.Y, cfg.Global.EffectRotation.Z) end
+})
+UIElements.EffectRotationY = EffectRotSec:AddSlider({
+    Name = "Y軸 (Yaw)", Min = -180, Max = 180, Default = 0,
+    Callback = function(v) cfg.Global.EffectRotation = Vector3.new(cfg.Global.EffectRotation.X, v, cfg.Global.EffectRotation.Z) end
+})
+UIElements.EffectRotationZ = EffectRotSec:AddSlider({
+    Name = "Z軸 (Roll)", Min = -180, Max = 180, Default = 0,
+    Callback = function(v) cfg.Global.EffectRotation = Vector3.new(cfg.Global.EffectRotation.X, cfg.Global.EffectRotation.Y, v) end
 })
 
-local seqRunning = false
-AnimSec:AddToggle({
-	Name = "変形シーケンス",
-    Default = false,
-	Callback = function(v)
-        seqRunning = v
-        if v then
-            task.spawn(function()
-                local s = 1 / cfg.AnimSpeed
-                currentMode = "MagicCircle"
-                cfg.MagicCircle.Height = -10
-                startEffect()
-                for i = -10, 5, 0.5 do 
-                    if not seqRunning then break end
-                    cfg.MagicCircle.Height = i
-                    task.wait(0.2 * s) 
-                end
-                if not seqRunning then return end
-                currentMode = "Merkaba"
-                task.wait(6 * s)
-                if not seqRunning then return end
-                currentMode = "FloatStone"
-                cfg.FloatStone.Chaos = true
-                cfg.FloatStone.Size = 2
-                for i = 2, 15, 0.5 do
-                    if not seqRunning then break end
-                    cfg.FloatStone.Size = i
-                    task.wait(0.05 * s)
-                end
-            end)
-        end
-	end
+local IndivRotSec = MainTab:AddSection({ Name = "おもちゃ自体の向き" })
+UIElements.IndividualRotationX = IndivRotSec:AddSlider({
+    Name = "X軸 (Pitch)", Min = -180, Max = 180, Default = 0,
+    Callback = function(v) cfg.Global.IndividualRotation = Vector3.new(v, cfg.Global.IndividualRotation.Y, cfg.Global.IndividualRotation.Z) end
+})
+UIElements.IndividualRotationY = IndivRotSec:AddSlider({
+    Name = "Y軸 (Yaw)", Min = -180, Max = 180, Default = -90,
+    Callback = function(v) cfg.Global.IndividualRotation = Vector3.new(cfg.Global.IndividualRotation.X, v, cfg.Global.IndividualRotation.Z) end
+})
+UIElements.IndividualRotationZ = IndivRotSec:AddSlider({
+    Name = "Z軸 (Roll)", Min = -180, Max = 180, Default = 0,
+    Callback = function(v) cfg.Global.IndividualRotation = Vector3.new(cfg.Global.IndividualRotation.X, cfg.Global.IndividualRotation.Y, v) end
 })
 
-local surgeRunning = false
-AnimSec:AddToggle({
-	Name = "Surge",
-    Default = false,
-	Callback = function(v)
-        surgeRunning = v
-        if v then
+-- ワールドリセットボタン
+MainSec:AddButton({
+    Name = "エフェクトをワールド0,0,0にリセット",
+    Callback = function()
+        if not isEnabled then return end
+        followPlayer = false 
+        lastBaseCF = CFrame.new(0, 0, 0) 
+
+        for i, fw in ipairs(activeToys) do
             task.spawn(function()
-                local s = 1 / cfg.AnimSpeed
-                currentMode = "MagicCircle"
-                cfg.MagicCircle.Height = -3
-                cfg.MagicCircle.Size = 5
-                cfg.MagicCircle.Speed = 10
-                startEffect()
-                for i = 5, 30, 2 do
-                    if not surgeRunning then break end
-                    cfg.MagicCircle.Size = i
-                    task.wait(0.09 * s)
-                end
-                if not surgeRunning then return end
-                currentMode = "Sphere"
-                cfg.Sphere.Size = 30
-                task.wait(1 * s)
-                if not surgeRunning then return end
-                for i = 30, 3, 2 do
-                    if not surgeRunning then break end
-                    cfg.Sphere.Size = i
-                    cfg.Sphere.Speed = (cfg.Sphere.Speed or 1) + 0.5
-                    task.wait(0.05 * s)
-                end
-                if not surgeRunning then return end
-                task.wait(0.9 * s)
-                if not surgeRunning then return end
-                cfg.Sphere.Speed = 20
-                for i = 3, 25, 3 do
-                    if not surgeRunning then break end
-                    cfg.Sphere.Size = i
-                    task.wait(0.04 * s)
-                end
-                if not surgeRunning then return end
-                task.wait(1.5 * s)
-                if not surgeRunning then return end
-                currentMode = "BackGuard"
-                cfg.BackGuard.Back = 15
-                cfg.BackGuard.Height = 5
-                cfg.BackGuard.Size = 20
-                cfg.BackGuard.Speed = 1
+                fw.AP.Enabled = false 
+                fw.Part.Anchored = true
+                fw.Part.CFrame = CFrame.new(0, 0, 0)
+                fw.AP.Position = Vector3.new(0, 0, 0) 
+                fw.Part.AssemblyLinearVelocity = Vector3.zero
+                
+                task.wait(0.1)
+                
+                fw.AP.Enabled = true 
+                fw.Part.Anchored = false
             end)
         end
-	end
+    end
 })
 
 -- --- TAB: MODE SETTINGS ---
@@ -1613,114 +1573,6 @@ sl_Back = EditSec:AddSlider({
     Callback = function(v) cfg[currentEditMode].Back = v end
 })
 
--- --- 詳細設定タブ (固有設定のみ) ---
-local AdvTab = Window:MakeTab({
-    Name = "詳細設定",
-    Icon = "rbxassetid://7733771472"
-})
-
-for _, m in ipairs(modes) do
-    -- 固有設定があるモードのみセクションを作成
-    if m == "Wing" or m == "Pet" or m == "Text" or m == "MagicCircle2" or m == "MagicCircle3" or m == "Beam" or m == "FloatStone" or m == "Tornado" or m == "Rotate" then
-        local s = AdvTab:AddSection({ Name = modeNames[m] or m })
-        
-        if m == "Wing" then
-            s:AddToggle({ Name = "付け根を固定 (Root Fixed)", Default = cfg.Wing.RootFixed, Callback = function(v) cfg.Wing.RootFixed = v end })
-            s:AddSlider({ Name = "体との距離 (Gap)", Min = 0, Max = 50, Default = cfg.Wing.Gap or 10, Callback = function(v) cfg.Wing.Gap = v end })
-            s:AddSlider({ Name = "関節数", Min = 0, Max = 10, Default = 3, Callback = function(v) cfg.Wing.Joints = v end })
-            s:AddSlider({ Name = "V字角度 (前後方向)", Min = -180, Max = 180, Default = 0, Callback = function(v) cfg.Wing.V_Angle = v end })
-            s:AddSlider({ Name = "上下傾斜", Min = -90, Max = 90, Default = 0, Callback = function(v) cfg.Wing.Tilt = v end })
-            s:AddSlider({ Name = "羽ばたき強度", Min = 0, Max = 50, Default = 15, Callback = function(v) cfg.Wing.Strength = v end })
-            s:AddToggle({ Name = "カーブ (反り)", Default = cfg.Wing.Curve or false, Callback = function(v) cfg.Wing.Curve = v end })
-            s:AddSlider({ Name = "カーブ強度 (反り)", Min = -50, Max = 50, Default = cfg.Wing.CurveAmount or 10, Callback = function(v) cfg.Wing.CurveAmount = v end })
-        
-        elseif m == "Pet" then
-            s:AddSlider({ Name = "個体数", Min = 1, Max = 10, Default = 2, Callback = function(v) cfg.Pet.Count = v end })
-            s:AddSlider({ Name = "関節数(うねり)", Min = 0, Max = 10, Default = 3, Callback = function(v) cfg.Pet.Joints = v end })
-            s:AddSlider({ Name = "横の広がり(Gap)", Min = 1, Max = 20, Default = 13, Callback = function(v) cfg.Pet.Gap = v end })
-        
-        elseif m == "Text" then
-            s:AddTextbox({ Name = "表示テキスト", Default = "HELLO", TextDisappear = false, Callback = function(v) cfg.Text.Content = v end })
-        
-        elseif m == "MagicCircle2" then
-            s:AddSlider({ Name = "レイヤー数", Min = 1, Max = 5, Default = 3, Callback = function(v) cfg.MagicCircle2.Layers = v end })
-        
-        elseif m == "MagicCircle3" then
-            s:AddSlider({ Name = "複雑度", Min = 1, Max = 10, Default = 5, Callback = function(v) cfg.MagicCircle3.Complexity = v end })
-        
-        elseif m == "Beam" then
-            s:AddSlider({ Name = "ビーム本数", Min = 1, Max = 20, Default = 8, Callback = function(v) cfg.Beam.Count = v end })
-        
-        elseif m == "FloatStone" then
-            s:AddToggle({ Name = "カオス移動", Default = false, Callback = function(v) cfg.FloatStone.Chaos = v end })
-
-        elseif m == "Tornado" then
-            s:AddSlider({ Name = "下部幅", Min = 0, Max = 50, Default = cfg.Tornado.Radius, Callback = function(v) cfg.Tornado.Radius = v end })
-            s:AddSlider({ Name = "上部幅", Min = 0, Max = 50, Default = cfg.Tornado.TopRadius, Callback = function(v) cfg.Tornado.TopRadius = v end })
-            s:AddToggle({ Name = "ピラミッド形状", Default = false, Callback = function(v) cfg.Tornado.Pyramid = v end })
-
-        elseif m == "Rotate" then
-            s:AddToggle({ Name = "ウェーブ (くねくね)", Default = cfg.Rotate.Wave or false, Callback = function(v) cfg.Rotate.Wave = v end })
-            s:AddSlider({ Name = "ウェーブ速度", Min = 1, Max = 20, Default = cfg.Rotate.WaveSpeed or 2, Callback = function(v) cfg.Rotate.WaveSpeed = v end })
-            s:AddSlider({ Name = "ウェーブ振幅", Min = 1, Max = 20, Default = cfg.Rotate.WaveAmp or 2, Callback = function(v) cfg.Rotate.WaveAmp = v end })
-        end
-    end
-end
-
--- エフェクト全体の向きセクション
-local EffectRotSec = MainTab:AddSection({ Name = "エフェクト全体の向き" })
-UIElements.EffectRotationX = EffectRotSec:AddSlider({
-    Name = "X軸 (Pitch)", Min = -180, Max = 180, Default = 0,
-    Callback = function(v) cfg.Global.EffectRotation = Vector3.new(v, cfg.Global.EffectRotation.Y, cfg.Global.EffectRotation.Z) end
-})
-UIElements.EffectRotationY = EffectRotSec:AddSlider({
-    Name = "Y軸 (Yaw)", Min = -180, Max = 180, Default = 0,
-    Callback = function(v) cfg.Global.EffectRotation = Vector3.new(cfg.Global.EffectRotation.X, v, cfg.Global.EffectRotation.Z) end
-})
-UIElements.EffectRotationZ = EffectRotSec:AddSlider({
-    Name = "Z軸 (Roll)", Min = -180, Max = 180, Default = 0,
-    Callback = function(v) cfg.Global.EffectRotation = Vector3.new(cfg.Global.EffectRotation.X, cfg.Global.EffectRotation.Y, v) end
-})
-
-local IndivRotSec = MainTab:AddSection({ Name = "おもちゃ自体の向き" })
-UIElements.IndividualRotationX = IndivRotSec:AddSlider({
-    Name = "X軸 (Pitch)", Min = -180, Max = 180, Default = 0,
-    Callback = function(v) cfg.Global.IndividualRotation = Vector3.new(v, cfg.Global.IndividualRotation.Y, cfg.Global.IndividualRotation.Z) end
-})
-UIElements.IndividualRotationY = IndivRotSec:AddSlider({
-    Name = "Y軸 (Yaw)", Min = -180, Max = 180, Default = -90,
-    Callback = function(v) cfg.Global.IndividualRotation = Vector3.new(cfg.Global.IndividualRotation.X, v, cfg.Global.IndividualRotation.Z) end
-})
-UIElements.IndividualRotationZ = IndivRotSec:AddSlider({
-    Name = "Z軸 (Roll)", Min = -180, Max = 180, Default = 0,
-    Callback = function(v) cfg.Global.IndividualRotation = Vector3.new(cfg.Global.IndividualRotation.X, cfg.Global.IndividualRotation.Y, v) end
-})
-
--- ワールドリセットボタン
-MainSec:AddButton({
-    Name = "エフェクトをワールド0,0,0にリセット",
-    Callback = function()
-        if not isEnabled then return end
-        followPlayer = false 
-        lastBaseCF = CFrame.new(0, 0, 0) 
-
-        for i, fw in ipairs(activeToys) do
-            task.spawn(function()
-                fw.AP.Enabled = false 
-                fw.Part.Anchored = true
-                fw.Part.CFrame = CFrame.new(0, 0, 0)
-                fw.AP.Position = Vector3.new(0, 0, 0) 
-                fw.Part.AssemblyLinearVelocity = Vector3.zero
-                
-                task.wait(0.1)
-                
-                fw.AP.Enabled = true 
-                fw.Part.Anchored = false
-            end)
-        end
-    end
-})
-
 -- --- TAB: DETAIL ---
 local DetailTab = Window:MakeTab({Name = "詳細", Icon = DetailIcon})
 AddDetailContent(DetailTab)
@@ -1735,56 +1587,5 @@ OrionLib:MakeNotification({
     OrionLib:Init()
 end
 
--- 認証システム（変更なし）
-if isfile(KeyFileName) and readfile(KeyFileName) == CorrectKey then
-    -- 認証済みなら即メインへ
-    StartHolonHUB()
-else
-    -- 未認証なら認証UIを作る
-    local OrionLib = loadstring(game:HttpGet(OrionUrl))()
-    
-    local AuthWindow = OrionLib:MakeWindow({
-        Name = "Holon HUB | Key System",
-        HidePremium = true,
-        IntroEnabled = false
-    })
-
-    local AuthTab = AuthWindow:MakeTab({Name = "認証", Icon = "rbxassetid://7733919526"})
-    local KeyInput = ""
-
-    AuthTab:AddTextbox({
-        Name = "キーを入力",
-        Default = "",
-        TextDisappear = false,
-        Callback = function(Value) 
-            KeyInput = Value 
-        end     
-    })
-
-    AuthTab:AddButton({
-        Name = "認証する",
-        Callback = function()
-            if KeyInput == CorrectKey then
-                writefile(KeyFileName, CorrectKey)
-                OrionLib:MakeNotification({Name = "成功", Content = "起動します!", Time = 2})
-                task.wait(1)
-                pcall(function() game.CoreGui.Orion:Destroy() end)
-                task.wait(0.5)
-                StartHolonHUB()
-            else
-                OrionLib:MakeNotification({Name = "失敗", Content = "キーが違います", Time = 5})
-            end
-        end
-    })
-
-    AuthTab:AddButton({
-        Name = "キーを入手 (Discord)",
-        Callback = function() setclipboard("https://discord.gg/EHBXqgZZYN") end
-    })
-
-    -- 詳細タブ
-    local AuthDetailTab = AuthWindow:MakeTab({Name = "詳細", Icon = DetailIcon})
-    AddDetailContent(AuthDetailTab)
-    
-    OrionLib:Init()
-end
+-- キーシステムを完全に削除し、直接起動
+StartHolonHUB()
