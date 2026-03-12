@@ -226,7 +226,6 @@ local function startEffect()
                 local side = (i % 2 == 1) and -1 or 1
                 local baseRotation = CFrame.Angles(math.rad(90), 0, 0)
                 if side == -1 then
-                    -- 左側（奇数）は向きを反転（Y軸180度回転）
                     fw.AO.CFrame = baseCF * baseRotation * CFrame.Angles(0, math.rad(180), 0)
                 else
                     fw.AO.CFrame = baseCF * baseRotation
@@ -345,21 +344,19 @@ local function StartHolonHUB()
 
     task.spawn(refreshToyList)
 
-    local WingSec = MainTab:AddSection({ Name = "翼設定" })
+    local WingSec = MainTab:AddSection({ Name = "羽設定" })
 
-    WingSec:AddSlider({ Name = "サイズ (Size)", Min = 1, Max = 150, Default = cfg.Wing.Size, Callback = function(v) cfg.Wing.Size = v end })
-    WingSec:AddSlider({ Name = "速度 (Speed)", Min = 0, Max = 100, Default = cfg.Wing.Speed, Callback = function(v) cfg.Wing.Speed = v end })
-    WingSec:AddSlider({ Name = "高さ (Height)", Min = -50, Max = 50, Default = cfg.Wing.Height, Callback = function(v) cfg.Wing.Height = v end })
-    WingSec:AddSlider({ Name = "奥行き (Back)", Min = -50, Max = 50, Default = cfg.Wing.Back, Callback = function(v) cfg.Wing.Back = v end })
-    WingSec:AddSlider({ Name = "体との距離 (Gap)", Min = 0, Max = 50, Default = cfg.Wing.Gap, Callback = function(v) cfg.Wing.Gap = v end })
-    WingSec:AddSlider({ Name = "関節数 (Joints)", Min = 0, Max = 10, Default = cfg.Wing.Joints, Callback = function(v) cfg.Wing.Joints = v end })
-    WingSec:AddSlider({ Name = "羽ばたき強度 (Strength)", Min = 0, Max = 50, Default = cfg.Wing.Strength, Callback = function(v) cfg.Wing.Strength = v end })
-    WingSec:AddToggle({ Name = "カーブ (Curve)", Default = cfg.Wing.Curve, Callback = function(v) cfg.Wing.Curve = v end })
-    WingSec:AddSlider({ Name = "カーブ強度 (Curve Amount)", Min = -50, Max = 50, Default = cfg.Wing.CurveAmount, Callback = function(v) cfg.Wing.CurveAmount = v end })
+    WingSec:AddSlider({ Name = "サイズ", Min = 1, Max = 150, Default = cfg.Wing.Size, Callback = function(v) cfg.Wing.Size = v end })
+    WingSec:AddSlider({ Name = "速度", Min = 0, Max = 100, Default = cfg.Wing.Speed, Callback = function(v) cfg.Wing.Speed = v end })
+    WingSec:AddSlider({ Name = "高さ", Min = -50, Max = 50, Default = cfg.Wing.Height, Callback = function(v) cfg.Wing.Height = v end })
+    WingSec:AddSlider({ Name = "奥行き", Min = -50, Max = 50, Default = cfg.Wing.Back, Callback = function(v) cfg.Wing.Back = v end })
+    WingSec:AddSlider({ Name = "体との距離", Min = 0, Max = 50, Default = cfg.Wing.Gap, Callback = function(v) cfg.Wing.Gap = v end })
+    WingSec:AddSlider({ Name = "関節数", Min = 0, Max = 10, Default = cfg.Wing.Joints, Callback = function(v) cfg.Wing.Joints = v end })
+    WingSec:AddSlider({ Name = "羽ばたき強度", Min = 0, Max = 50, Default = cfg.Wing.Strength, Callback = function(v) cfg.Wing.Strength = v end })
+    WingSec:AddToggle({ Name = "カーブ", Default = cfg.Wing.Curve, Callback = function(v) cfg.Wing.Curve = v end })
+    WingSec:AddSlider({ Name = "カーブ強度", Min = -50, Max = 50, Default = cfg.Wing.CurveAmount, Callback = function(v) cfg.Wing.CurveAmount = v end })
 
-    OrionLib:MakeNotification({ Name = "Wing HUB", Content = "Wing Only が読み込まれました！", Time = 5 })
     OrionLib:Init()
 end
 
 StartHolonHUB()
-
