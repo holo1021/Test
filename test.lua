@@ -223,9 +223,8 @@ local function startEffect()
                 local worldPos = baseCF:PointToWorldSpace(relativePos)
                 fw.AP.Position = worldPos
 
-                local side = (i % 2 == 1) and -1 or 1
-                local wingRotation = CFrame.Angles(0, math.rad(side == 1 and 90 or -90), 0)
-                fw.AO.CFrame = baseCF * wingRotation
+                -- 全てのおもちゃをX軸中心に90度回転
+                fw.AO.CFrame = baseCF * CFrame.Angles(math.rad(90), 0, 0)
             end
         end
     end)
