@@ -256,7 +256,7 @@ local function StartHolonHUB()
     })
 
     local UIElements = {}
-    local MainTab = Window:MakeTab({ Name = "メイン", Icon = "rbxassetid://7733960981" })
+    local MainTab = Window:MakeTab({ Name = "メイン"})
     local MainSec = MainTab:AddSection({ Name = "エフェクト制御" })
 
     UIElements.EffectToggle = MainSec:AddToggle({
