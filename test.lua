@@ -1,6 +1,5 @@
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -17,7 +16,7 @@ local Camera = Workspace.CurrentCamera
 --------------------------------------------------------------------------------
 local defaultConfig = {
     Wing = { Size = 30, Gap = 3.0, Speed = 6, Height = 0.5, Back = 0, Joints = 3, V_Angle = 0, Tilt = 0, Strength = 15, RootFixed = true, Curve = false, CurveAmount = 10 },
-    Global = { MaxToys = 30, EffectRotation = Vector3.new(0,0,0), IndividualRotation = Vector3.new(0, -90, 0) },
+    Global = { MaxToys = 30 },
 }
 
 -- Deep Copy Helper
@@ -31,17 +30,14 @@ local selectedItemName = "全てのおもちゃ"
 local detectedItems = {}
 
 local cfg = deepCopy(defaultConfig)
-local useOtherToys = false
 local isEnabled = false
-local followPlayer = true
-local lastBaseCF = nil
-local targetMain = LocalPlayer
 local activeToys = {}        -- {A0, A1, AP, AO, Part}
 local originalCollisions = {} -- {Part: Boolean}
 local updateConnection = nil
 
--- Wing mode only
-local currentMode = "Wing"
+-- 常に自分を対象、追従は常にオン
+local targetMain = LocalPlayer
+local followPlayer = true
 
 --------------------------------------------------------------------------------
 -- [計算ロジック] 翼(Wing)の座標計算
@@ -136,25 +132,15 @@ local function startEffect()
     local plotsFolder = Workspace:FindFirstChild("Plots")
     local plotItemsFolder = Workspace:FindFirstChild("PlotItems")
 
-    -- 0. Get items from SpawnedInToys
-    if useOtherToys then
-        for _, folder in ipairs(Workspace:GetChildren()) do
-            if folder.Name:match("SpawnedInToys$") then
-                for _, item in ipairs(folder:GetChildren()) do
-                    table.insert(allMyItems, item)
-                end
-            end
-        end
-    else
-        local spawnedToys = Workspace:FindFirstChild(myName .. "SpawnedInToys")
-        if spawnedToys then
-            for _, item in ipairs(spawnedToys:GetChildren()) do
-                table.insert(allMyItems, item)
-            end
+    -- 自分のおもちゃのみを対象（他人のは使用しない）
+    local spawnedToys = Workspace:FindFirstChild(myName .. "SpawnedInToys")
+    if spawnedToys then
+        for _, item in ipairs(spawnedToys:GetChildren()) do
+            table.insert(allMyItems, item)
         end
     end
 
-    -- 1. Get items from my plot
+    -- 自分のプロットからおもちゃを取得
     if plotsFolder and plotItemsFolder then
         for _, plot in ipairs(plotsFolder:GetChildren()) do
             local sign = plot:FindFirstChild("PlotSign")
@@ -164,31 +150,30 @@ local function startEffect()
                 local data = val:FindFirstChild("Data") or val
                 local isMine = (data:IsA("StringValue") and data.Value == myName)
                 
-                if isMine or useOtherToys then
-                    local myPlotName = plot.Name
-                    local targetFolder = plotItemsFolder:FindFirstChild(myPlotName)
+                if isMine then
+                    local targetFolder = plotItemsFolder:FindFirstChild(plot.Name)
                     if targetFolder then
                         for _, item in ipairs(targetFolder:GetChildren()) do
                             table.insert(allMyItems, item)
                         end
                     end
-                    if isMine and not useOtherToys then break end
+                    break
                 end
             end
         end
     end
 
-    -- 2. Get items directly from Workspace that I own
+    -- Workspace内の自分所有のおもちゃ
     for _, item in ipairs(Workspace:GetChildren()) do
         local ownerValue = item:FindFirstChild("Owner") or item:FindFirstChild("PartOwner")
-        if item:IsA("Model") and ownerValue and ownerValue:IsA("StringValue") then
-            if (ownerValue.Value == myName or useOtherToys) and not table.find(allMyItems, item) then
-                 table.insert(allMyItems, item)
+        if item:IsA("Model") and ownerValue and ownerValue:IsA("StringValue") and ownerValue.Value == myName then
+            if not table.find(allMyItems, item) then
+                table.insert(allMyItems, item)
             end
         end
     end
 
-    -- 3. Filter items based on selection and add to fws
+    -- フィルタリング
     for _, item in ipairs(allMyItems) do
         if #fws >= maxCount then break end
         if item:IsA("Model") and item.PrimaryPart and (selectedItemName == "全てのおもちゃ" or item.Name == selectedItemName) then
@@ -196,7 +181,7 @@ local function startEffect()
         end
     end
 
-    -- 4. Ensure network ownership for all found items
+    -- ネットワークオーナーシップ確保
     for _, item in ipairs(fws) do
         for _, part in ipairs(item:GetDescendants()) do
             if part:IsA("BasePart") then
@@ -212,11 +197,11 @@ local function startEffect()
 
     print("おもちゃを " .. #fws .. " 個捕捉しました。 (目標数: " .. maxCount .. ")")
 
-    -- ネットワークオーナーシップを強制的に取得
+    -- 各おもちゃを設定
     for i, model in ipairs(fws) do
         local pp = model.PrimaryPart
         
-        -- 全パーツの勢いを殺す
+        -- 勢いを殺す
         for _, d in ipairs(model:GetDescendants()) do 
             if d:IsA("BasePart") then
                 d.AssemblyLinearVelocity = Vector3.zero
@@ -225,7 +210,7 @@ local function startEffect()
             end
         end
         
-        -- スタート時の爆発を防ぐため、計算上の初期位置に直接配置する
+        -- 初期位置を計算して配置
         if root then
             local relativePos = getPositionForMode(i, #fws, tick())
             pp.CFrame = root.CFrame:ToWorldSpace(CFrame.new(relativePos))
@@ -268,25 +253,10 @@ local function startEffect()
         local rootPart = char and char:FindFirstChild("HumanoidRootPart")
         if not rootPart then return end
 
-        local baseCF
-        if followPlayer then
-            baseCF = rootPart.CFrame
-            lastBaseCF = baseCF
-        else
-            if not lastBaseCF then lastBaseCF = rootPart.CFrame end
-            baseCF = lastBaseCF
-        end
+        -- 常にプレイヤーに追従
+        local baseCF = rootPart.CFrame
 
         local t = tick()
-        
-        -- エフェクト全体の回転
-        local effectRot = cfg.Global.EffectRotation or Vector3.zero
-        local effectRotationCF = CFrame.Angles(math.rad(effectRot.X), math.rad(effectRot.Y), math.rad(effectRot.Z))
-        local rotatedBaseCF = baseCF * effectRotationCF
-
-        -- おもちゃ個別の回転
-        local indivRot = cfg.Global.IndividualRotation or Vector3.new(0, -90, 0)
-        local individualRotation = CFrame.Angles(math.rad(indivRot.X), math.rad(indivRot.Y), math.rad(indivRot.Z))
         
         for i, fw in ipairs(activeToys) do
             if fw.Part.Position.Y <= -90 then
@@ -295,9 +265,10 @@ local function startEffect()
                 fw.Part.Anchored = false
 
                 local relativePos = getPositionForMode(i, #activeToys, t)
-                local worldPos = rotatedBaseCF:PointToWorldSpace(relativePos)
+                local worldPos = baseCF:PointToWorldSpace(relativePos)
                 fw.AP.Position = worldPos
-                fw.AO.CFrame = rotatedBaseCF * individualRotation
+                -- 向きはプレイヤーと同じ（回転設定は削除）
+                fw.AO.CFrame = baseCF
             end
         end
     end)
@@ -326,45 +297,11 @@ local function StartHolonHUB()
         IntroText = "Holon HUB Load!"
     })
 
-    -- プレイヤーリスト取得関数
-    local function getPList()
-        local plist = {}
-        for _, p in ipairs(Players:GetPlayers()) do
-            table.insert(plist, p.DisplayName .. " (@" .. p.Name .. ")")
-        end
-        return plist
-    end
-
-    -- UI要素管理
-    local UIElements = {}
-
     -- --- メインタブ ---
     local MainTab = Window:MakeTab({ Name = "メイン", Icon = "rbxassetid://7733960981" })
 
     -- エフェクト制御セクション
     local MainSec = MainTab:AddSection({ Name = "エフェクト制御" })
-
-    local targetMainName = ""
-
-    UIElements.MainTargetDropdown = MainSec:AddDropdown({
-        Name = "メイン対象",
-        Default = LocalPlayer.DisplayName .. " (@" .. LocalPlayer.Name .. ")",
-        Options = getPList(),
-        Callback = function(v)
-            local name = v:match("@([^)]+)")
-            targetMainName = name or LocalPlayer.Name
-            targetMain = Players:FindFirstChild(targetMainName) or LocalPlayer
-        end    
-    })
-
-    Players.PlayerAdded:Connect(function()
-        task.wait(0.5)
-        UIElements.MainTargetDropdown:Refresh(getPList(), true)
-    end)
-    Players.PlayerRemoving:Connect(function()
-        task.wait(0.5)
-        UIElements.MainTargetDropdown:Refresh(getPList(), true)
-    end)
 
     UIElements.EffectToggle = MainSec:AddToggle({
         Name = "エフェクト有効化",
@@ -392,16 +329,11 @@ local function StartHolonHUB()
         local plotsFolder = Workspace:FindFirstChild("Plots")
         local plotItemsFolder = Workspace:FindFirstChild("PlotItems")
 
-        if useOtherToys then
-            for _, folder in ipairs(Workspace:GetChildren()) do
-                if folder.Name:match("SpawnedInToys$") then
-                    for _, item in ipairs(folder:GetChildren()) do table.insert(allMyItems, item) end
-                end
-            end
-        else
-            local spawnedToys = Workspace:FindFirstChild(myName .. "SpawnedInToys")
-            if spawnedToys then
-                for _, item in ipairs(spawnedToys:GetChildren()) do table.insert(allMyItems, item) end
+        -- 自分のおもちゃのみを収集（他人のは使わない）
+        local spawnedToys = Workspace:FindFirstChild(myName .. "SpawnedInToys")
+        if spawnedToys then
+            for _, item in ipairs(spawnedToys:GetChildren()) do
+                table.insert(allMyItems, item)
             end
         end
 
@@ -413,12 +345,14 @@ local function StartHolonHUB()
                     local val = ownerObj:FindFirstChild("Value") or ownerObj
                     local data = val:FindFirstChild("Data") or val
                     local isMine = (data:IsA("StringValue") and data.Value == myName)
-                    if isMine or useOtherToys then
+                    if isMine then
                         local targetFolder = plotItemsFolder:FindFirstChild(plot.Name)
                         if targetFolder then
-                            for _, item in ipairs(targetFolder:GetChildren()) do table.insert(allMyItems, item) end
+                            for _, item in ipairs(targetFolder:GetChildren()) do
+                                table.insert(allMyItems, item)
+                            end
                         end
-                        if isMine and not useOtherToys then break end
+                        break
                     end
                 end
             end
@@ -426,8 +360,8 @@ local function StartHolonHUB()
 
         for _, item in ipairs(Workspace:GetChildren()) do
             local ownerValue = item:FindFirstChild("Owner") or item:FindFirstChild("PartOwner")
-            if item:IsA("Model") and ownerValue and ownerValue:IsA("StringValue") then
-                if (ownerValue.Value == myName or useOtherToys) and not table.find(allMyItems, item) then
+            if item:IsA("Model") and ownerValue and ownerValue:IsA("StringValue") and ownerValue.Value == myName then
+                if not table.find(allMyItems, item) then
                     table.insert(allMyItems, item)
                 end
             end
@@ -455,33 +389,12 @@ local function StartHolonHUB()
         end
     })
 
-    UIElements.OtherToysToggle = MainSec:AddToggle({
-        Name = "他人のおもちゃも使用",
-        Default = false,
-        Callback = function(v)
-            useOtherToys = v
-            refreshToyList()
-        end
-    })
-
     task.spawn(refreshToyList)
-
-    UIElements.FollowToggle = MainSec:AddToggle({
-        Name = "プレイヤー追従",
-        Default = true,
-        Callback = function(v) followPlayer = v end
-    })
 
     UIElements.MaxToysSlider = MainSec:AddSlider({
         Name = "使用するおもちゃの最大数",
         Min = 1, Max = 200, Default = cfg.Global.MaxToys or 100,
         Callback = function(v) cfg.Global.MaxToys = v end
-    })
-
-    UIElements.AnimSpeedSlider = MainSec:AddSlider({
-        Name = "アニメ速度倍率",
-        Min = 1, Max = 50, Default = 10,
-        Callback = function(v) cfg.AnimSpeed = v / 10 end
     })
 
     -- 翼固有設定セクション
@@ -495,57 +408,6 @@ local function StartHolonHUB()
     WingSec:AddSlider({ Name = "羽ばたき強度", Min = 0, Max = 50, Default = cfg.Wing.Strength, Callback = function(v) cfg.Wing.Strength = v end })
     WingSec:AddToggle({ Name = "カーブ (反り)", Default = cfg.Wing.Curve, Callback = function(v) cfg.Wing.Curve = v end })
     WingSec:AddSlider({ Name = "カーブ強度 (反り)", Min = -50, Max = 50, Default = cfg.Wing.CurveAmount, Callback = function(v) cfg.Wing.CurveAmount = v end })
-
-    -- エフェクト全体の向き
-    local EffectRotSec = MainTab:AddSection({ Name = "エフェクト全体の向き" })
-    UIElements.EffectRotationX = EffectRotSec:AddSlider({
-        Name = "X軸 (Pitch)", Min = -180, Max = 180, Default = 0,
-        Callback = function(v) cfg.Global.EffectRotation = Vector3.new(v, cfg.Global.EffectRotation.Y, cfg.Global.EffectRotation.Z) end
-    })
-    UIElements.EffectRotationY = EffectRotSec:AddSlider({
-        Name = "Y軸 (Yaw)", Min = -180, Max = 180, Default = 0,
-        Callback = function(v) cfg.Global.EffectRotation = Vector3.new(cfg.Global.EffectRotation.X, v, cfg.Global.EffectRotation.Z) end
-    })
-    UIElements.EffectRotationZ = EffectRotSec:AddSlider({
-        Name = "Z軸 (Roll)", Min = -180, Max = 180, Default = 0,
-        Callback = function(v) cfg.Global.EffectRotation = Vector3.new(cfg.Global.EffectRotation.X, cfg.Global.EffectRotation.Y, v) end
-    })
-
-    local IndivRotSec = MainTab:AddSection({ Name = "おもちゃ自体の向き" })
-    UIElements.IndividualRotationX = IndivRotSec:AddSlider({
-        Name = "X軸 (Pitch)", Min = -180, Max = 180, Default = 0,
-        Callback = function(v) cfg.Global.IndividualRotation = Vector3.new(v, cfg.Global.IndividualRotation.Y, cfg.Global.IndividualRotation.Z) end
-    })
-    UIElements.IndividualRotationY = IndivRotSec:AddSlider({
-        Name = "Y軸 (Yaw)", Min = -180, Max = 180, Default = -90,
-        Callback = function(v) cfg.Global.IndividualRotation = Vector3.new(cfg.Global.IndividualRotation.X, v, cfg.Global.IndividualRotation.Z) end
-    })
-    UIElements.IndividualRotationZ = IndivRotSec:AddSlider({
-        Name = "Z軸 (Roll)", Min = -180, Max = 180, Default = 0,
-        Callback = function(v) cfg.Global.IndividualRotation = Vector3.new(cfg.Global.IndividualRotation.X, cfg.Global.IndividualRotation.Y, v) end
-    })
-
-    -- ワールドリセット
-    MainSec:AddButton({
-        Name = "エフェクトをワールド0,0,0にリセット",
-        Callback = function()
-            if not isEnabled then return end
-            followPlayer = false 
-            lastBaseCF = CFrame.new(0, 0, 0) 
-            for i, fw in ipairs(activeToys) do
-                task.spawn(function()
-                    fw.AP.Enabled = false 
-                    fw.Part.Anchored = true
-                    fw.Part.CFrame = CFrame.new(0, 0, 0)
-                    fw.AP.Position = Vector3.new(0, 0, 0) 
-                    fw.Part.AssemblyLinearVelocity = Vector3.zero
-                    task.wait(0.1)
-                    fw.AP.Enabled = true 
-                    fw.Part.Anchored = false
-                end)
-            end
-        end
-    })
 
     OrionLib:MakeNotification({ Name = "Holon HUB", Content = "v1.4.3 [Wing Only] が読み込まれました！", Time = 5 })
     OrionLib:Init()
