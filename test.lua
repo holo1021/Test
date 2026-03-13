@@ -15,6 +15,29 @@ local function vm_run(bytecode, env, args_list, params, upvalues)
     -- 1: LOAD_CONST, 2: GET_GLOBAL, 3: CALL, 4: STORE_LOCAL, 5: LOAD_LOCAL
     -- 6: GET_TABLE, 7: SET_TABLE, 8: SELF, 0: EXIT
     -- 9-12: Math, 13: JUMP, 14: JMP_FALSE, 15: CLOSURE, 16: RETURN
+    -- 24: ITER_LOOP
+
+    -- Polyfills for VM compatibility
+    -- ipairs/pairs usually return 3 values. Our VM Call only captures 1 (simplification).
+    -- So we wrap them to return a SINGLE stateful iterator closure.
+    local _orig_ipairs = env.ipairs
+    env.ipairs = function(t)
+        local f, s, i = _orig_ipairs(t)
+        return function()
+            local i_new, v = f(s, i)
+            i = i_new
+            return i_new, v
+        end
+    end
+    local _orig_pairs = env.pairs
+    env.pairs = function(t)
+        local f, s, k = _orig_pairs(t)
+        return function()
+            local k_new, v = f(s, k)
+            k = k_new
+            return k_new, v
+        end
+    end
     
     while true do
         local op_data = bytecode[pc]
@@ -103,9 +126,24 @@ local function vm_run(bytecode, env, args_list, params, upvalues)
             stack[top] = closure
         elseif op == 16 then -- RETURN
             return
+        elseif op == 24 then -- ITER_LOOP
+            -- stack[top] is iterator function. Call it.
+            local iter = stack[top]
+            local i, v = iter() -- Call the wrapped iterator
+            if i then
+                -- Continue loop: assign vars
+                local var_names = arg.vars
+                if var_names[1] then locals[var_names[1]] = i end
+                if var_names[2] then locals[var_names[2]] = v end
+                -- Don't increment PC, fall through to block
+            else
+                -- Loop finished: Pop iterator and Jump
+                top = top - 1
+                pc = pc + arg.skip
+            end
         end
     end
 end
 
-local bytecode = {{5, "game"},{8, "GetService"},{1, "Players"},{3, 2},{4, "Players"},{5, "game"},{8, "GetService"},{1, "ReplicatedStorage"},{3, 2},{4, "ReplicatedStorage"},{5, "game"},{8, "GetService"},{1, "RunService"},{3, 2},{4, "RunService"},{5, "Players"},{6, "LocalPlayer"},{4, "player"},{5, "ReplicatedStorage"},{8, "WaitForChild"},{1, "GrabEvents"},{3, 2},{8, "WaitForChild"},{1, "CreateGrabLine"},{3, 2},{4, "grabEvent"},{5, "Instance"},{6, "new"},{1, "ScreenGui"},{3, 1},{4, "screenGui"},{5, "screenGui"},{1, "MapWideSpamUI"},{7, "Name"},{5, "screenGui"},{1, false},{7, "ResetOnSpawn"},{5, "screenGui"},{5, "player"},{8, "WaitForChild"},{1, "PlayerGui"},{3, 2},{7, "Parent"},{5, "Instance"},{6, "new"},{1, "TextButton"},{3, 1},{4, "toggleBtn"},{5, "toggleBtn"},{5, "UDim2"},{6, "new"},{1, 0},{1, 250},{1, 0},{1, 60},{3, 4},{7, "Size"},{5, "toggleBtn"},{5, "UDim2"},{6, "new"},{1, 0.5},{1, 125},{18, 0},{1, 0.85},{1, 0},{3, 4},{7, "Position"},{5, "toggleBtn"},{5, "Color3"},{6, "fromRGB"},{1, 20},{1, 20},{1, 20},{3, 3},{7, "BackgroundColor3"},{5, "toggleBtn"},{5, "Color3"},{6, "new"},{1, 1},{1, 1},{1, 1},{3, 3},{7, "TextColor3"},{5, "toggleBtn"},{5, "Enum"},{6, "Font"},{6, "SourceSansBold"},{7, "Font"},{5, "toggleBtn"},{1, 24},{7, "TextSize"},{5, "toggleBtn"},{1, "MAP ALL SPAM: OFF"},{7, "Text"},{5, "toggleBtn"},{5, "screenGui"},{7, "Parent"},{5, "Instance"},{6, "new"},{1, "UICorner"},{3, 1},{4, "corner"},{5, "corner"},{5, "UDim"},{6, "new"},{1, 0},{1, 15},{3, 2},{7, "CornerRadius"},{5, "corner"},{5, "toggleBtn"},{7, "Parent"},{1, false},{4, "active"},{5, "CFrame"},{6, "new"},{1, 0.939641953},{18, 0},{1, 0.372039795},{1, 0.499999046},{18, 0},{1, 0.106275439},{18, 0},{1, 0},{1, 0.994336784},{18, 0},{1, 1.18534182e-07},{18, 0},{1, 1},{1, 1.26690196e-08},{1, 0.994336784},{1, 5.96046448e-08},{1, 0.106275439},{18, 0},{3, 12},{4, "targetCFrame"},{1, 2000},{4, "targetFrequency"},{5, "RunService"},{6, "Heartbeat"},{8, "Connect"},{15, {params={"dt",}, code={{5, "active"},{17, 0},{14, 1},{16, 0},{5, "math"},{6, "ceil"},{5, "targetFrequency"},{5, "dt"},{11, 0},{3, 1},{4, "batchSize"},{5, "Players"},{8, "GetPlayers"},{3, 1},{4, "allPlayers"},{1, 1},{4, "i"},{5, "target"},{4, "_"},{5, "target"},{6, "Character"},{4, "char"},{5, "char"},{14, 22},{5, "char"},{8, "FindFirstChild"},{1, "Torso"},{3, 2},{5, "char"},{8, "FindFirstChild"},{1, "UpperTorso"},{3, 2},{23, 0},{5, "char"},{8, "FindFirstChild"},{1, "HumanoidRootPart"},{3, 2},{23, 0},{4, "targetPart"},{5, "targetPart"},{14, 5},{5, "grabEvent"},{8, "FireServer"},{5, "targetPart"},{5, "targetCFrame"},{3, 3},{13, -28},{13, -31},{0, 0},{5, "toggleBtn"},{6, "MouseButton1Click"},{8, "Connect"},{15, {params={}, code={{5, "active"},{17, 0},{4, "active"},{5, "active"},{14, 11},{5, "toggleBtn"},{1, "MAP ALL SPAM: ON"},{7, "Text"},{5, "toggleBtn"},{5, "Color3"},{6, "fromRGB"},{1, 150},{1, 0},{1, 0},{3, 3},{7, "BackgroundColor3"},{0, 0},}}},{3, 2},}}},{3, 2},{0, 0},}
+local bytecode = {{5, "game"},{8, "GetService"},{1, "Players"},{3, 2},{4, "Players"},{5, "game"},{8, "GetService"},{1, "ReplicatedStorage"},{3, 2},{4, "ReplicatedStorage"},{5, "game"},{8, "GetService"},{1, "RunService"},{3, 2},{4, "RunService"},{5, "Players"},{6, "LocalPlayer"},{4, "player"},{5, "ReplicatedStorage"},{8, "WaitForChild"},{1, "GrabEvents"},{3, 2},{8, "WaitForChild"},{1, "CreateGrabLine"},{3, 2},{4, "grabEvent"},{5, "Instance"},{6, "new"},{1, "ScreenGui"},{3, 1},{4, "screenGui"},{5, "screenGui"},{1, "MapWideSpamUI"},{7, "Name"},{5, "screenGui"},{1, false},{7, "ResetOnSpawn"},{5, "screenGui"},{5, "player"},{8, "WaitForChild"},{1, "PlayerGui"},{3, 2},{7, "Parent"},{5, "Instance"},{6, "new"},{1, "TextButton"},{3, 1},{4, "toggleBtn"},{5, "toggleBtn"},{5, "UDim2"},{6, "new"},{1, 0},{1, 250},{1, 0},{1, 60},{3, 4},{7, "Size"},{5, "toggleBtn"},{5, "UDim2"},{6, "new"},{1, 0.5},{1, 125},{18, 0},{1, 0.85},{1, 0},{3, 4},{7, "Position"},{5, "toggleBtn"},{5, "Color3"},{6, "fromRGB"},{1, 20},{1, 20},{1, 20},{3, 3},{7, "BackgroundColor3"},{5, "toggleBtn"},{5, "Color3"},{6, "new"},{1, 1},{1, 1},{1, 1},{3, 3},{7, "TextColor3"},{5, "toggleBtn"},{5, "Enum"},{6, "Font"},{6, "SourceSansBold"},{7, "Font"},{5, "toggleBtn"},{1, 24},{7, "TextSize"},{5, "toggleBtn"},{1, "MAP ALL SPAM: OFF"},{7, "Text"},{5, "toggleBtn"},{5, "screenGui"},{7, "Parent"},{5, "Instance"},{6, "new"},{1, "UICorner"},{3, 1},{4, "corner"},{5, "corner"},{5, "UDim"},{6, "new"},{1, 0},{1, 15},{3, 2},{7, "CornerRadius"},{5, "corner"},{5, "toggleBtn"},{7, "Parent"},{1, false},{4, "active"},{5, "CFrame"},{6, "new"},{1, 0.939641953},{18, 0},{1, 0.372039795},{1, 0.499999046},{18, 0},{1, 0.106275439},{18, 0},{1, 0},{1, 0.994336784},{18, 0},{1, 1.18534182e-07},{18, 0},{1, 1},{1, 1.26690196e-08},{1, 0.994336784},{1, 5.96046448e-08},{1, 0.106275439},{18, 0},{3, 12},{4, "targetCFrame"},{1, 2000},{4, "targetFrequency"},{5, "RunService"},{6, "Heartbeat"},{8, "Connect"},{15, {params={"dt",}, code={{5, "active"},{17, 0},{14, 1},{16, 0},{5, "math"},{6, "ceil"},{5, "targetFrequency"},{5, "dt"},{11, 0},{3, 1},{4, "batchSize"},{5, "Players"},{8, "GetPlayers"},{3, 1},{4, "allPlayers"},{1, 1},{4, "i"},{5, "ipairs"},{5, "allPlayers"},{3, 1},{24, {vars={"_","target"}, skip=29}},{5, "target"},{6, "Character"},{4, "char"},{5, "char"},{14, 22},{5, "char"},{8, "FindFirstChild"},{1, "Torso"},{3, 2},{5, "char"},{8, "FindFirstChild"},{1, "UpperTorso"},{3, 2},{23, 0},{5, "char"},{8, "FindFirstChild"},{1, "HumanoidRootPart"},{3, 2},{23, 0},{4, "targetPart"},{5, "targetPart"},{14, 5},{5, "grabEvent"},{8, "FireServer"},{5, "targetPart"},{5, "targetCFrame"},{3, 3},{13, -28},{13, -33},{0, 0},{5, "toggleBtn"},{6, "MouseButton1Click"},{8, "Connect"},{15, {params={}, code={{5, "active"},{17, 0},{4, "active"},{5, "active"},{14, 11},{5, "toggleBtn"},{1, "MAP ALL SPAM: ON"},{7, "Text"},{5, "toggleBtn"},{5, "Color3"},{6, "fromRGB"},{1, 150},{1, 0},{1, 0},{3, 3},{7, "BackgroundColor3"},{0, 0},}}},{3, 2},}}},{3, 2},{0, 0},}
 vm_run(bytecode, getfenv(), {}, {})
