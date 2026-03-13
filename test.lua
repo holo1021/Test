@@ -1,9 +1,9 @@
 -- Holon VM Runtime
-local function vm_run(bytecode, env)
+local function vm_run(bytecode, env, args_list, params, upvalues)
     local pc = 1        -- Program Counter
     local top = 0       -- Stack Top
     local stack = {}    -- Virtual Stack
-    local locals = args_locals or {} -- Use passed locals or new
+    local locals = {}   -- Local Variables
     
     if params and args_list then
         for i, param in ipairs(params) do
@@ -31,6 +31,8 @@ local function vm_run(bytecode, env)
             stack[top] = arg
         elseif op == 2 then -- GET_GLOBAL
             local val = env[arg] or (game and game[arg])
+            -- Fallback: check upvalues if global is missing? No, standard Lua checks env last.
+            -- But in this simple VM, we might have mixed up scopes.
             stack[top] = val
         elseif op == 3 then -- CALL
             local args_count = arg
@@ -55,6 +57,7 @@ local function vm_run(bytecode, env)
             locals[arg] = val
         elseif op == 5 then -- LOAD_LOCAL / GLOBAL FALLBACK
             local val = locals[arg]
+            if val == nil and upvalues then val = upvalues[arg] end
             if val == nil then val = env[arg] end
             if val == nil and arg == "game" then val = game end
             top = top + 1
@@ -92,8 +95,9 @@ local function vm_run(bytecode, env)
         elseif op == 15 then -- CLOSURE
             -- arg contains {params={...}, code={...}}
             local proto = arg
+            local captured_locals = locals -- Capture current scope for the closure
             local function closure(...)
-                return vm_run(proto.code, env, {...}, proto.params)
+                return vm_run(proto.code, env, {...}, proto.params, captured_locals)
             end
             top = top + 1
             stack[top] = closure
