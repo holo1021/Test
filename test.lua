@@ -12,7 +12,7 @@ local Debris = game:GetService("Debris")
 local LocalPlayer = Players.LocalPlayer
 local Mouse = LocalPlayer:GetMouse()
 
--- グローバル設定用テーブル
+-- グローバル設定用テーブル（各機能の状態を保持）
 _G.Settings = {
     SuperStrength = false,
     Strength = 400,
@@ -36,6 +36,10 @@ _G.Settings = {
     AnchorButton = false,
     TeleportButton = false,
 }
+
+-- プレイヤー選択用のグローバル変数（各タブで共有）
+local SelectedPlayer = nil
+local SelectedPlayerName = ""
 
 -- ヘルパー関数（bliz hubより抜粋）
 local function GetPlayerCharacter()
@@ -71,7 +75,7 @@ end
 local function antiKickLoop()
     while _G.Settings.AntiKick do
         local char = LocalPlayer.Character
-        if char and char:FindFirstChild("HumanoidRootPart") and not LocalPlayer.InPlot.Value then
+        if char and char:FindFirstChild("HumanoidRootPart") and not LocalPlayer:FindFirstChild("InPlot") then
             local backpack = Workspace:FindFirstChild(LocalPlayer.Name .. "SpawnedInToys")
             if backpack then
                 local kunai = backpack:FindFirstChild("NinjaKunai")
@@ -80,11 +84,20 @@ local function antiKickLoop()
                     if sticky and sticky:FindFirstChild("StickyWeld") then
                         local weld = sticky.StickyWeld
                         if not weld.Part1 or weld.Part1 ~= char:FindFirstChild("Left Leg") then
-                            ReplicatedStorage:WaitForChild("PlayerEvents"):WaitForChild("StickyPartEvent"):FireServer(sticky, char:FindFirstChild("Left Leg"), CFrame.new(0, -0.5, 0) * CFrame.Angles(0, 0, math.rad(90)))
+                            local playerEvents = ReplicatedStorage:FindFirstChild("PlayerEvents")
+                            if playerEvents then
+                                local stickyEvent = playerEvents:FindFirstChild("StickyPartEvent")
+                                if stickyEvent then
+                                    stickyEvent:FireServer(sticky, char:FindFirstChild("Left Leg"), CFrame.new(0, -0.5, 0) * CFrame.Angles(0, 0, math.rad(90)))
+                                end
+                            end
                         end
                     end
-                elseif LocalPlayer.CanSpawnToy.Value then
-                    ReplicatedStorage:WaitForChild("MenuToys"):WaitForChild("SpawnToyRemoteFunction"):InvokeServer("NinjaKunai", char.HumanoidRootPart.CFrame * CFrame.new(0, 0, -5), Vector3.new(0, 0, 0))
+                elseif LocalPlayer:FindFirstChild("CanSpawnToy") and LocalPlayer.CanSpawnToy.Value then
+                    local spawnFunc = ReplicatedStorage:FindFirstChild("MenuToys") and ReplicatedStorage.MenuToys:FindFirstChild("SpawnToyRemoteFunction")
+                    if spawnFunc then
+                        spawnFunc:InvokeServer("NinjaKunai", char.HumanoidRootPart.CFrame * CFrame.new(0, 0, -5), Vector3.new(0, 0, 0))
+                    end
                 end
             end
         end
@@ -157,11 +170,11 @@ Workspace.ChildAdded:Connect(onGrab)
 
 -- オーラ処理（bliz hubより）
 local poisonParts = {
-    Workspace.Map:FindFirstChild("Hole") and Workspace.Map.Hole:FindFirstChild("PoisonBigHole") and Workspace.Map.Hole.PoisonBigHole:FindFirstChild("PoisonHurtPart"),
-    Workspace.Map:FindFirstChild("Hole") and Workspace.Map.Hole:FindFirstChild("PoisonSmallHole") and Workspace.Map.Hole.PoisonSmallHole:FindFirstChild("PoisonHurtPart"),
-    Workspace.Map:FindFirstChild("FactoryIsland") and Workspace.Map.FactoryIsland:FindFirstChild("PoisonContainer") and Workspace.Map.FactoryIsland.PoisonContainer:FindFirstChild("PoisonHurtPart")
+    Workspace.Map and Workspace.Map:FindFirstChild("Hole") and Workspace.Map.Hole:FindFirstChild("PoisonBigHole") and Workspace.Map.Hole.PoisonBigHole:FindFirstChild("PoisonHurtPart"),
+    Workspace.Map and Workspace.Map:FindFirstChild("Hole") and Workspace.Map.Hole:FindFirstChild("PoisonSmallHole") and Workspace.Map.Hole.PoisonSmallHole:FindFirstChild("PoisonHurtPart"),
+    Workspace.Map and Workspace.Map:FindFirstChild("FactoryIsland") and Workspace.Map.FactoryIsland:FindFirstChild("PoisonContainer") and Workspace.Map.FactoryIsland.PoisonContainer:FindFirstChild("PoisonHurtPart")
 }
-local radioactivePart = Workspace.Map:FindFirstChild("AlwaysHereTweenedObjects") and Workspace.Map.AlwaysHereTweenedObjects:FindFirstChild("OuterUFO") and Workspace.Map.AlwaysHereTweenedObjects.OuterUFO:FindFirstChild("Object") and Workspace.Map.AlwaysHereTweenedObjects.OuterUFO.Object:FindFirstChild("ObjectModel") and Workspace.Map.AlwaysHereTweenedObjects.OuterUFO.Object.ObjectModel:FindFirstChild("PaintPlayerPart")
+local radioactivePart = Workspace.Map and Workspace.Map:FindFirstChild("AlwaysHereTweenedObjects") and Workspace.Map.AlwaysHereTweenedObjects:FindFirstChild("OuterUFO") and Workspace.Map.AlwaysHereTweenedObjects.OuterUFO:FindFirstChild("Object") and Workspace.Map.AlwaysHereTweenedObjects.OuterUFO.Object:FindFirstChild("ObjectModel") and Workspace.Map.AlwaysHereTweenedObjects.OuterUFO.Object.ObjectModel:FindFirstChild("PaintPlayerPart")
 
 RunService.Heartbeat:Connect(function()
     -- デスオーラ
@@ -169,7 +182,8 @@ RunService.Heartbeat:Connect(function()
         for _, player in ipairs(Players:GetPlayers()) do
             if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
                 local hrp = player.Character.HumanoidRootPart
-                if (hrp.Position - GetPlayerRoot().Position).Magnitude < 20 then
+                local root = GetPlayerRoot()
+                if root and (hrp.Position - root.Position).Magnitude < 20 then
                     if SNOWshipOnce(hrp) then
                         local hum = player.Character:FindFirstChildOfClass("Humanoid")
                         if hum then hum.Health = 0 end
@@ -184,7 +198,8 @@ RunService.Heartbeat:Connect(function()
         for _, player in ipairs(Players:GetPlayers()) do
             if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") then
                 local head = player.Character.Head
-                if (head.Position - GetPlayerRoot().Position).Magnitude < 20 then
+                local root = GetPlayerRoot()
+                if root and (head.Position - root.Position).Magnitude < 20 then
                     if SNOWshipOnce(head) then
                         radioactivePart.CFrame = head.CFrame
                         task.wait()
@@ -196,14 +211,13 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- ラインエクステンダー・ソフトラグ・インビジブルライン（簡易実装）
+-- ラインエクステンダー・ソフトラグ・インビジブルライン
 local lineExtendConnection
-_G.LineExtendAmount = 3
 function toggleLineExtend(state)
     if state then
+        -- 実際のライン延長はグラブ生成時に距離を操作する必要があるため、ここでは簡易的な処理
         lineExtendConnection = RunService.Heartbeat:Connect(function()
-            -- 擬似的なライン延長：何もしないが、実際にはグラブ生成時に距離を操作する必要あり
-            -- ここでは簡易的にグローバル変数で制御
+            -- ダミー：特に何もしないが、フラグとして機能
         end)
     elseif lineExtendConnection then
         lineExtendConnection:Disconnect()
@@ -214,9 +228,11 @@ local softLagConnection
 function toggleSoftLag(state)
     if state then
         softLagConnection = RunService.Heartbeat:Connect(function()
-            -- ソフトラグ：大量のライン生成（簡易版）
             for i = 1, 10 do
-                ReplicatedStorage:WaitForChild("GrabEvents"):WaitForChild("CreateGrabLine"):FireServer(Workspace:FindFirstChildOfClass("Part"), CFrame.new(0,0,0))
+                local createLine = ReplicatedStorage:FindFirstChild("GrabEvents") and ReplicatedStorage.GrabEvents:FindFirstChild("CreateGrabLine")
+                if createLine then
+                    createLine:FireServer(Workspace:FindFirstChildOfClass("Part"), CFrame.new(0,0,0))
+                end
             end
         end)
     elseif softLagConnection then
@@ -224,27 +240,27 @@ function toggleSoftLag(state)
     end
 end
 
--- インビジブルライン：ラインを非表示にする（実際のラインの透明度を操作するのは難しいため、ライン生成を抑制）
 local invisibleLineConnection
 function toggleInvisibleLine(state)
     if state then
         invisibleLineConnection = RunService.Heartbeat:Connect(function()
-            -- ラインを生成しないようにする代わりに、既存のラインを非表示にする処理を入れることも可能だが省略
-            -- ここでは何もしない
+            -- ラインを非表示にするには、既存のラインの透明度を操作するか、生成を抑制する
+            -- ここではダミー
         end)
     elseif invisibleLineConnection then
         invisibleLineConnection:Disconnect()
     end
 end
 
--- ループキル・キルオール・ブリングオール（簡易版）
+-- ループキル
 function loopKill()
     while _G.Settings.LoopKill do
         for _, player in ipairs(Players:GetPlayers()) do
             if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
                 local hrp = player.Character.HumanoidRootPart
                 if SNOWshipOnce(hrp) then
-                    player.Character:FindFirstChildOfClass("Humanoid").Health = 0
+                    local hum = player.Character:FindFirstChildOfClass("Humanoid")
+                    if hum then hum.Health = 0 end
                 end
             end
         end
@@ -252,6 +268,7 @@ function loopKill()
     end
 end
 
+-- キルオール
 function killAll()
     for _, player in ipairs(Players:GetPlayers()) do
         if player ~= LocalPlayer and player.Character then
@@ -261,6 +278,7 @@ function killAll()
     end
 end
 
+-- ブリングオール
 function bringAll()
     local root = GetPlayerRoot()
     if not root then return end
@@ -271,7 +289,7 @@ function bringAll()
     end
 end
 
--- ブロブマンロック（簡易：自分が座っているブロブマンで対象を掴む）
+-- ブロブマンロック（自分が座っているブロブマンで対象を掴む）
 function blobmanLock(targetPlayer)
     if not targetPlayer or not targetPlayer.Character then return end
     local char = LocalPlayer.Character
@@ -284,10 +302,16 @@ function blobmanLock(targetPlayer)
     if not detector then return end
     local weld = detector:FindFirstChild("LeftWeld")
     if not weld then return end
-    blob:WaitForChild("BlobmanSeatAndOwnerScript"):WaitForChild("CreatureGrab"):FireServer(detector, targetPlayer.Character.HumanoidRootPart, weld)
+    local grabScript = blob:FindFirstChild("BlobmanSeatAndOwnerScript")
+    if grabScript then
+        local grab = grabScript:FindFirstChild("CreatureGrab")
+        if grab then
+            grab:FireServer(detector, targetPlayer.Character.HumanoidRootPart, weld)
+        end
+    end
 end
 
--- アンカーボタン（簡易：見ているオブジェクトをアンカー）
+-- アンカーボタン（見ているオブジェクトをアンカー）
 function anchorObject()
     local root = GetPlayerRoot()
     if not root then return end
@@ -298,7 +322,7 @@ function anchorObject()
     end
 end
 
--- テレポートボタン
+-- テレポートボタン（視線先にテレポート）
 function teleportToCursor()
     local root = GetPlayerRoot()
     if not root then return end
@@ -307,6 +331,32 @@ function teleportToCursor()
     if pos then
         root.CFrame = CFrame.new(pos + Vector3.new(0, 3, 0))
     end
+end
+
+-- アンカー解除（再固定の接待）
+function unanchorAll()
+    for _, v in ipairs(Workspace:GetDescendants()) do
+        if v:IsA("BasePart") and v.Anchored then
+            v.Anchored = false
+        end
+    end
+end
+
+-- オートアタッカー（自分を掴んだプレイヤーを殺す）
+local function onPartOwnerAdded(part)
+    if part.Name == "PartOwner" and part.Value ~= LocalPlayer.Name then
+        local attacker = Players:FindFirstChild(part.Value)
+        if attacker and attacker.Character and _G.Settings.AutoAttackerDeath then
+            local hum = attacker.Character:FindFirstChildOfClass("Humanoid")
+            if hum then hum.Health = 0 end
+        end
+    end
+end
+LocalPlayer.CharacterAdded:Connect(function(char)
+    char.DescendantAdded:Connect(onPartOwnerAdded)
+end)
+if LocalPlayer.Character then
+    LocalPlayer.Character.DescendantAdded:Connect(onPartOwnerAdded)
 end
 
 -- Orion UI作成
@@ -321,88 +371,47 @@ local Window = OrionLib:MakeWindow({
     Icon = "rbxassetid://8834748103"
 })
 
--- グラブタブ
-local GrabTab = Window:MakeTab({
-    Name = "Grab",
-    Icon = "rbxassetid://3944703587",
-    PremiumOnly = false
-})
+-- プレイヤーリスト更新用関数
+local function updatePlayerDropdown(dropdown)
+    local names = {}
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then
+            table.insert(names, p.Name)
+        end
+    end
+    dropdown:Refresh(names, true)
+end
 
-GrabTab:AddToggle({
-    Name = "Super Strength",
-    Default = false,
-    Callback = function(v) _G.Settings.SuperStrength = v end
-})
-GrabTab:AddSlider({
-    Name = "Strength",
-    Min = 100,
-    Max = 5000,
-    Default = 400,
-    Callback = function(v) _G.Settings.Strength = v end
-})
-GrabTab:AddToggle({
-    Name = "Death Grab",
-    Default = false,
-    Callback = function(v) _G.Settings.DeathGrab = v end
-})
-GrabTab:AddToggle({
-    Name = "Noclip Grab",
-    Default = false,
-    Callback = function(v) _G.Settings.NoclipGrab = v end
-})
-GrabTab:AddToggle({
-    Name = "Perspective Grab",
-    Default = false,
-    Callback = function(v) _G.Settings.PerspectiveGrab = v end
-})
-GrabTab:AddSlider({
-    Name = "Perspective Speed",
-    Min = 10,
-    Max = 200,
-    Default = 50,
-    Callback = function(v) _G.Settings.PerspectiveSpeed = v end
-})
-GrabTab:AddButton({
-    Name = "Anchor Object",
-    Callback = anchorObject
-})
-GrabTab:AddButton({
-    Name = "Teleport to Cursor",
-    Callback = teleportToCursor
-})
+-- グラブタブ
+local GrabTab = Window:MakeTab({ Name = "Grab", Icon = "rbxassetid://3944703587" })
+GrabTab:AddToggle({ Name = "Super Strength", Default = false, Callback = function(v) _G.Settings.SuperStrength = v end })
+GrabTab:AddSlider({ Name = "Strength", Min = 100, Max = 5000, Default = 400, Callback = function(v) _G.Settings.Strength = v end })
+GrabTab:AddToggle({ Name = "Death Grab", Default = false, Callback = function(v) _G.Settings.DeathGrab = v end })
+GrabTab:AddToggle({ Name = "Noclip Grab", Default = false, Callback = function(v) _G.Settings.NoclipGrab = v end })
+GrabTab:AddToggle({ Name = "Perspective Grab", Default = false, Callback = function(v) _G.Settings.PerspectiveGrab = v end })
+GrabTab:AddSlider({ Name = "Perspective Speed", Min = 10, Max = 200, Default = 50, Callback = function(v) _G.Settings.PerspectiveSpeed = v end })
+GrabTab:AddButton({ Name = "Anchor Object", Callback = anchorObject })
+GrabTab:AddButton({ Name = "Teleport to Cursor", Callback = teleportToCursor })
 
 -- オーラタブ
-local AuraTab = Window:MakeTab({
-    Name = "Aura",
-    Icon = "rbxassetid://3944703587"
-})
-AuraTab:AddToggle({
-    Name = "Death Aura",
-    Default = false,
-    Callback = function(v) _G.Settings.DeathAura = v end
-})
-AuraTab:AddToggle({
-    Name = "Radioactive Aura",
-    Default = false,
-    Callback = function(v) _G.Settings.RadioactiveAura = v end
-})
+local AuraTab = Window:MakeTab({ Name = "Aura", Icon = "rbxassetid://3944703587" })
+AuraTab:AddToggle({ Name = "Death Aura", Default = false, Callback = function(v) _G.Settings.DeathAura = v end })
+AuraTab:AddToggle({ Name = "Radioactive Aura", Default = false, Callback = function(v) _G.Settings.RadioactiveAura = v end })
 
 -- ブロブマンタブ
-local BlobmanTab = Window:MakeTab({
-    Name = "Blobman",
-    Icon = "rbxassetid://3944703587"
-})
-local playerNames = {}
-for _, p in ipairs(Players:GetPlayers()) do
-    if p ~= LocalPlayer then table.insert(playerNames, p.Name) end
-end
-BlobmanTab:AddDropdown({
+local BlobmanTab = Window:MakeTab({ Name = "Blobman", Icon = "rbxassetid://3944703587" })
+local blobmanTargetDropdown = BlobmanTab:AddDropdown({
     Name = "Select Target",
-    Options = playerNames,
+    Options = {},
     Callback = function(v)
+        SelectedPlayerName = v
         _G.Settings.BlobmanTarget = Players:FindFirstChild(v)
     end
 })
+updatePlayerDropdown(blobmanTargetDropdown)
+Players.PlayerAdded:Connect(function() updatePlayerDropdown(blobmanTargetDropdown) end)
+Players.PlayerRemoving:Connect(function() updatePlayerDropdown(blobmanTargetDropdown) end)
+
 BlobmanTab:AddButton({
     Name = "Lock (Grab with Blobman)",
     Callback = function()
@@ -411,27 +420,8 @@ BlobmanTab:AddButton({
 })
 
 -- プレイヤータブ
-local PlayerTab = Window:MakeTab({
-    Name = "Player",
-    Icon = "rbxassetid://3944703587"
-})
-PlayerTab:AddToggle({
-    Name = "Auto Attacker (Death Mode)",
-    Default = false,
-    Callback = function(v) _G.Settings.AutoAttackerDeath = v end
-})
--- 簡易オートアタッカー：自分を掴んだプレイヤーを殺す
-local function onPartOwnerAdded(part)
-    if part.Name == "PartOwner" and part.Value ~= LocalPlayer.Name then
-        local attacker = Players:FindFirstChild(part.Value)
-        if attacker and attacker.Character and _G.Settings.AutoAttackerDeath then
-            local hum = attacker.Character:FindFirstChildOfClass("Humanoid")
-            if hum then hum.Health = 0 end
-        end
-    end
-end
-LocalPlayer.Character.DescendantAdded:Connect(onPartOwnerAdded)
-
+local PlayerTab = Window:MakeTab({ Name = "Player", Icon = "rbxassetid://3944703587" })
+PlayerTab:AddToggle({ Name = "Auto Attacker (Death Mode)", Default = false, Callback = function(v) _G.Settings.AutoAttackerDeath = v end })
 PlayerTab:AddToggle({
     Name = "Loop Kill",
     Default = false,
@@ -440,48 +430,18 @@ PlayerTab:AddToggle({
         if v then task.spawn(loopKill) end
     end
 })
-PlayerTab:AddButton({
-    Name = "Kill All",
-    Callback = killAll
-})
-PlayerTab:AddButton({
-    Name = "Bring All",
-    Callback = bringAll
-})
+PlayerTab:AddButton({ Name = "Kill All", Callback = killAll })
+PlayerTab:AddButton({ Name = "Bring All", Callback = bringAll })
 
 -- ラインタブ
-local LineTab = Window:MakeTab({
-    Name = "Line",
-    Icon = "rbxassetid://3944703587"
-})
-LineTab:AddToggle({
-    Name = "Line Extender",
-    Default = false,
-    Callback = toggleLineExtend
-})
-LineTab:AddSlider({
-    Name = "Extend Amount",
-    Min = 1,
-    Max = 20,
-    Default = 3,
-    Callback = function(v) _G.LineExtendAmount = v end
-})
-LineTab:AddToggle({
-    Name = "Soft Lag",
-    Default = false,
-    Callback = toggleSoftLag
-})
-LineTab:AddToggle({
-    Name = "Invisible Line",
-    Default = false,
-    Callback = toggleInvisibleLine
-})
+local LineTab = Window:MakeTab({ Name = "Line", Icon = "rbxassetid://3944703587" })
+LineTab:AddToggle({ Name = "Line Extender", Default = false, Callback = toggleLineExtend })
+LineTab:AddSlider({ Name = "Extend Amount", Min = 1, Max = 20, Default = 3, Callback = function(v) _G.LineExtendAmount = v end })
+LineTab:AddToggle({ Name = "Soft Lag", Default = false, Callback = toggleSoftLag })
+LineTab:AddToggle({ Name = "Invisible Line", Default = false, Callback = toggleInvisibleLine })
 
 -- ディフェンスタブ
-local DefenseTab = Window:MakeTab({
-    Name = "Defense",
-    Icon = "rbxassetid://3944703587"
-})
+local DefenseTab = Window:MakeTab({ Name = "Defense", Icon = "rbxassetid://3944703587" })
 DefenseTab:AddToggle({
     Name = "Anti-Kick (Iyan)",
     Default = false,
@@ -490,15 +450,6 @@ DefenseTab:AddToggle({
         if v then task.spawn(antiKickLoop) end
     end
 })
-DefenseTab:AddButton({
-    Name = "Unanchor All (Re-anchor)",
-    Callback = function()
-        for _, v in ipairs(Workspace:GetDescendants()) do
-            if v:IsA("BasePart") and v.Anchored then
-                v.Anchored = false
-            end
-        end
-    end
-})
+DefenseTab:AddButton({ Name = "Unanchor All (Re-anchor)", Callback = unanchorAll })
 
 OrionLib:Init()
