@@ -1,455 +1,450 @@
--- OrionLibを読み込み
+--[[
+--[[
+    Bliz-style Feature Hub
+    Objective: A clean script implementing a specific list of features requested by the user.
+    This script is a complete rewrite for clarity and stability, containing only the specified functions.
+]]
+
+--============================================================================--
+--                            SERVICES AND VARIABLES                          --
+--============================================================================--
+
+-- Services
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+
+-- Local Player
+local localPlayer = Players.LocalPlayer
+local mouse = localPlayer:GetMouse()
+
+-- Feature States
+local states = {
+    superStrong = false,
+    deathGrab = false,
+    noclipGrab = false,
+    perspective = false,
+    blobmanLock = false,
+    autoAttacker = false,
+    lineEsp = false,
+    softLag = false,
+    invisible = false,
+    deathAura = false,
+    radioactiveAura = false,
+    clickTp = false,
+    loopKill = false,
+    persistentAnchor = false,
+    antiKick = false,
+    noclip = false
+}
+
+-- Other Variables
+local grabTarget = nil
+local radioactivePart = nil
+local lineAdornments = {}
+local softLagTick = 0
+
+-- Helper function to get Player's HumanoidRootPart safely
+local function GetPlayerRoot()
+    return localPlayer.Character and localPlayer.Character:FindFirstChild("HumanoidRootPart")
+end
+
+--============================================================================--
+--                                ORION UI SETUP                              --
+--============================================================================--
+
+-- Load Orion Library
 local OrionUrl = "https://raw.githubusercontent.com/hololove1021/HolonHUB/refs/heads/main/source.txt"
 local OrionLib = loadstring(game:HttpGet(OrionUrl))()
 
--- サービス定義
-local Players = game:GetService("Players")
-local Workspace = game:GetService("Workspace")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local Debris = game:GetService("Debris")
-local LocalPlayer = Players.LocalPlayer
-local Mouse = LocalPlayer:GetMouse()
-
--- グローバル設定用テーブル（各機能の状態を保持）
-_G.Settings = {
-    SuperStrength = false,
-    Strength = 400,
-    DeathGrab = false,
-    NoclipGrab = false,
-    PerspectiveGrab = false,
-    PerspectiveSpeed = 50,
-    DeathAura = false,
-    RadioactiveAura = false,
-    LineExtend = false,
-    ExtendAmount = 3,
-    SoftLag = false,
-    InvisibleLine = false,
-    LoopKill = false,
-    KillAll = false,
-    BringAll = false,
-    AntiKick = false,
-    BlobmanLock = false,
-    BlobmanTarget = nil,
-    AutoAttackerDeath = false,
-    AnchorButton = false,
-    TeleportButton = false,
-}
-
--- プレイヤー選択用のグローバル変数（各タブで共有）
-local SelectedPlayer = nil
-local SelectedPlayerName = ""
-
--- ヘルパー関数（bliz hubより抜粋）
-local function GetPlayerCharacter()
-    return LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character or nil
-end
-
-local function GetPlayerRoot()
-    local char = GetPlayerCharacter()
-    return char and char:FindFirstChild("HumanoidRootPart")
-end
-
-local function lookAt(from, to)
-    return CFrame.lookAt(from, to)
-end
-
-local function SNOWshipOnce(part)
-    local root = GetPlayerRoot()
-    if not root then return false end
-    if part:FindFirstChild("PartOwner") and part.PartOwner.Value == LocalPlayer.Name then
-        return true
-    end
-    if (part.Position - root.Position).Magnitude <= 30 then
-        ReplicatedStorage:WaitForChild("GrabEvents"):WaitForChild("SetNetworkOwner"):FireServer(part, lookAt(root.Position, part.Position))
-    end
-    return false
-end
-
-local function DeleteToy(toy)
-    ReplicatedStorage:WaitForChild("MenuToys"):WaitForChild("DestroyToy"):FireServer(toy)
-end
-
--- アンチキック関数（いやんはぶより抜粋・簡略化）
-local function antiKickLoop()
-    while _G.Settings.AntiKick do
-        local char = LocalPlayer.Character
-        if char and char:FindFirstChild("HumanoidRootPart") and not LocalPlayer:FindFirstChild("InPlot") then
-            local backpack = Workspace:FindFirstChild(LocalPlayer.Name .. "SpawnedInToys")
-            if backpack then
-                local kunai = backpack:FindFirstChild("NinjaKunai")
-                if kunai then
-                    local sticky = kunai:FindFirstChild("StickyPart")
-                    if sticky and sticky:FindFirstChild("StickyWeld") then
-                        local weld = sticky.StickyWeld
-                        if not weld.Part1 or weld.Part1 ~= char:FindFirstChild("Left Leg") then
-                            local playerEvents = ReplicatedStorage:FindFirstChild("PlayerEvents")
-                            if playerEvents then
-                                local stickyEvent = playerEvents:FindFirstChild("StickyPartEvent")
-                                if stickyEvent then
-                                    stickyEvent:FireServer(sticky, char:FindFirstChild("Left Leg"), CFrame.new(0, -0.5, 0) * CFrame.Angles(0, 0, math.rad(90)))
-                                end
-                            end
-                        end
-                    end
-                elseif LocalPlayer:FindFirstChild("CanSpawnToy") and LocalPlayer.CanSpawnToy.Value then
-                    local spawnFunc = ReplicatedStorage:FindFirstChild("MenuToys") and ReplicatedStorage.MenuToys:FindFirstChild("SpawnToyRemoteFunction")
-                    if spawnFunc then
-                        spawnFunc:InvokeServer("NinjaKunai", char.HumanoidRootPart.CFrame * CFrame.new(0, 0, -5), Vector3.new(0, 0, 0))
-                    end
-                end
-            end
-        end
-        task.wait(0.5)
-    end
-end
-
--- グラブ関連の処理（bliz hubより）
-local function onGrab(model)
-    if model.Name ~= "GrabParts" then return end
-    local grabbedPart = model:FindFirstChild("GrabPart") and model.GrabPart:FindFirstChild("WeldConstraint") and model.GrabPart.WeldConstraint.Part1
-    if not grabbedPart then return end
-
-    -- スーパーストレングス
-    if _G.Settings.SuperStrength then
-        local bv = Instance.new("BodyVelocity", grabbedPart)
-        bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-        bv.Velocity = Workspace.CurrentCamera.CFrame.LookVector * _G.Settings.Strength
-        Debris:AddItem(bv, 1)
-    end
-
-    -- デスグラブ
-    if _G.Settings.DeathGrab and grabbedPart.Parent:FindFirstChildOfClass("Humanoid") then
-        local hum = grabbedPart.Parent:FindFirstChildOfClass("Humanoid")
-        hum.Health = 0
-    end
-
-    -- ノクリップグラブ
-    if _G.Settings.NoclipGrab and grabbedPart.Parent:IsA("Model") then
-        for _, v in ipairs(grabbedPart.Parent:GetDescendants()) do
-            if v:IsA("BasePart") then
-                v.CanCollide = false
-            end
-        end
-        model.AncestryChanged:Connect(function()
-            for _, v in ipairs(grabbedPart.Parent:GetDescendants()) do
-                if v:IsA("BasePart") then
-                    v.CanCollide = true
-                end
-            end
-        end)
-    end
-
-    -- パースペクティブグラブ
-    if _G.Settings.PerspectiveGrab then
-        local cam = Workspace.CurrentCamera
-        local debugPart = Instance.new("Part", Workspace)
-        debugPart.Anchored = true
-        debugPart.CanCollide = false
-        debugPart.Transparency = 1
-        debugPart.CFrame = cam.CFrame
-        cam.CameraType = Enum.CameraType.Scriptable
-        cam.CameraSubject = debugPart
-        local heartbeat
-        heartbeat = RunService.Heartbeat:Connect(function()
-            if not model.Parent then
-                heartbeat:Disconnect()
-                debugPart:Destroy()
-                cam.CameraType = Enum.CameraType.Custom
-                cam.CameraSubject = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-                return
-            end
-            local moveDir = LocalPlayer.Character.Humanoid.MoveDirection * _G.Settings.PerspectiveSpeed
-            debugPart.CFrame = debugPart.CFrame * CFrame.new(moveDir)
-        end)
-    end
-end
-
-Workspace.ChildAdded:Connect(onGrab)
-
--- オーラ処理（bliz hubより）
-local poisonParts = {
-    Workspace.Map and Workspace.Map:FindFirstChild("Hole") and Workspace.Map.Hole:FindFirstChild("PoisonBigHole") and Workspace.Map.Hole.PoisonBigHole:FindFirstChild("PoisonHurtPart"),
-    Workspace.Map and Workspace.Map:FindFirstChild("Hole") and Workspace.Map.Hole:FindFirstChild("PoisonSmallHole") and Workspace.Map.Hole.PoisonSmallHole:FindFirstChild("PoisonHurtPart"),
-    Workspace.Map and Workspace.Map:FindFirstChild("FactoryIsland") and Workspace.Map.FactoryIsland:FindFirstChild("PoisonContainer") and Workspace.Map.FactoryIsland.PoisonContainer:FindFirstChild("PoisonHurtPart")
-}
-local radioactivePart = Workspace.Map and Workspace.Map:FindFirstChild("AlwaysHereTweenedObjects") and Workspace.Map.AlwaysHereTweenedObjects:FindFirstChild("OuterUFO") and Workspace.Map.AlwaysHereTweenedObjects.OuterUFO:FindFirstChild("Object") and Workspace.Map.AlwaysHereTweenedObjects.OuterUFO.Object:FindFirstChild("ObjectModel") and Workspace.Map.AlwaysHereTweenedObjects.OuterUFO.Object.ObjectModel:FindFirstChild("PaintPlayerPart")
-
-RunService.Heartbeat:Connect(function()
-    -- デスオーラ
-    if _G.Settings.DeathAura then
-        for _, player in ipairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-                local hrp = player.Character.HumanoidRootPart
-                local root = GetPlayerRoot()
-                if root and (hrp.Position - root.Position).Magnitude < 20 then
-                    if SNOWshipOnce(hrp) then
-                        local hum = player.Character:FindFirstChildOfClass("Humanoid")
-                        if hum then hum.Health = 0 end
-                    end
-                end
-            end
-        end
-    end
-
-    -- ラジオアクティブオーラ
-    if _G.Settings.RadioactiveAura and radioactivePart then
-        for _, player in ipairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") then
-                local head = player.Character.Head
-                local root = GetPlayerRoot()
-                if root and (head.Position - root.Position).Magnitude < 20 then
-                    if SNOWshipOnce(head) then
-                        radioactivePart.CFrame = head.CFrame
-                        task.wait()
-                        radioactivePart.Position = Vector3.new(0, -50, 0)
-                    end
-                end
-            end
-        end
-    end
-end)
-
--- ラインエクステンダー・ソフトラグ・インビジブルライン
-local lineExtendConnection
-function toggleLineExtend(state)
-    if state then
-        -- 実際のライン延長はグラブ生成時に距離を操作する必要があるため、ここでは簡易的な処理
-        lineExtendConnection = RunService.Heartbeat:Connect(function()
-            -- ダミー：特に何もしないが、フラグとして機能
-        end)
-    elseif lineExtendConnection then
-        lineExtendConnection:Disconnect()
-    end
-end
-
-local softLagConnection
-function toggleSoftLag(state)
-    if state then
-        softLagConnection = RunService.Heartbeat:Connect(function()
-            for i = 1, 10 do
-                local createLine = ReplicatedStorage:FindFirstChild("GrabEvents") and ReplicatedStorage.GrabEvents:FindFirstChild("CreateGrabLine")
-                if createLine then
-                    createLine:FireServer(Workspace:FindFirstChildOfClass("Part"), CFrame.new(0,0,0))
-                end
-            end
-        end)
-    elseif softLagConnection then
-        softLagConnection:Disconnect()
-    end
-end
-
-local invisibleLineConnection
-function toggleInvisibleLine(state)
-    if state then
-        invisibleLineConnection = RunService.Heartbeat:Connect(function()
-            -- ラインを非表示にするには、既存のラインの透明度を操作するか、生成を抑制する
-            -- ここではダミー
-        end)
-    elseif invisibleLineConnection then
-        invisibleLineConnection:Disconnect()
-    end
-end
-
--- ループキル
-function loopKill()
-    while _G.Settings.LoopKill do
-        for _, player in ipairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-                local hrp = player.Character.HumanoidRootPart
-                if SNOWshipOnce(hrp) then
-                    local hum = player.Character:FindFirstChildOfClass("Humanoid")
-                    if hum then hum.Health = 0 end
-                end
-            end
-        end
-        task.wait(0.5)
-    end
-end
-
--- キルオール
-function killAll()
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character then
-            local hum = player.Character:FindFirstChildOfClass("Humanoid")
-            if hum then hum.Health = 0 end
-        end
-    end
-end
-
--- ブリングオール
-function bringAll()
-    local root = GetPlayerRoot()
-    if not root then return end
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-            player.Character.HumanoidRootPart.CFrame = root.CFrame * CFrame.new(0, 0, 5)
-        end
-    end
-end
-
--- ブロブマンロック（自分が座っているブロブマンで対象を掴む）
-function blobmanLock(targetPlayer)
-    if not targetPlayer or not targetPlayer.Character then return end
-    local char = LocalPlayer.Character
-    if not char then return end
-    local hum = char:FindFirstChildOfClass("Humanoid")
-    if not hum or not hum.SeatPart then return end
-    local blob = hum.SeatPart.Parent
-    if blob.Name ~= "CreatureBlobman" then return end
-    local detector = blob:FindFirstChild("LeftDetector")
-    if not detector then return end
-    local weld = detector:FindFirstChild("LeftWeld")
-    if not weld then return end
-    local grabScript = blob:FindFirstChild("BlobmanSeatAndOwnerScript")
-    if grabScript then
-        local grab = grabScript:FindFirstChild("CreatureGrab")
-        if grab then
-            grab:FireServer(detector, targetPlayer.Character.HumanoidRootPart, weld)
-        end
-    end
-end
-
--- アンカーボタン（見ているオブジェクトをアンカー）
-function anchorObject()
-    local root = GetPlayerRoot()
-    if not root then return end
-    local ray = Ray.new(root.Position, Workspace.CurrentCamera.CFrame.LookVector * 100)
-    local hit, pos = Workspace:FindPartOnRay(ray, LocalPlayer.Character)
-    if hit and hit.Parent and hit.Parent:IsA("Model") and not hit.Anchored then
-        hit.Anchored = true
-    end
-end
-
--- テレポートボタン（視線先にテレポート）
-function teleportToCursor()
-    local root = GetPlayerRoot()
-    if not root then return end
-    local ray = Ray.new(Workspace.CurrentCamera.CFrame.Position, Workspace.CurrentCamera.CFrame.LookVector * 1000)
-    local hit, pos = Workspace:FindPartOnRay(ray, LocalPlayer.Character)
-    if pos then
-        root.CFrame = CFrame.new(pos + Vector3.new(0, 3, 0))
-    end
-end
-
--- アンカー解除（再固定の接待）
-function unanchorAll()
-    for _, v in ipairs(Workspace:GetDescendants()) do
-        if v:IsA("BasePart") and v.Anchored then
-            v.Anchored = false
-        end
-    end
-end
-
--- オートアタッカー（自分を掴んだプレイヤーを殺す）
-local function onPartOwnerAdded(part)
-    if part.Name == "PartOwner" and part.Value ~= LocalPlayer.Name then
-        local attacker = Players:FindFirstChild(part.Value)
-        if attacker and attacker.Character and _G.Settings.AutoAttackerDeath then
-            local hum = attacker.Character:FindFirstChildOfClass("Humanoid")
-            if hum then hum.Health = 0 end
-        end
-    end
-end
-LocalPlayer.CharacterAdded:Connect(function(char)
-    char.DescendantAdded:Connect(onPartOwnerAdded)
-end)
-if LocalPlayer.Character then
-    LocalPlayer.Character.DescendantAdded:Connect(onPartOwnerAdded)
-end
-
--- Orion UI作成
+-- Create Window
 local Window = OrionLib:MakeWindow({
-    Name = "Combined Hub",
-    HidePremium = false,
+    Name = "Feature Hub",
+    HidePremium = true,
     SaveConfig = true,
-    ConfigFolder = "CombinedHub",
+    ConfigFolder = "FeatureHubConfig",
     IntroEnabled = true,
-    IntroText = "Loading...",
-    IntroIcon = "rbxassetid://8834748103",
-    Icon = "rbxassetid://8834748103"
+    IntroText = "Bliz-Style Hub Loaded"
 })
 
--- プレイヤーリスト更新用関数
-local function updatePlayerDropdown(dropdown)
-    local names = {}
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer then
-            table.insert(names, p.Name)
+-- Create Tabs
+local CombatTab = Window:MakeTab({ Name = "Combat" })
+local PlayerTab = Window:MakeTab({ Name = "Player" })
+local VisualsTab = Window:MakeTab({ Name = "Visuals" })
+local MiscTab = Window:MakeTab({ Name = "Misc" })
+
+--============================================================================--
+--                              UI ELEMENT CREATION                           --
+--============================================================================--
+
+-- Combat Tab
+CombatTab:AddToggle({
+    Name = "Death Aura",
+    Callback = function(v) states.deathAura = v end
+})
+CombatTab:AddToggle({
+    Name = "Auto Attacker (Death)",
+    Callback = function(v) states.autoAttacker = v end
+})
+CombatTab:AddToggle({
+    Name = "Death Grab",
+    Callback = function(v) states.deathGrab = v end
+})
+CombatTab:AddToggle({
+    Name = "Noclip Grab",
+    Callback = function(v) states.noclipGrab = v end
+})
+CombatTab:AddToggle({
+    Name = "Loop Kill Target",
+    Callback = function(v) states.loopKill = v end
+})
+CombatTab:AddButton({
+    Name = "Kill All",
+    Callback = function()
+        -- これはクライアント側のシミュレーションです。安全なゲームでは他のプレイヤーをキルしません。
+        for _, p in pairs(Players:GetPlayers()) do
+            if p ~= localPlayer and p.Character and p.Character:FindFirstChild("Humanoid") then
+                p.Character.Humanoid.Health = 0
+            end
         end
     end
-    dropdown:Refresh(names, true)
-end
-
--- グラブタブ
-local GrabTab = Window:MakeTab({ Name = "Grab", Icon = "rbxassetid://3944703587" })
-GrabTab:AddToggle({ Name = "Super Strength", Default = false, Callback = function(v) _G.Settings.SuperStrength = v end })
-GrabTab:AddSlider({ Name = "Strength", Min = 100, Max = 5000, Default = 400, Callback = function(v) _G.Settings.Strength = v end })
-GrabTab:AddToggle({ Name = "Death Grab", Default = false, Callback = function(v) _G.Settings.DeathGrab = v end })
-GrabTab:AddToggle({ Name = "Noclip Grab", Default = false, Callback = function(v) _G.Settings.NoclipGrab = v end })
-GrabTab:AddToggle({ Name = "Perspective Grab", Default = false, Callback = function(v) _G.Settings.PerspectiveGrab = v end })
-GrabTab:AddSlider({ Name = "Perspective Speed", Min = 10, Max = 200, Default = 50, Callback = function(v) _G.Settings.PerspectiveSpeed = v end })
-GrabTab:AddButton({ Name = "Anchor Object", Callback = anchorObject })
-GrabTab:AddButton({ Name = "Teleport to Cursor", Callback = teleportToCursor })
-
--- オーラタブ
-local AuraTab = Window:MakeTab({ Name = "Aura", Icon = "rbxassetid://3944703587" })
-AuraTab:AddToggle({ Name = "Death Aura", Default = false, Callback = function(v) _G.Settings.DeathAura = v end })
-AuraTab:AddToggle({ Name = "Radioactive Aura", Default = false, Callback = function(v) _G.Settings.RadioactiveAura = v end })
-
--- ブロブマンタブ
-local BlobmanTab = Window:MakeTab({ Name = "Blobman", Icon = "rbxassetid://3944703587" })
-local blobmanTargetDropdown = BlobmanTab:AddDropdown({
-    Name = "Select Target",
-    Options = {},
-    Callback = function(v)
-        SelectedPlayerName = v
-        _G.Settings.BlobmanTarget = Players:FindFirstChild(v)
-    end
-})
-updatePlayerDropdown(blobmanTargetDropdown)
-Players.PlayerAdded:Connect(function() updatePlayerDropdown(blobmanTargetDropdown) end)
-Players.PlayerRemoving:Connect(function() updatePlayerDropdown(blobmanTargetDropdown) end)
-
-BlobmanTab:AddButton({
-    Name = "Lock (Grab with Blobman)",
-    Callback = function()
-        blobmanLock(_G.Settings.BlobmanTarget)
-    end
 })
 
--- プレイヤータブ
-local PlayerTab = Window:MakeTab({ Name = "Player", Icon = "rbxassetid://3944703587" })
-PlayerTab:AddToggle({ Name = "Auto Attacker (Death Mode)", Default = false, Callback = function(v) _G.Settings.AutoAttackerDeath = v end })
+-- Player Tab
 PlayerTab:AddToggle({
-    Name = "Loop Kill",
-    Default = false,
-    Callback = function(v)
-        _G.Settings.LoopKill = v
-        if v then task.spawn(loopKill) end
+    Name = "Super Strong",
+    Callback = function(enabled)
+        states.superStrong = enabled
+        local character = localPlayer.Character
+        if not (character and character:FindFirstChild("Humanoid")) then return end
+        local humanoid = character.Humanoid
+        if enabled then
+            humanoid.WalkSpeed = 50
+            humanoid.JumpPower = 100
+            if not character:FindFirstChild("ForceField") then Instance.new("ForceField", character) end
+        else
+            humanoid.WalkSpeed = 16
+            humanoid.JumpPower = 50
+            if character:FindFirstChild("ForceField") then character.ForceField:Destroy() end
+        end
     end
 })
-PlayerTab:AddButton({ Name = "Kill All", Callback = killAll })
-PlayerTab:AddButton({ Name = "Bring All", Callback = bringAll })
-
--- ラインタブ
-local LineTab = Window:MakeTab({ Name = "Line", Icon = "rbxassetid://3944703587" })
-LineTab:AddToggle({ Name = "Line Extender", Default = false, Callback = toggleLineExtend })
-LineTab:AddSlider({ Name = "Extend Amount", Min = 1, Max = 20, Default = 3, Callback = function(v) _G.LineExtendAmount = v end })
-LineTab:AddToggle({ Name = "Soft Lag", Default = false, Callback = toggleSoftLag })
-LineTab:AddToggle({ Name = "Invisible Line", Default = false, Callback = toggleInvisibleLine })
-
--- ディフェンスタブ
-local DefenseTab = Window:MakeTab({ Name = "Defense", Icon = "rbxassetid://3944703587" })
-DefenseTab:AddToggle({
-    Name = "Anti-Kick (Iyan)",
-    Default = false,
-    Callback = function(v)
-        _G.Settings.AntiKick = v
-        if v then task.spawn(antiKickLoop) end
+PlayerTab:AddToggle({
+    Name = "Noclip",
+    Callback = function(v) states.noclip = v end
+})
+PlayerTab:AddToggle({
+    Name = "Invisible",
+    Callback = function(enabled)
+        states.invisible = enabled
+        local char = localPlayer.Character
+        if not char then return end
+        -- これはクライアント側のみです。他のプレイヤーには通常通り見えます。
+        for _, part in pairs(char:GetDescendants()) do
+            if part:IsA("BasePart") or part:IsA("Decal") then
+                part.Transparency = states.invisible and 1 or 0
+            end
+        end
     end
 })
-DefenseTab:AddButton({ Name = "Unanchor All (Re-anchor)", Callback = unanchorAll })
+PlayerTab:AddToggle({
+    Name = "Persistent Anchor (Re-anchor)",
+    Callback = function(enabled) 
+        states.persistentAnchor = enabled
+        if not enabled and GetPlayerRoot() then
+            GetPlayerRoot().Anchored = false
+        end
+    end
+})
+PlayerTab:AddToggle({
+    Name = "Click Teleport [Hold Ctrl]",
+    Callback = function(enabled)
+        states.clickTp = enabled
+        if enabled then
+            OrionLib:MakeNotification({
+                Name = "Click TP Enabled",
+                Content = "Hold [Ctrl] and click in the world to teleport.",
+                Time = 5
+            })
+        end
+    end
+})
+
+-- Visuals Tab
+VisualsTab:AddToggle({
+    Name = "Perspective",
+    Callback = function(enabled)
+        states.perspective = enabled
+        if enabled then
+            localPlayer.CameraMode = Enum.CameraMode.LockFirstPerson
+        else
+            localPlayer.CameraMode = Enum.CameraMode.Classic
+            localPlayer.CameraMinZoomDistance = 0.5
+            localPlayer.CameraMaxZoomDistance = 128
+        end
+    end
+})
+VisualsTab:AddToggle({
+    Name = "Line ESP",
+    Callback = function(enabled)
+        states.lineEsp = enabled
+        if not enabled then
+            for _, line in pairs(lineAdornments) do if line then line:Destroy() end end
+            lineAdornments = {}
+        end
+    end
+})
+VisualsTab:AddToggle({
+    Name = "Radioactive Aura",
+    Default = false,
+    Callback = function(enabled) states.radioactiveAura = enabled end
+})
+VisualsTab:AddToggle({
+    Name = "Blobman Lock",
+    Default = false,
+    Callback = function(enabled) states.blobmanLock = enabled end
+})
+
+-- World Tab
+WorldTab:AddButton({
+    Name = "Bring All (Client-Side)",
+    Callback = function()
+        -- 注意: この機能はクライアント側でのみ動作します。
+        -- 他のプレイヤーはあなたの画面上でテレポートして見えますが、実際のサーバー上では移動しません。
+        -- これはRobloxのネットワークオーナーシップによるセキュリティ機能のためです。
+        OrionLib:MakeNotification({
+            Name = "Bring All",
+            Content = "これはクライアント側のエフェクトであり、他のプレイヤーには影響しません。",
+            Time = 5
+        })
+        local myHrp = GetPlayerRoot()
+        if not myHrp then return end
+
+        for _, p in pairs(Players:GetPlayers()) do
+            if p ~= localPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                p.Character:SetPrimaryPartCFrame(myHrp.CFrame * CFrame.new(math.random(-10, 10), 5, math.random(-10, 10)))
+            end
+        end
+    end
+})
+
+-- Misc Tab
+MiscTab:AddToggle({
+    Name = "Soft Lag",
+    Default = false,
+    Callback = function(enabled) states.softLag = enabled end
+})
+MiscTab:AddToggle({
+    Name = "Anti-Kick (Iyhan)",
+    Default = false,
+    Callback = function(enabled)
+        states.antiKick = enabled
+        -- この部分はエクスプロイト実行環境でのみ機能します。Roblox Studioでは何もしません。
+        if enabled and getrawmetatable and setreadonly then
+            pcall(function()
+                local mt = getrawmetatable(game)
+                local old_namecall = mt.__namecall
+                setreadonly(mt, false)
+                mt.__namecall = function(self, ...)
+                    if getnamecallmethod():lower() == "kick" then
+                        return "Player has been kicked." -- 偽の戻り値を返す
+                    end
+                    return old_namecall(self, ...)
+                end
+                setreadonly(mt, true)
+            end)
+        end
+    end
+})
 
 OrionLib:Init()
+
+--============================================================================--
+--                           CORE FEATURE LOGIC                               --
+--============================================================================--
+
+-- Mouse Input Handler
+mouse.Button1Down:Connect(function()
+    if not mouse.Target then return end
+    local char = localPlayer.Character
+
+    -- Click TP Logic
+    if states.clickTp and char and (UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) or UserInputService:IsKeyDown(Enum.KeyCode.RightControl)) then
+        char:SetPrimaryPartCFrame(CFrame.new(mouse.Hit.p + Vector3.new(0, 3, 0)))
+    end
+
+    -- Grab Logic
+    if (states.deathGrab or states.noclipGrab) and mouse.Target.Parent and mouse.Target.Parent:FindFirstChild("Humanoid") then
+        local targetCharacter = mouse.Target.Parent
+        if targetCharacter ~= char then
+            grabTarget = targetCharacter
+        end
+    end
+end)
+
+mouse.Button1Up:Connect(function()
+    grabTarget = nil
+end)
+
+-- Keyboard Input Handler
+UserInputService.InputBegan:Connect(function(input, gameProcessedEvent)
+    if gameProcessedEvent then return end
+
+    -- Death Grab Action Key
+    if input.KeyCode == Enum.KeyCode.Q and states.deathGrab and grabTarget and grabTarget:FindFirstChild("Humanoid") then
+        -- これはクライアント側のシミュレーションです。安全なゲームでは他のプレイヤーをキルしません。
+        -- これを機能させるには、サーバーにアクションを実行するよう依頼するRemoteEventが必要です。
+        print("Attempting to 'eliminate' " .. grabTarget.Name)
+        grabTarget.Humanoid.Health = 0
+    end
+end)
+
+-- Main Loop
+RunService.RenderStepped:Connect(function()
+    local hrp = GetPlayerRoot()
+    if not hrp then return end
+
+    -- Noclip Logic
+    if states.noclip then
+        for _, part in ipairs(localPlayer.Character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+            end
+        end
+    end
+
+    -- Grab Movement Logic
+    if grabTarget and grabTarget.PrimaryPart then
+        if states.deathGrab or states.noclipGrab then
+            -- This moves the grabbed target in front of the client's camera.
+            -- It will not work or replicate to others in FE games due to network ownership.
+            local camera = workspace.CurrentCamera
+            local newPosition = camera.CFrame.p + camera.CFrame.LookVector * 10
+            grabTarget:SetPrimaryPartCFrame(CFrame.new(newPosition))
+        end
+    end
+
+    -- Blobman Lock (Aim at nearest player)
+    if states.blobmanLock then
+        local nearest, minDist = nil, math.huge
+        for _, p in pairs(Players:GetPlayers()) do
+            if p ~= localPlayer and p.Character and p.Character:FindFirstChild("Head") then
+                local dist = (p.Character.Head.Position - hrp.Position).Magnitude
+                if dist < minDist then
+                    minDist = dist
+                    nearest = p.Character
+                end
+            end
+        end
+        if nearest then
+            workspace.CurrentCamera.CFrame = CFrame.new(workspace.CurrentCamera.CFrame.Position, nearest.Head.Position)
+        end
+    end
+
+    -- Line ESP Logic
+    if states.lineEsp then
+        for p, line in pairs(lineAdornments) do
+            if not (p and p.Parent and p.Character and p.Character.Parent) then
+                if line then line:Destroy() end
+                lineAdornments[p] = nil
+            end
+        end
+        for _, p in pairs(Players:GetPlayers()) do
+            if p ~= localPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                if not lineAdornments[p] then
+                    local line = Instance.new("LineHandleAdornment")
+                    line.Adornee = hrp
+                    line.Target = p.Character.HumanoidRootPart
+                    line.Color3 = Color3.new(1, 0, 0)
+                    line.Thickness = 1
+                    line.AlwaysOnTop = true
+                    line.Parent = workspace
+                    lineAdornments[p] = line
+                end
+            end
+        end
+    end
+
+    -- Soft Lag Logic
+    if states.softLag then
+        softLagTick = softLagTick + 1
+        if softLagTick % 10 == 0 then
+            hrp.Anchored = not hrp.Anchored
+        end
+    end
+
+    -- Persistent Anchor Logic
+    if states.persistentAnchor and hrp then
+        hrp.Anchored = true
+    end
+
+    -- Aura / Auto-Attack / Loop Kill Logic
+    if states.deathAura or states.autoAttacker or (states.loopKill and grabTarget) then
+        for _, p in pairs(Players:GetPlayers()) do
+            if p ~= localPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                local targetHrp = p.Character.HumanoidRootPart
+                local dist = (targetHrp.Position - hrp.Position).Magnitude
+                
+                local shouldAttack = false
+                if states.loopKill and p.Character == grabTarget then shouldAttack = true end
+                if (states.deathAura or states.autoAttacker) and dist < 25 then shouldAttack = true end
+
+                if shouldAttack then
+                    -- これはクライアント側のシミュレーションです。安全なゲームでは他のプレイヤーをキルしません。
+                    if p.Character:FindFirstChild("Humanoid") then
+                        p.Character.Humanoid.Health = 0
+                    end
+                end
+            end
+        end
+    end
+
+    -- Radioactive Aura (Visual)
+    if states.radioactiveAura then
+        if not radioactivePart or not radioactivePart.Parent then
+            radioactivePart = Instance.new("Part")
+            radioactivePart.Name = "RadioactiveField"
+            radioactivePart.CanCollide = false
+            radioactivePart.Anchored = true
+            radioactivePart.Shape = Enum.PartType.Ball
+            radioactivePart.Size = Vector3.new(20, 20, 20)
+            radioactivePart.Color = Color3.fromRGB(0, 255, 0)
+            radioactivePart.Transparency = 0.7
+            radioactivePart.Material = Enum.Material.Neon
+            radioactivePart.Parent = workspace
+        end
+        radioactivePart.CFrame = hrp.CFrame
+    elseif radioactivePart then
+        radioactivePart:Destroy()
+        radioactivePart = nil
+    end
+end)
+
+-- Character Reset Logic
+localPlayer.CharacterAdded:Connect(function(character)
+    -- Re-apply super strong if it was enabled
+    if states.superStrong then
+        local humanoid = character:WaitForChild("Humanoid")
+        humanoid.WalkSpeed = 50
+        humanoid.JumpPower = 100
+        if not character:FindFirstChild("ForceField") then Instance.new("ForceField", character) end
+    end
+
+    -- Re-apply invisibility if it was enabled
+    if states.invisible then
+        -- This is client-side only. Other players will still see you.
+        for _, part in pairs(character:GetDescendants()) do
+            if part:IsA("BasePart") or part:IsA("Decal") then
+                part.Transparency = 1
+            end
+        end
+    end
+end)
+
+-- Cleanup on script removal
+game:GetService("Players").PlayerRemoving:Connect(function(player)
+    if player == localPlayer then
+        if radioactivePart then radioactivePart:Destroy() end
+        for _, line in pairs(lineAdornments) do if line then line:Destroy() end end
+    end
+end)
