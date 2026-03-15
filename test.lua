@@ -39,108 +39,34 @@ local softLagTick = 0
 local killAllActive = false
 
 --============================================================================--
---                                  MAIN UI                                   --
---============================================================================--
-
--- Create the main screen GUI
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "MainFeatureGui"
-screenGui.Parent = localPlayer:WaitForChild("PlayerGui")
-screenGui.ResetOnSpawn = false
-
--- Main frame
-local mainFrame = Instance.new("Frame")
-mainFrame.Name = "MainFrame"
-mainFrame.Parent = screenGui
-mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-mainFrame.BorderColor3 = Color3.fromRGB(80, 80, 80)
-mainFrame.BorderSizePixel = 2
-mainFrame.Position = UDim2.new(0.5, -150, 0.5, -100)
-mainFrame.Size = UDim2.new(0, 340, 0, 350) -- Increased size
-mainFrame.Draggable = true
-mainFrame.Active = true
-
--- Scrolling Frame for buttons
-local scrollingFrame = Instance.new("ScrollingFrame")
-scrollingFrame.Name = "ButtonContainer"
-scrollingFrame.Parent = mainFrame
-scrollingFrame.BackgroundTransparency = 1
-scrollingFrame.Position = UDim2.new(0, 10, 0, 40)
-scrollingFrame.Size = UDim2.new(1, -20, 1, -50)
-scrollingFrame.CanvasSize = UDim2.new(0, 0, 2, 0) -- Adjustable
-scrollingFrame.ScrollBarThickness = 6
-
--- Title label
-local titleLabel = Instance.new("TextLabel")
-titleLabel.Name = "TitleLabel"
-titleLabel.Parent = mainFrame
-titleLabel.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-titleLabel.Size = UDim2.new(1, 0, 0, 30)
-titleLabel.Font = Enum.Font.SourceSansBold
-titleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-titleLabel.Text = "Feature Control"
-
--- UI Layout
-local gridLayout = Instance.new("UIGridLayout")
-gridLayout.Parent = scrollingFrame
-gridLayout.CellSize = UDim2.new(0, 145, 0, 35)
-gridLayout.CellPadding = UDim2.new(0, 5, 0, 5)
-
--- Function to update canvas size
-gridLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
-	scrollingFrame.CanvasSize = UDim2.new(0, 0, 0, gridLayout.AbsoluteContentSize.Y + 10)
-end)
-
--- Function to create a toggle button
-local function createToggleButton(name, text, callback)
-	local button = Instance.new("TextButton")
-	button.Name = name
-	button.Parent = scrollingFrame
-	button.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
-	button.BorderColor3 = Color3.fromRGB(100, 100, 100)
-	button.Font = Enum.Font.SourceSans
-	button.TextColor3 = Color3.fromRGB(255, 255, 255)
-	button.Text = text
-
-	local toggled = false
-	button.MouseButton1Click:Connect(function()
-		toggled = not toggled
-		if toggled then
-			button.BackgroundColor3 = Color3.fromRGB(90, 150, 90)
-			button.Text = text .. " (On)"
-		else
-			button.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
-			button.Text = text
-		end
-		callback(toggled)
-	end)
-	return button
-end
-
--- Function to create a standard action button
-local function createActionButton(name, text, callback)
-	local button = Instance.new("TextButton")
-	button.Name = name
-	button.Parent = scrollingFrame
-	button.BackgroundColor3 = Color3.fromRGB(50, 50, 90)
-	button.BorderColor3 = Color3.fromRGB(100, 100, 100)
-	button.Font = Enum.Font.SourceSans
-	button.TextColor3 = Color3.fromRGB(255, 255, 255)
-	button.Text = text
-
-	button.MouseButton1Click:Connect(function()
-		callback()
-	end)
-	return button
-end
-
-
---============================================================================--
 --                                FEATURE SETUP                               --
 --============================================================================--
 
--- Super Strong
-createToggleButton("SuperStrongButton", "Super Strong", function(enabled)
+-- Load Orion Library
+local OrionUrl = "https://raw.githubusercontent.com/hololove1021/HolonHUB/refs/heads/main/source.txt"
+local OrionLib = loadstring(game:HttpGet(OrionUrl))()
+
+-- Create Window
+local Window = OrionLib:MakeWindow({
+	Name = "Feature Control Hub",
+	HidePremium = false,
+	SaveConfig = true,
+	ConfigFolder = "FeatureControlConfig",
+	IntroEnabled = true,
+	IntroText = "Loaded!"
+})
+
+-- Create Tabs
+local CombatTab = Window:MakeTab({ Name = "Combat" })
+local PlayerTab = Window:MakeTab({ Name = "Player" })
+local VisualsTab = Window:MakeTab({ Name = "Visuals" })
+local MiscTab = Window:MakeTab({ Name = "Misc" })
+
+-- Player Tab
+PlayerTab:AddToggle({
+	Name = "Super Strong",
+	Default = false,
+	Callback = function(enabled)
 	isSuperStrong = enabled
 	local character = localPlayer.Character
 	if character and character:FindFirstChild("Humanoid") then
@@ -157,67 +83,84 @@ createToggleButton("SuperStrongButton", "Super Strong", function(enabled)
 			end
 		end
 	end
-end)
+end})
 
--- Death Grab
-createToggleButton("DeathGrabButton", "Death Grab", function(enabled)
-	isDeathGrabActive = enabled
-	if not enabled and grabTarget then
-		grabTarget = nil -- Clear target if disabled
-	end
-end)
-
--- Noclip Grab
-createToggleButton("NoclipGrabButton", "Noclip Grab", function(enabled)
-	isNoclipGrabActive = enabled
-	if not enabled and grabTarget then
-		grabTarget = nil -- Clear target if disabled
-	end
-end)
-
--- Perspective Toggle
-createToggleButton("PerspectiveButton", "Perspective", function(enabled)
+PlayerTab:AddToggle({
+	Name = "Perspective",
+	Default = false,
+	Callback = function(enabled)
 	if enabled then
 		localPlayer.CameraMode = Enum.CameraMode.LockFirstPerson
 	else
 		localPlayer.CameraMode = Enum.CameraMode.Classic
-		-- Force third-person by setting camera distance
 		localPlayer.CameraMinZoomDistance = 0.5
 		localPlayer.CameraMaxZoomDistance = 128
 	end
-end)
+end})
 
--- Noclip Toggle Button
-createToggleButton("NoclipButton", "Noclip", function(enabled)
+CombatTab:AddToggle({
+	Name = "Death Grab",
+	Default = false,
+	Callback = function(enabled)
+	isDeathGrabActive = enabled
+	if not enabled and grabTarget then
+		grabTarget = nil -- Clear target if disabled
+	end
+end})
+
+CombatTab:AddToggle({
+	Name = "Noclip Grab",
+	Default = false,
+	Callback = function(enabled)
+	isNoclipGrabActive = enabled
+	if not enabled and grabTarget then
+		grabTarget = nil -- Clear target if disabled
+	end
+end})
+
+PlayerTab:AddToggle({
+	Name = "Noclip",
+	Default = false,
+	Callback = function(enabled)
 	noclipEnabled = enabled
-end)
+end})
 
--- Blobman Lock (Target Lock)
-createToggleButton("BlobmanButton", "Blobman Lock", function(enabled)
+VisualsTab:AddToggle({
+	Name = "Blobman Lock",
+	Default = false,
+	Callback = function(enabled)
 	isBlobmanLock = enabled
-end)
+end})
 
--- Auto Attacker (Death Only)
-createToggleButton("AutoAttackerButton", "Auto Attacker", function(enabled)
+CombatTab:AddToggle({
+	Name = "Auto Attacker (Death)",
+	Default = false,
+	Callback = function(enabled)
 	isAutoAttacker = enabled
-end)
+end})
 
--- Line Esp (Line Exenter?)
-createToggleButton("LineEspButton", "Line ESP", function(enabled)
+VisualsTab:AddToggle({
+	Name = "Line ESP",
+	Default = false,
+	Callback = function(enabled)
 	isLineEsp = enabled
 	if not enabled then
 		for _, line in pairs(lineAdornments) do line:Destroy() end
 		lineAdornments = {}
 	end
-end)
+end})
 
--- Soft Lag
-createToggleButton("SoftLagButton", "Soft Lag", function(enabled)
+MiscTab:AddToggle({
+	Name = "Soft Lag",
+	Default = false,
+	Callback = function(enabled)
 	isSoftLag = enabled
-end)
+end})
 
--- Invisible Line (Invisible Character)
-createToggleButton("InvisibleButton", "Invisible", function(enabled)
+PlayerTab:AddToggle({
+	Name = "Invisible",
+	Default = false,
+	Callback = function(enabled)
 	isInvisible = enabled
 	local char = localPlayer.Character
 	if char then
@@ -228,58 +171,74 @@ createToggleButton("InvisibleButton", "Invisible", function(enabled)
 			end
 		end
 	end
-end)
+end})
 
--- Death Aura
-createToggleButton("DeathAuraButton", "Death Aura", function(enabled)
+CombatTab:AddToggle({
+	Name = "Death Aura",
+	Default = false,
+	Callback = function(enabled)
 	isDeathAura = enabled
-end)
+end})
 
--- Radioactive Aura
-createToggleButton("RadioactiveButton", "Radioactive Aura", function(enabled)
+VisualsTab:AddToggle({
+	Name = "Radioactive Aura",
+	Default = false,
+	Callback = function(enabled)
 	isRadioactive = enabled
-end)
+end})
 
--- Teleport Button (Click TP)
-createToggleButton("TPButton", "Click TP (Ctrl)", function(enabled)
+PlayerTab:AddToggle({
+	Name = "Click TP (Ctrl)",
+	Default = false,
+	Callback = function(enabled)
 	isClickTp = enabled
-end)
+end})
 
--- Anchor Button (Fixed)
-createToggleButton("AnchorButton", "Anchor Self", function(enabled)
+PlayerTab:AddToggle({
+	Name = "Anchor Self",
+	Default = false,
+	Callback = function(enabled)
 	local char = localPlayer.Character
 	if char and char:FindFirstChild("HumanoidRootPart") then
 		char.HumanoidRootPart.Anchored = enabled
 	end
-end)
+end})
 
--- Auto Anchor (Re-anchor setting)
-createToggleButton("AutoAnchorButton", "Auto Anchor", function(enabled)
+PlayerTab:AddToggle({
+	Name = "Auto Anchor (Re-anchor)",
+	Default = false,
+	Callback = function(enabled)
 	isAutoAnchor = enabled
-end)
+end})
 
--- Loop Kill
-createToggleButton("LoopKillButton", "Loop Kill Target", function(enabled)
+CombatTab:AddToggle({
+	Name = "Loop Kill Target",
+	Default = false,
+	Callback = function(enabled)
 	isLoopKill = enabled
-end)
+end})
 
--- Kill All
-createActionButton("KillAllButton", "Kill All", function()
+CombatTab:AddButton({
+	Name = "Kill All",
+	Callback = function()
 	killAllActive = true
 	wait(0.5)
 	killAllActive = false
-end)
+end})
 
--- Bring All
-createActionButton("BringAllButton", "Bring All (Client)", function()
+MiscTab:AddButton({
+	Name = "Bring All (Client)",
+	Callback = function()
 	-- Client side bring simulation (Teleport to them)
 	killAllActive = true -- Reusing logic to visit everyone
 	wait(0.5)
 	killAllActive = false
-end)
+end})
 
--- Anti-Kick (Iyhan)
-createToggleButton("AntiKickButton", "Anti-Kick (Iyhan)", function(enabled)
+MiscTab:AddToggle({
+	Name = "Anti-Kick (Iyhan)",
+	Default = false,
+	Callback = function(enabled)
 	isAntiKick = enabled
 	-- Try to hook Kick (Only works in exploit environments)
 	if enabled and getrawmetatable and setreadonly then
@@ -295,7 +254,9 @@ createToggleButton("AntiKickButton", "Anti-Kick (Iyhan)", function(enabled)
 			setreadonly(mt, true)
 		end)
 	end
-end)
+end})
+
+OrionLib:Init()
 
 --============================================================================--
 --                             FEATURE IMPLEMENTATION                         --
@@ -495,10 +456,4 @@ localPlayer.CharacterAdded:Connect(function(character)
 
 	-- Reset noclip
 	noclipEnabled = false
-	-- Find and update the noclip button's state if it exists
-	local noclipButton = screenGui:FindFirstChild("MainFrame", true) and screenGui.MainFrame:FindFirstChild("NoclipButton")
-	if noclipButton then
-		noclipButton.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
-		noclipButton.Text = "Noclip"
-	end
 end)
