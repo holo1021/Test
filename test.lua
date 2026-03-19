@@ -3924,23 +3924,39 @@ Workspace.ChildAdded:Connect(function(potentialGrabPart)
             if grabPart and dragPart then
                 local dragPartClone = dragPart:Clone()
                 dragPartClone.Name = "DragPart1"
-                if dragPartClone:FindFirstChild("AlignPosition") and dragPartClone:FindFirstChild("DragAttach") then
-                     dragPartClone.AlignPosition.Attachment1 = dragPartClone.DragAttach
-                end
+                dragPartClone.Transparency = 1
                 dragPartClone.Parent = grabPartModel
                 
+                -- クローン側のコンストレイントを無効化（干渉防止）
+                for _, v in pairs(dragPartClone:GetChildren()) do
+                    if v:IsA("AlignPosition") or v:IsA("AlignOrientation") then
+                        v.Enabled = false
+                    end
+                end
+                
                 pcDistance = (dragPartClone.Position - Camera.CFrame.Position).Magnitude
+                if pcDistance < 11 then pcDistance = 11 end
                 
-                if dragPartClone:FindFirstChild("AlignOrientation") then dragPartClone.AlignOrientation.Enabled = false end
+                -- オリジナルのDragPartの影響をローカルで無効化
                 if dragPart:FindFirstChild("AlignPosition") then dragPart.AlignPosition.Enabled = false end
+                if dragPart:FindFirstChild("AlignOrientation") then dragPart.AlignOrientation.Enabled = false end
                 
+                -- GrabPart（掴み判定パーツ）の接続先をクローンに変更
                 if grabPart:FindFirstChild("AlignPosition") and dragPartClone:FindFirstChild("DragAttach") then
                      grabPart.AlignPosition.Attachment1 = dragPartClone.DragAttach
+                end
+                if grabPart:FindFirstChild("AlignOrientation") and dragPartClone:FindFirstChild("DragAttach") then
+                     grabPart.AlignOrientation.Attachment1 = dragPartClone.DragAttach
                 end
 
                 task.spawn(function()
                     while grabPartModel.Parent do
                         dragPartClone.Position = Camera.CFrame.Position + Camera.CFrame.LookVector * pcDistance
+                        -- 【修正】所有権を継続的に主張して位置ズレ（他人に見えない問題）を防ぐ
+                        local weld = grabPart:FindFirstChild("WeldConstraint")
+                        if weld and weld.Part1 then
+                            SetNetworkOwner:FireServer(weld.Part1, weld.Part1.CFrame)
+                        end
                         task.wait()
                     end
                     pcDistance = 0
