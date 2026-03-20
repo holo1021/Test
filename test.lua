@@ -1,4 +1,4 @@
-
+-- 各種サービスを取得
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -486,37 +486,32 @@ Workspace.ChildAdded:Connect(function(child)
         if furtherExtendEnabled then
             local dragPart = child:WaitForChild("DragPart", 5)
             if dragPart then
-                -- Bliz Logic: DragPartを複製して制御する
-                local dragPartClone = dragPart:Clone()
-                dragPartClone.Name = "DragPart1"
+                -- Bliz (Keyless) Logic: BodyPosition on GrabPart
+                local bp = Instance.new("BodyPosition", grabPart)
+                bp.Name = "LineExtendPos"
+                bp.MaxForce = Vector3.new(275000, 275000, 275000)
+                bp.P = 20000
+                bp.D = 950
                 
-                -- 複製したDragPartのAlignPosition設定 (自分自身のアタッチメントに向ける)
-                local cloneAP = dragPartClone:FindFirstChild("AlignPosition")
-                local cloneDA = dragPartClone:FindFirstChild("DragAttach")
-                if cloneAP and cloneDA then
-                    cloneAP.Attachment1 = cloneDA
+                local weld = grabPart:FindFirstChildOfClass("WeldConstraint")
+                if weld and weld.Part1 then
+                    bp.Position = weld.Part1.Position
+                else
+                    bp.Position = grabPart.Position
                 end
+
+                pcDistance = (grabPart.Position - Camera.CFrame.Position).Magnitude
                 
-                dragPartClone.Parent = child -- モデル内に追加
-
-                -- 初期距離
-                pcDistance = (dragPartClone.Position - Camera.CFrame.Position).Magnitude
-
-                -- Cloneの回転制御を無効化 (Bliz仕様)
-                local cloneAO = dragPartClone:FindFirstChild("AlignOrientation")
-                if cloneAO then cloneAO.Enabled = false end
-
-                -- オリジナルのDragPartのAlignPositionを無効化 (マウス追従を切る)
                 local origAP = dragPart:FindFirstChild("AlignPosition")
                 if origAP then origAP.Enabled = false end
 
-                -- Cloneの位置を制御するループ
                 task.spawn(function()
                     while child.Parent do
-                        dragPartClone.Position = Camera.CFrame.Position + Camera.CFrame.LookVector * pcDistance
+                        bp.Position = Camera.CFrame.Position + Camera.CFrame.LookVector * pcDistance
                         task.wait()
                     end
                     pcDistance = 0
+                    if bp then bp:Destroy() end
                 end)
             end
         end
