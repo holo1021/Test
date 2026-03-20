@@ -327,11 +327,6 @@ UserInputService.InputChanged:Connect(function(input, gameProcessed)
         else
             pcDistance = pcDistance + extendAmount
         end
-
-        -- サーバーに距離変更を通知 (ExtendGrabLine)
-        if GrabEvents and GrabEvents:FindFirstChild("ExtendGrabLine") then
-            GrabEvents.ExtendGrabLine:FireServer(pcDistance)
-        end
     end
 end)
 
