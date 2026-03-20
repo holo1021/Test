@@ -327,6 +327,11 @@ UserInputService.InputChanged:Connect(function(input, gameProcessed)
         else
             pcDistance = pcDistance + extendAmount
         end
+
+        -- サーバーに距離変更を通知 (ExtendGrabLine)
+        if GrabEvents and GrabEvents:FindFirstChild("ExtendGrabLine") then
+            GrabEvents.ExtendGrabLine:FireServer(pcDistance)
+        end
     end
 end)
 
@@ -501,6 +506,10 @@ Workspace.ChildAdded:Connect(function(child)
 
                 -- 初期距離
                 pcDistance = (dragPartClone.Position - Camera.CFrame.Position).Magnitude
+
+                -- Cloneの回転制御を無効化 (Bliz仕様)
+                local cloneAO = dragPartClone:FindFirstChild("AlignOrientation")
+                if cloneAO then cloneAO.Enabled = false end
 
                 -- オリジナルのDragPartのAlignPositionを無効化 (マウス追従を切る)
                 local origAP = dragPart:FindFirstChild("AlignPosition")
