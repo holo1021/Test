@@ -639,6 +639,81 @@ LoopKillSec:AddToggle({
     Flag = "lk_toggle"
 })
                             
+local killAllEnabled = false
+
+LoopKillSec:AddToggle({
+    Name = "Kill All (Bliz)",
+    Default = false,
+    Callback = function(v)
+        killAllEnabled = v
+        if v then
+            task.spawn(function()
+                while killAllEnabled do
+                    for _, p in ipairs(Players:GetPlayers()) do
+                        if not killAllEnabled then break end
+                        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character:FindFirstChild("Humanoid") then
+                             local hum = p.Character.Humanoid
+                             if hum.Health > 0 then
+                                local targetRoot = p.Character.HumanoidRootPart
+                                local startTime = tick()
+                                -- Try to kill this player for up to 1 seconds
+                                while tick() - startTime < 1 and killAllEnabled and p.Character and p.Character:FindFirstChild("Humanoid") and p.Character.Humanoid.Health > 0 do
+                                    if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then break end
+                                    
+                                    local myRoot = LocalPlayer.Character.HumanoidRootPart
+                                    
+                                    -- Position (Bliz style)
+                                    local newPos
+                                    if targetRoot.Position.Y <= -12 then
+                                         newPos = targetRoot.Position + Vector3.new(0, 5, -15)
+                                    else
+                                         newPos = targetRoot.Position + Vector3.new(0, -10, -10)
+                                    end
+                                    myRoot.CFrame = CFrame.new(newPos)
+                                    myRoot.AssemblyLinearVelocity = Vector3.zero
+                                    
+                                    -- Noclip
+                                    for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
+                                        if part:IsA("BasePart") then part.CanCollide = false end
+                                    end
+                                    
+                                    -- Ownership
+                                    SNOWship(targetRoot)
+                                    
+                                    if CheckNetworkOwnerShipOnPart(targetRoot) then
+                                        pcall(function() 
+                                            if GrabEvents and GrabEvents:FindFirstChild("DestroyGrabLine") then 
+                                                GrabEvents.DestroyGrabLine:FireServer(targetRoot) 
+                                            end 
+                                        end)
+                                        
+                                        if not targetRoot:FindFirstChild("SkyVelocity") then
+                                            local bv = Instance.new("BodyVelocity")
+                                            bv.Name = "SkyVelocity"
+                                            bv.Velocity = Vector3.new(0, 100000000000000, 0)
+                                            bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+                                            bv.Parent = targetRoot
+                                            DebrisService:AddItem(bv, 1)
+                                        end
+                                        
+                                        hum.BreakJointsOnDeath = false
+                                        hum:ChangeState(Enum.HumanoidStateType.Dead)
+                                        hum.Jump = true
+                                        hum.Sit = false
+                                        -- Move to next player if success
+                                        break
+                                    end
+                                    RunService.Heartbeat:Wait()
+                                end
+                             end
+                        end
+                    end
+                    task.wait(0.1)
+                end
+            end)
+        end
+    end
+})
 
 -- --- キーボードタブ (Bliz Keybinds) ---
 local keyboardTargetName = ""
@@ -747,7 +822,6 @@ local SilentAimTab = Window:MakeTab({
 local ConfigContainer = {
     SA = {
         En = false, 
-        FOV = 400, 
         Key = "RightAlt", 
         TP = "HumanoidRootPart", 
         Show = false, 
@@ -852,37 +926,34 @@ local function GPP(VelocityObject)
 end
 
 local function GCP()
-    if not ConfigContainer.SA.TP then
-        return
-    else
-        local NilValue1 = nil
-        local NilValue2 = nil
-        local MiddlePoint = ConfigContainer.MC and ConfigContainer.Cam.ViewportSize / 2 or GMP()
-        for _, LoopCharacter in next, ConfigContainer.P:GetPlayers() do
-            if LoopCharacter ~= ConfigContainer.LP then
-                local TargetCharacter = LoopCharacter.Character
-                if TargetCharacter then
-                    local HumanoidRootPart = TargetCharacter:FindFirstChild("HumanoidRootPart")
-                    local Humanoid = TargetCharacter:FindFirstChild("Humanoid")
-                    if HumanoidRootPart and Humanoid and (not Humanoid or Humanoid.Health > 0) and (ConfigContainer.Cam.CFrame.Position - HumanoidRootPart.Position).Magnitude <= 5000 then
-                        local PositionX, PositionY = GPx(HumanoidRootPart.Position)
-                        if PositionY then
-                            local DistanceMagnitude = (MiddlePoint - PositionX).Magnitude
-                            if DistanceMagnitude <= ConfigContainer.SA.FOV and DistanceMagnitude < (NilValue2 or math.huge) then
-                                NilValue1 = ConfigContainer.SA.TP == "Random" and TargetCharacter[ConfigContainer.VTP[math.random(1, #ConfigContainer.VTP)]] or TargetCharacter[ConfigContainer.SA.TP]
-                                NilValue2 = DistanceMagnitude
-                            end
-                        end
+    if not ConfigContainer.SA.TP then return end
+    
+    local BestTarget = nil
+    local ClosestDist = math.huge
+    local MyRoot = ConfigContainer.LP.Character and ConfigContainer.LP.Character:FindFirstChild("HumanoidRootPart")
+    if not MyRoot then return nil end
+    local MyPos = MyRoot.Position
+
+    for _, LoopCharacter in next, ConfigContainer.P:GetPlayers() do
+        if LoopCharacter ~= ConfigContainer.LP then
+            local TargetCharacter = LoopCharacter.Character
+            if TargetCharacter then
+                local HumanoidRootPart = TargetCharacter:FindFirstChild("HumanoidRootPart")
+                local Humanoid = TargetCharacter:FindFirstChild("Humanoid")
+                if HumanoidRootPart and Humanoid and Humanoid.Health > 0 then
+                    local Dist = (MyPos - HumanoidRootPart.Position).Magnitude
+                    if Dist < ClosestDist then
+                        ClosestDist = Dist
+                        BestTarget = ConfigContainer.SA.TP == "Random" and TargetCharacter[ConfigContainer.VTP[math.random(1, #ConfigContainer.VTP)]] or TargetCharacter[ConfigContainer.SA.TP]
                     end
                 end
             end
         end
-        return NilValue1
     end
+    return BestTarget
 end
 
 SilentAimTab:AddToggle({Name = "Enabled (有効化)", Default = ConfigContainer.SA.En, Callback = function(v) ConfigContainer.SA.En = v end})
-SilentAimTab:AddSlider({Name = "Silent Aim Width (幅/FOV)", Min = 10, Max = 2000, Default = ConfigContainer.SA.FOV, Increment = 10, ValueName = "Px", Callback = function(v) ConfigContainer.SA.FOV = v end})
 
 ConfigContainer.RS.Heartbeat:Connect(function()
     if ConfigContainer.SA.AP then
