@@ -656,8 +656,8 @@ LoopKillSec:AddToggle({
                              if hum.Health > 0 then
                                 local targetRoot = p.Character.HumanoidRootPart
                                 local startTime = tick()
-                                -- Try to kill this player for up to 1 seconds
-                                while tick() - startTime < 1 and killAllEnabled and p.Character and p.Character:FindFirstChild("Humanoid") and p.Character.Humanoid.Health > 0 do
+                                -- Try to kill this player for up to 3 seconds (Extended)
+                                while tick() - startTime < 3 and killAllEnabled and p.Character and p.Character:FindFirstChild("Humanoid") and p.Character.Humanoid.Health > 0 do
                                     if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then break end
                                     
                                     local myRoot = LocalPlayer.Character.HumanoidRootPart
@@ -681,27 +681,25 @@ LoopKillSec:AddToggle({
                                     SNOWship(targetRoot)
                                     
                                     if CheckNetworkOwnerShipOnPart(targetRoot) then
-                                        pcall(function() 
-                                            if GrabEvents and GrabEvents:FindFirstChild("DestroyGrabLine") then 
-                                                GrabEvents.DestroyGrabLine:FireServer(targetRoot) 
-                                            end 
-                                        end)
-                                        
                                         if not targetRoot:FindFirstChild("SkyVelocity") then
                                             local bv = Instance.new("BodyVelocity")
                                             bv.Name = "SkyVelocity"
                                             bv.Velocity = Vector3.new(0, 100000000000000, 0)
                                             bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
                                             bv.Parent = targetRoot
-                                            DebrisService:AddItem(bv, 1)
+                                            DebrisService:AddItem(bv, 0.5)
                                         end
                                         
                                         hum.BreakJointsOnDeath = false
                                         hum:ChangeState(Enum.HumanoidStateType.Dead)
                                         hum.Jump = true
                                         hum.Sit = false
-                                        -- Move to next player if success
-                                        break
+
+                                        pcall(function() 
+                                            if GrabEvents and GrabEvents:FindFirstChild("DestroyGrabLine") then 
+                                                GrabEvents.DestroyGrabLine:FireServer(targetRoot) 
+                                            end 
+                                        end)
                                     end
                                     RunService.Heartbeat:Wait()
                                 end
