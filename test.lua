@@ -1,4 +1,4 @@
-
+-- 各種サービスを取得
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -670,7 +670,12 @@ BlobmanKickSec:AddButton({
 BlobmanKickSec:AddButton({
     Name = "キックオール",
     Callback = function()
-        -- 必要な関数をローカル定義してエラーを回避
+        -- キックオール.txt のロジックを再現した関数群
+        local Players = game:GetService("Players")
+        local ReplicatedStorage = game:GetService("ReplicatedStorage")
+        local LocalPlayer = Players.LocalPlayer
+        local Workspace = game:GetService("Workspace")
+
         local function GetMyToyFolder()
             return Workspace:FindFirstChild(LocalPlayer.Name .. "SpawnedInToys")
         end
@@ -682,7 +687,19 @@ BlobmanKickSec:AddButton({
         local function IsPlayerProtected(player)
             if player == LocalPlayer then return true end
             if player:IsFriendsWith(LocalPlayer.UserId) then return true end
+            -- 必要ならここにホワイトリスト判定を追加
             return false
+        end
+
+        local function SetNetworkOwner(part)
+            if not part then return end
+            local myRoot = GetMyRoot()
+            -- キックオール.txt同様、第2引数に自分のHRPのCFrameを渡す
+            if myRoot and ReplicatedStorage:FindFirstChild("GrabEvents") then
+                pcall(function()
+                    ReplicatedStorage.GrabEvents.SetNetworkOwner:FireServer(part, myRoot.CFrame)
+                end)
+            end
         end
 
         local function AnchorBlobman(blob, state)
@@ -692,27 +709,46 @@ BlobmanKickSec:AddButton({
             end
         end
 
-        local function SetNetworkOwnerFunc(part)
-            if GrabEvents and GrabEvents:FindFirstChild("SetNetworkOwner") then
-                pcall(function() GrabEvents.SetNetworkOwner:FireServer(part, part.CFrame) end)
+        local function GrabPlayer(blob, targetPlayer)
+            if not blob or not targetPlayer or not targetPlayer.Character then return end
+            if IsPlayerProtected(targetPlayer) then return end
+            
+            local targetRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+            local scriptObj = blob:FindFirstChild("BlobmanSeatAndOwnerScript")
+            local grabEvent = scriptObj and scriptObj:FindFirstChild("CreatureGrab")
+            local leftDetector = blob:FindFirstChild("LeftDetector")
+            local leftWeld = leftDetector and (leftDetector:FindFirstChild("LeftWeld") or leftDetector:FindFirstChild("RigidConstraint"))
+
+            if targetRoot and grabEvent and leftDetector and leftWeld then
+                pcall(function()
+                    grabEvent:FireServer(leftDetector, targetRoot, leftWeld)
+                end)
             end
         end
 
-        local function Grab3Times(blob, player)
-            if not blob or not player or not player.Character then return end
-            local root = player.Character:FindFirstChild("HumanoidRootPart")
-            if not root then return end
+        local function Grab3Times(blob, targetPlayer)
+            if not blob or not targetPlayer or not targetPlayer.Character then return end
+            if IsPlayerProtected(targetPlayer) then return end
             
+            local targetRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if not targetRoot then return end
+
+            -- キックオール.txtに倣い、所有権取得を連打
+            for i = 1, 50 do
+                SetNetworkOwner(targetRoot)
+            end
+
             local scriptObj = blob:FindFirstChild("BlobmanSeatAndOwnerScript")
-            local grabRemote = scriptObj and scriptObj:FindFirstChild("CreatureGrab")
+            local grabEvent = scriptObj and scriptObj:FindFirstChild("CreatureGrab")
+            local leftDetector = blob:FindFirstChild("LeftDetector")
+            local leftWeld = leftDetector and (leftDetector:FindFirstChild("LeftWeld") or leftDetector:FindFirstChild("RigidConstraint"))
             
-            -- 左右どちらかのDetectorを使用
-            local det = blob:FindFirstChild("LeftDetector") or blob:FindFirstChild("RightDetector")
-            local weld = det and (det:FindFirstChild("LeftWeld") or det:FindFirstChild("RightWeld") or det:FindFirstChild("RigidConstraint"))
-            
-            if grabRemote and det and weld then
+            -- BlobmanGrab
+            if grabEvent and leftDetector and leftWeld then
                 for i = 1, 3 do
-                    pcall(function() grabRemote:FireServer(det, root, weld) end)
+                    pcall(function()
+                        grabEvent:FireServer(leftDetector, targetRoot, leftWeld)
+                    end)
                     task.wait(0.02)
                 end
             end
@@ -720,59 +756,41 @@ BlobmanKickSec:AddButton({
 
         local function TeleportAllToCircleInstant(center, radius)
             local count = 0
-            local angle = 0
-            local players = Players:GetPlayers()
-            local step = (math.pi * 2) / math.max(1, #players)
-            
-            for _, p in ipairs(players) do
-                if p ~= LocalPlayer and not IsPlayerProtected(p) and p.Character then
-                    local root = p.Character:FindFirstChild("HumanoidRootPart")
-                    if root then
-                        local x = math.cos(angle) * radius
-                        local z = math.sin(angle) * radius
-                        pcall(function()
-                            root.CFrame = CFrame.new(center + Vector3.new(x, 0, z))
-                            root.AssemblyLinearVelocity = Vector3.zero
-                        end)
-                        angle = angle + step
-                        count = count + 1
-                    end
+            local validPlayers = {}
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p ~= LocalPlayer and not IsPlayerProtected(p) and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                    table.insert(validPlayers, p)
                 end
+            end
+
+            local angleStep = (math.pi * 2) / math.max(1, #validPlayers)
+            for i, p in ipairs(validPlayers) do
+                local root = p.Character.HumanoidRootPart
+                local angle = (i - 1) * angleStep
+                local pos = center + Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
+                
+                for j = 1, 20 do SetNetworkOwner(root) end
+                
+                pcall(function()
+                    root.CFrame = CFrame.new(pos)
+                    root.AssemblyLinearVelocity = Vector3.zero
+                end)
+                count = count + 1
             end
             return count
         end
 
         local function MassGrab20(blob)
-            if not blob then return end
-            local scriptObj = blob:FindFirstChild("BlobmanSeatAndOwnerScript")
-            local grabRemote = scriptObj and scriptObj:FindFirstChild("CreatureGrab")
-            local det = blob:FindFirstChild("LeftDetector") or blob:FindFirstChild("RightDetector")
-            local weld = det and (det:FindFirstChild("LeftWeld") or det:FindFirstChild("RightWeld") or det:FindFirstChild("RigidConstraint"))
-            
-            if not grabRemote or not det or not weld then return end
-
             for i = 1, 20 do
                 for _, p in ipairs(Players:GetPlayers()) do
-                    if p ~= LocalPlayer and not IsPlayerProtected(p) and p.Character then
-                        local root = p.Character:FindFirstChild("HumanoidRootPart")
-                        if root and (root.Position - blob.PrimaryPart.Position).Magnitude < 50 then
-                             pcall(function() grabRemote:FireServer(det, root, weld) end)
-                        end
-                    end
+                    GrabPlayer(blob, p)
                 end
-                task.wait(0.05)
+                task.wait(0.02)
             end
         end
 
-        -- メイン処理
+        -- メイン処理実行
         local currentBlob = nil
-        
-        local protectedCount = 0
-        for _, player in ipairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer and IsPlayerProtected(player) then
-                protectedCount = protectedCount + 1
-            end
-        end
         
         local character = LocalPlayer.Character
         if character then
@@ -788,7 +806,9 @@ BlobmanKickSec:AddButton({
         task.wait(0.5)
         
         local folder = GetMyToyFolder()
-        currentBlob = folder and folder:FindFirstChild("CreatureBlobman")
+        if folder then
+            currentBlob = folder:FindFirstChild("CreatureBlobman")
+        end
         
         if currentBlob then
             local vehicleSeat = currentBlob:FindFirstChild("VehicleSeat")
@@ -802,7 +822,6 @@ BlobmanKickSec:AddButton({
             OrionLib:MakeNotification({Name = "エラー", Content = "Blobmanが見つかりません", Time = 3})
             return
         end
-
         task.wait(0.3)
         
         local myRoot = GetMyRoot()
@@ -823,8 +842,8 @@ BlobmanKickSec:AddButton({
             if player ~= LocalPlayer and not IsPlayerProtected(player) and player.Character then
                 local targetRoot = player.Character:FindFirstChild("HumanoidRootPart")
                 if targetRoot then
-                    for i = 1, 5 do
-                        SetNetworkOwnerFunc(targetRoot)
+                    for i = 1, 50 do
+                        SetNetworkOwner(targetRoot)
                     end
                 end
             end
@@ -851,7 +870,7 @@ BlobmanKickSec:AddButton({
         
         OrionLib:MakeNotification({
             Name = "完了",
-            Content = string.format("対象: %d人\n保護対象: %d人", teleportedCount, protectedCount),
+            Content = string.format("対象: %d人", teleportedCount),
             Image = "rbxassetid://4483345998",
             Time = 4
         })
