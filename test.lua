@@ -48,9 +48,6 @@ local perspectiveGrabEnabled = false
 local perspectiveSpeed = 50
 local crazyLineEnabled = false
 local invisibleLineEnabled = false
-local furtherExtendEnabled = false
-local pcDistance = 0
-local increaseLineExtend = 3
 
 local lastGrabbedPart = nil
 local noclipOriginalCollisions = {}
@@ -540,29 +537,6 @@ UIElements.PerspectiveSpeedSlider = PerspectiveGrabSec:AddSlider({
 	Callback = function(v) perspectiveSpeed = v end    
 })
 
-local FurtherExtendSec = GrabTab:AddSection({ Name = "Line Extender" })
-
-UIElements.FurtherExtendToggle = FurtherExtendSec:AddToggle({
-    Name = "Further Extend (距離調整)",
-    Default = false,
-    Callback = function(v)
-        furtherExtendEnabled = v
-    end
-})
-
-UIElements.IncreaseExtendSlider = FurtherExtendSec:AddSlider({
-    Name = "Increase Extend Amount (調整量)",
-    Min = 1,
-    Max = 25,
-    Default = 3,
-    Color = Color3.fromRGB(255, 255, 255),
-    Increment = 1,
-    ValueName = "Amount",
-    Callback = function(v)
-        increaseLineExtend = v
-    end
-})
-
 -- --- アクションタブ (UI構築をここに移動) ---
 local BlobmanKickSec = ActionTab:AddSection({ Name = "Actions" })
 
@@ -690,6 +664,109 @@ BlobmanKickSec:AddButton({
                 OrionLib:MakeNotification({ Name = "エラー", Content = "Blobmanが見つかりません", Time = 3 })
             end
         end
+    end
+})
+
+BlobmanKickSec:AddButton({
+    Name = "Kick All (Blobman)",
+    Callback = function()
+        task.spawn(function()
+            local folder = Workspace:FindFirstChild(LocalPlayer.Name .. "SpawnedInToys")
+            local blob = folder and folder:FindFirstChild("CreatureBlobman")
+            
+            -- Spawn if missing
+            if not blob then
+                local mt = ReplicatedStorage:FindFirstChild("MenuToys")
+                local st = mt and mt:FindFirstChild("SpawnToyRemoteFunction")
+                local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                if st and myRoot then
+                    st:InvokeServer("CreatureBlobman", myRoot.CFrame * CFrame.new(0, 5, 0), Vector3.new(0, 0, 0))
+                    task.wait(0.5)
+                    folder = Workspace:FindFirstChild(LocalPlayer.Name .. "SpawnedInToys")
+                    blob = folder and folder:FindFirstChild("CreatureBlobman")
+                end
+            end
+            
+            if not blob then
+                OrionLib:MakeNotification({ Name = "Error", Content = "Blobman not found", Time = 3 })
+                return
+            end
+            
+            -- Sit
+            local seat = blob:FindFirstChild("VehicleSeat")
+            local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid")
+            if seat and hum then
+                if seat.Occupant ~= hum then
+                    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                        LocalPlayer.Character.HumanoidRootPart.CFrame = seat.CFrame + Vector3.new(0, 2, 0)
+                    end
+                    seat:Sit(hum)
+                    task.wait(0.3)
+                end
+            end
+            
+            local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if not myRoot then return end
+            
+            -- Helper for protection
+            local function isProtected(p)
+                if p == LocalPlayer then return true end
+                if LocalPlayer:IsFriendsWith(p.UserId) then return true end
+                local pi = Workspace:FindFirstChild("PlotItems")
+                local pip = pi and pi:FindFirstChild("PlayersInPlots")
+                if pip and pip:FindFirstChild(p.Name) then return true end
+                return false
+            end
+            
+            -- Main Loop
+            for _, player in ipairs(Players:GetPlayers()) do
+                if not isProtected(player) and player.Character then
+                    local tRoot = player.Character:FindFirstChild("HumanoidRootPart")
+                    if tRoot then
+                        myRoot.CFrame = tRoot.CFrame
+                        task.wait(0.15)
+                        
+                        -- Grab3Times Logic (Reference: キックオール.txt)
+                        local scr = blob:FindFirstChild("BlobmanSeatAndOwnerScript")
+                        local grab = scr and scr:FindFirstChild("CreatureGrab")
+                        local drop = scr and scr:FindFirstChild("CreatureDrop")
+                        local rel = scr and scr:FindFirstChild("CreatureRelease")
+                        
+                        local lDet = blob:FindFirstChild("LeftDetector")
+                        local lWeld = lDet and lDet:FindFirstChild("LeftWeld")
+                        local rDet = blob:FindFirstChild("RightDetector")
+                        local rWeld = rDet and rDet:FindFirstChild("RightWeld")
+                        local rootAtt = myRoot:FindFirstChild("RootAttachment")
+                        
+                        if grab and drop and lDet and lWeld and rWeld and rootAtt then
+                            -- Network Owner Spam
+                            if GrabEvents and GrabEvents:FindFirstChild("SetNetworkOwner") then
+                                for i = 1, 10 do
+                                    GrabEvents.SetNetworkOwner:FireServer(tRoot, tRoot.CFrame)
+                                end
+                            end
+                            
+                            for i = 1, 3 do
+                                pcall(function()
+                                    grab:FireServer(lDet, tRoot, lWeld)
+                                    drop:FireServer(lWeld, rootAtt)
+                                    if rel then rel:FireServer(rWeld) end
+                                end)
+                            end
+                        end
+                    end
+                end
+            end
+            
+            -- Finish
+            myRoot.CFrame = CFrame.new(0, 100, 0)
+            if blob then
+                for _, v in ipairs(blob:GetDescendants()) do
+                    if v:IsA("BasePart") then v.Anchored = false end
+                end
+            end
+            OrionLib:MakeNotification({ Name = "Success", Content = "Kick All Completed", Time = 3 })
+        end)
     end
 })
 
@@ -886,6 +963,11 @@ local function onAnchorAction(actionName, inputState, inputObject)
 
             OrionLib:MakeNotification({
                 Name = "Anchor",
+
+
+
+
+
                 Content = targetToProcess.Name .. (newAnchorState and " [固定]" or " [解除]"),
                 Time = 1
             })
@@ -1726,73 +1808,6 @@ BringAllSec:AddToggle({
         BringAllConfig.BringPlot = v
     end
 })
-
--- Further Extend Logic (Bliz)
-UserInputService.InputChanged:Connect(function(inputObject, gameProcessed)
-    if furtherExtendEnabled and inputObject.UserInputType == Enum.UserInputType.MouseWheel then
-        if pcDistance < 11 then
-            pcDistance = 11
-        end
-        if inputObject.Position.Z < 0 then
-            pcDistance = pcDistance - increaseLineExtend
-        elseif inputObject.Position.Z > 0 then
-            pcDistance = pcDistance + increaseLineExtend
-        end
-    end
-end)
-
-Workspace.ChildAdded:Connect(function(child)
-    if furtherExtendEnabled and child.Name == "GrabParts" and child:IsA("Model") then
-        local grabPart = child:WaitForChild("GrabPart", 5)
-        local dragPart = child:WaitForChild("DragPart", 5)
-        
-        if grabPart and dragPart then
-            local dragPartClone = dragPart:Clone()
-            dragPartClone.Name = "DragPart1"
-            dragPartClone.Transparency = 1
-            dragPartClone.Parent = child
-            
-            -- クローン側のコンストレイントを無効化（干渉防止）
-            for _, v in pairs(dragPartClone:GetChildren()) do
-                if v:IsA("AlignPosition") or v:IsA("AlignOrientation") then
-                    v.Enabled = false
-                end
-            end
-            
-            pcDistance = (dragPartClone.Position - Camera.CFrame.Position).Magnitude
-            if pcDistance < 11 then pcDistance = 11 end
-            
-            -- オリジナルのDragPartの影響をローカルで無効化
-            if dragPart:FindFirstChild("AlignPosition") then dragPart.AlignPosition.Enabled = false end
-            if dragPart:FindFirstChild("AlignOrientation") then dragPart.AlignOrientation.Enabled = false end
-            
-            -- GrabPart（掴み判定パーツ）の接続先をクローンに変更
-            if grabPart:FindFirstChild("AlignPosition") and dragPartClone:FindFirstChild("DragAttach") then
-                 grabPart.AlignPosition.Attachment1 = dragPartClone.DragAttach
-            end
-            if grabPart:FindFirstChild("AlignOrientation") and dragPartClone:FindFirstChild("DragAttach") then
-                 grabPart.AlignOrientation.Attachment1 = dragPartClone.DragAttach
-            end
-
-            task.spawn(function()
-                while child.Parent do
-                    dragPartClone.Position = Camera.CFrame.Position + Camera.CFrame.LookVector * pcDistance
-                    -- 所有権を継続的に主張して位置ズレを防ぐ
-                    local weld = grabPart:FindFirstChildOfClass("WeldConstraint")
-                    if weld and weld.Part1 then
-                        pcall(function()
-                            if GrabEvents and GrabEvents:FindFirstChild("SetNetworkOwner") then
-                                GrabEvents.SetNetworkOwner:FireServer(weld.Part1, weld.Part1.CFrame)
-                            end
-                        end)
-                    end
-                    task.wait()
-                end
-                pcDistance = 0
-            end)
-        end
-    end
-end)
 
 -- 起動完了通知
 OrionLib:MakeNotification({
