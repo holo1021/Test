@@ -668,105 +668,99 @@ BlobmanKickSec:AddButton({
 })
 
 BlobmanKickSec:AddButton({
-    Name = "Kick All (Blobman)",
+    Name = "キックオール",
     Callback = function()
-        task.spawn(function()
-            local folder = Workspace:FindFirstChild(LocalPlayer.Name .. "SpawnedInToys")
-            local blob = folder and folder:FindFirstChild("CreatureBlobman")
-            
-            -- Spawn if missing
-            if not blob then
-                local mt = ReplicatedStorage:FindFirstChild("MenuToys")
-                local st = mt and mt:FindFirstChild("SpawnToyRemoteFunction")
-                local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                if st and myRoot then
-                    st:InvokeServer("CreatureBlobman", myRoot.CFrame * CFrame.new(0, 5, 0), Vector3.new(0, 0, 0))
-                    task.wait(0.5)
-                    folder = Workspace:FindFirstChild(LocalPlayer.Name .. "SpawnedInToys")
-                    blob = folder and folder:FindFirstChild("CreatureBlobman")
+        grabbedPlayers = {}
+        currentBlob = nil
+        local totalPlayers = 0
+        
+        local protectedCount = 0
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and IsPlayerProtected(player) then
+                protectedCount = protectedCount + 1
+            end
+        end
+
+        
+        local character = LocalPlayer.Character
+        if character then
+            local rootPart = character:FindFirstChild("HumanoidRootPart")
+            if rootPart then
+                local spawnPos = rootPart.CFrame * CFrame.new(0, 0, -5)
+                ReplicatedStorage.MenuToys.SpawnToyRemoteFunction:InvokeServer(table.unpack({
+                    [1] = "CreatureBlobman",
+                    [2] = spawnPos,
+                    [3] = Vector3.new(0, 127, 0),
+                }))
+            end
+        end
+        task.wait(0.5)
+        
+        local folder = GetMyToyFolder()
+        currentBlob = folder and folder:FindFirstChild("CreatureBlobman")
+        
+        if currentBlob then
+            local vehicleSeat = currentBlob:FindFirstChild("VehicleSeat")
+            if vehicleSeat then
+                local humanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+                if humanoid then
+                    vehicleSeat:Sit(humanoid)
                 end
             end
-            
-            if not blob then
-                OrionLib:MakeNotification({ Name = "Error", Content = "Blobman not found", Time = 3 })
-                return
-            end
-            
-            -- Sit
-            local seat = blob:FindFirstChild("VehicleSeat")
-            local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid")
-            if seat and hum then
-                if seat.Occupant ~= hum then
-                    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                        LocalPlayer.Character.HumanoidRootPart.CFrame = seat.CFrame + Vector3.new(0, 2, 0)
-                    end
-                    seat:Sit(hum)
-                    task.wait(0.3)
-                end
-            end
-            
-            local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-            if not myRoot then return end
-            
-            -- Helper for protection
-            local function isProtected(p)
-                if p == LocalPlayer then return true end
-                if LocalPlayer:IsFriendsWith(p.UserId) then return true end
-                local pi = Workspace:FindFirstChild("PlotItems")
-                local pip = pi and pi:FindFirstChild("PlayersInPlots")
-                if pip and pip:FindFirstChild(p.Name) then return true end
-                return false
-            end
-            
-            -- Main Loop
+        end
+        task.wait(0.3)
+        
+        local myRoot = GetMyRoot()
+        if myRoot and currentBlob then
             for _, player in ipairs(Players:GetPlayers()) do
-                if not isProtected(player) and player.Character then
-                    local tRoot = player.Character:FindFirstChild("HumanoidRootPart")
-                    if tRoot then
-                        myRoot.CFrame = tRoot.CFrame
+                if player ~= LocalPlayer and not IsPlayerProtected(player) and player.Character then
+                    totalPlayers = totalPlayers + 1
+                    local targetRoot = player.Character:FindFirstChild("HumanoidRootPart")
+                    if targetRoot then
+                        myRoot.CFrame = targetRoot.CFrame
                         task.wait(0.15)
-                        
-                        -- Grab3Times Logic (Reference: キックオール.txt)
-                        local scr = blob:FindFirstChild("BlobmanSeatAndOwnerScript")
-                        local grab = scr and scr:FindFirstChild("CreatureGrab")
-                        local drop = scr and scr:FindFirstChild("CreatureDrop")
-                        local rel = scr and scr:FindFirstChild("CreatureRelease")
-                        
-                        local lDet = blob:FindFirstChild("LeftDetector")
-                        local lWeld = lDet and lDet:FindFirstChild("LeftWeld")
-                        local rDet = blob:FindFirstChild("RightDetector")
-                        local rWeld = rDet and rDet:FindFirstChild("RightWeld")
-                        local rootAtt = myRoot:FindFirstChild("RootAttachment")
-                        
-                        if grab and drop and lDet and lWeld and rWeld and rootAtt then
-                            -- Network Owner Spam
-                            if GrabEvents and GrabEvents:FindFirstChild("SetNetworkOwner") then
-                                for i = 1, 10 do
-                                    GrabEvents.SetNetworkOwner:FireServer(tRoot, tRoot.CFrame)
-                                end
-                            end
-                            
-                            for i = 1, 3 do
-                                pcall(function()
-                                    grab:FireServer(lDet, tRoot, lWeld)
-                                    drop:FireServer(lWeld, rootAtt)
-                                    if rel then rel:FireServer(rWeld) end
-                                end)
-                            end
-                        end
+                        Grab3Times(currentBlob, player)
                     end
                 end
             end
-            
-            -- Finish
-            myRoot.CFrame = CFrame.new(0, 100, 0)
-            if blob then
-                for _, v in ipairs(blob:GetDescendants()) do
-                    if v:IsA("BasePart") then v.Anchored = false end
+        end
+        
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and not IsPlayerProtected(player) and player.Character then
+                local targetRoot = player.Character:FindFirstChild("HumanoidRootPart")
+                if targetRoot then
+                    for i = 1, 50 do
+                        SetNetworkOwner(targetRoot)
+                    end
                 end
             end
-            OrionLib:MakeNotification({ Name = "Success", Content = "Kick All Completed", Time = 3 })
-        end)
+        end
+        
+        if myRoot then
+            myRoot.CFrame = CFrame.new(0, 70, 0)
+            task.wait(0.2)
+        end
+        
+        if currentBlob then
+            AnchorBlobman(currentBlob, true)
+        end
+        
+        local center = Vector3.new(0, 70, 0)
+        local teleportedCount = TeleportAllToCircleInstant(center, 15)
+        
+        local grabbedCount = MassGrab20(currentBlob)
+        
+        task.wait(0.5)
+        if currentBlob then
+            AnchorBlobman(currentBlob, false)
+        end
+        
+        OrionLib:MakeNotification({
+            Name = "完了",
+            Content = string.format("対象: %d人\n保護対象: %d人\nGrab20回完了", teleportedCount, protectedCount),
+            Image = "rbxassetid://4483345998",
+            Time = 4
+        })
     end
 })
 
