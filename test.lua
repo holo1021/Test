@@ -1,38 +1,57 @@
--- 常時ブロック版（テスト用）
-local repStorage = game:GetService("ReplicatedStorage")
-local chatEvent = repStorage:FindFirstChild("DefaultChatSystemChatEvents")
-if chatEvent then
-    chatEvent = chatEvent:FindFirstChild("SayMessageRequest")
-end
-if chatEvent then
-    local original = chatEvent.FireServer
-    chatEvent.FireServer = function(...)
-        print("ブロックされました")  -- コンソールに表示されるか確認
-        return
+-- TextChatService 完全ブロック (UI無し・常時ON版)
+local TextChatService = game:GetService("TextChatService")
+local Players = game:GetService("Players")
+local player = Players.LocalPlayer
+
+-- チャンネル取得
+local textChannels = TextChatService:FindFirstChild("TextChannels")
+local rbxGeneral = textChannels and textChannels:FindFirstChild("RBXGeneral")
+if rbxGeneral then
+    local originalSend = rbxGeneral.SendAsync
+    rbxGeneral.SendAsync = function(self, message, ...)
+        print("ブロック: " .. tostring(message))  -- コンソール確認用
+        return  -- 一切送信しない
     end
-    print("SayMessageRequest をブロック中")
+    print("RBXGeneral.SendAsync をフックしました")
 else
-    print("SayMessageRequest が見つかりません")
+    print("RBXGeneral チャンネルが見つかりません")
 end
 
--- 新チャット対応
-local textChatService = game:GetService("TextChatService")
-local player = game:GetService("Players").LocalPlayer
-local function disableNewChat()
-    for _, source in ipairs(textChatService:GetDescendants()) do
+-- TextSource の CanSend を false にし、リセットされても監視する
+local mySource = nil
+local function findAndSet()
+    for _, source in ipairs(TextChatService:GetDescendants()) do
         if source:IsA("TextSource") and source.UserId == player.UserId then
-            source.CanSend = false
-            print("TextSource.CanSend = false に設定")
+            if mySource ~= source then
+                mySource = source
+                source.CanSend = false
+                print("TextSource を false に設定")
+                -- プロパティ変更を監視して、trueに戻されたら再びfalseに
+                local conn
+                conn = source:GetPropertyChangedSignal("CanSend"):Connect(function()
+                    if source.CanSend == true then
+                        source.CanSend = false
+                        print("CanSend が true に戻されたので再ブロック")
+                    end
+                end)
+                -- ソースが削除されたら監視解除（任意）
+                source.AncestryChanged:Connect(function()
+                    if not source.Parent then
+                        conn:Disconnect()
+                        mySource = nil
+                    end
+                end)
+            end
             return true
         end
     end
     return false
 end
-if not disableNewChat() then
-    textChatService.DescendantAdded:Connect(function(desc)
+
+if not findAndSet() then
+    TextChatService.DescendantAdded:Connect(function(desc)
         if desc:IsA("TextSource") and desc.UserId == player.UserId then
-            desc.CanSend = false
-            print("TextSource が追加されました → CanSend = false")
+            findAndSet()
         end
     end)
 end
