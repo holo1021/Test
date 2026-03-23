@@ -1,4 +1,4 @@
--- 各種サービスを取得
+-- 各種
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -1405,9 +1405,10 @@ local keyboardTargetName = ""
 local TeleportSec = KeyboardTab:AddSection({ Name = "Teleport" })
 
 local function PerformTeleport()
-    local mouse = LocalPlayer:GetMouse()
-    if mouse.Hit then
-        local char = LocalPlayer.Character
+   local mouse = LocalPlayer:GetMouse()
+   local char = LocalPlayer.Character
+   
+    if mouse and mouse.Hit and char and char:FindFirstChild("HumanoidRootPart") then
         if char and char:FindFirstChild("HumanoidRootPart") then
             -- マウスの位置の少し上にテレポート
             char.HumanoidRootPart.CFrame = CFrame.new(mouse.Hit.Position + Vector3.new(0, 5, 0))
@@ -1464,6 +1465,10 @@ TeleportSec:AddToggle({
         end
     end
 })
+
+
+
+
 
 -- 2. Anchor Objects Section
 local AnchorSec = KeyboardTab:AddSection({ Name = "Anchor Objects" })
