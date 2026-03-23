@@ -1,4 +1,4 @@
--- 各種サービスを取得
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -1404,18 +1404,42 @@ local keyboardTargetName = ""
 -- 1. Teleport Section
 local TeleportSec = KeyboardTab:AddSection({ Name = "Teleport" })
 
-local function onTeleportAction(actionName, inputState, inputObject)
-    if inputState == Enum.UserInputState.Begin then
-        local mouse = LocalPlayer:GetMouse()
-        if mouse.Hit then
-            local char = LocalPlayer.Character
-            if char and char:FindFirstChild("HumanoidRootPart") then
-                -- マウスの位置の少し上にテレポート
-                char.HumanoidRootPart.CFrame = CFrame.new(mouse.Hit.Position + Vector3.new(0, 5, 0))
-            end
+local function PerformTeleport()
+    local mouse = LocalPlayer:GetMouse()
+    if mouse.Hit then
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            -- マウスの位置の少し上にテレポート
+            char.HumanoidRootPart.CFrame = CFrame.new(mouse.Hit.Position + Vector3.new(0, 5, 0))
         end
     end
 end
+
+local function onTeleportAction(actionName, inputState, inputObject)
+    if inputState == Enum.UserInputState.Begin then
+        PerformTeleport()
+    end
+end
+
+-- Mobile Teleport Button (Bliz Style)
+local TeleportBtn = Instance.new("ImageButton")
+TeleportBtn.Name = "TeleportButton"
+TeleportBtn.Size = UDim2.new(0, 45, 0, 45)
+TeleportBtn.Position = UDim2.new(1, -70, 1, -115)
+TeleportBtn.Image = "rbxassetid://97166444"
+TeleportBtn.ImageColor3 = Color3.fromRGB(142, 142, 142)
+TeleportBtn.BackgroundTransparency = 1
+TeleportBtn.ImageTransparency = 0.2
+TeleportBtn.Visible = false
+TeleportBtn.Parent = gui
+
+local TeleportIcon = Instance.new("ImageLabel")
+TeleportIcon.Size = UDim2.new(0.6, 0, 0.6, 0)
+TeleportIcon.Position = UDim2.new(0.2, 0, 0.2, 0)
+TeleportIcon.BackgroundTransparency = 1
+TeleportIcon.Image = "rbxassetid://10650996837" -- Teleport Icon
+TeleportIcon.Parent = TeleportBtn
+TeleportBtn.MouseButton1Click:Connect(PerformTeleport)
 
 TeleportSec:AddToggle({
     Name = "Teleport (Z)",
@@ -1423,8 +1447,10 @@ TeleportSec:AddToggle({
     Callback = function(v)
         if v then
             ContextActionService:BindAction("TeleportZ", onTeleportAction, false, Enum.KeyCode.Z)
+            if IsMobile() then TeleportBtn.Visible = true end
         else
             ContextActionService:UnbindAction("TeleportZ")
+            TeleportBtn.Visible = false
         end
     end
 })
@@ -1434,8 +1460,7 @@ local AnchorSec = KeyboardTab:AddSection({ Name = "Anchor Objects" })
 
 local AnchoredObjects = {}
 
-local function onAnchorAction(actionName, inputState, inputObject)
-    if inputState == Enum.UserInputState.Begin then
+local function PerformAnchor()
         local targetToProcess = nil
         local partToDrop = nil
         local grabPartsFolder = Workspace:FindFirstChild("GrabParts")
@@ -1593,8 +1618,33 @@ local function onAnchorAction(actionName, inputState, inputObject)
                 DebrisService:AddItem(sb, 0.5)
             end
         end
+end
+
+local function onAnchorAction(actionName, inputState, inputObject)
+    if inputState == Enum.UserInputState.Begin then
+        PerformAnchor()
     end
 end
+
+-- Mobile Anchor Button (Bliz Style)
+local AnchorBtn = Instance.new("ImageButton")
+AnchorBtn.Name = "AnchorButton"
+AnchorBtn.Size = UDim2.new(0, 45, 0, 45)
+AnchorBtn.Position = UDim2.new(1, -70, 1, -163)
+AnchorBtn.Image = "rbxassetid://97166444"
+AnchorBtn.ImageColor3 = Color3.fromRGB(142, 142, 142)
+AnchorBtn.BackgroundTransparency = 1
+AnchorBtn.ImageTransparency = 0.2
+AnchorBtn.Visible = false
+AnchorBtn.Parent = gui
+
+local AnchorIcon = Instance.new("ImageLabel")
+AnchorIcon.Size = UDim2.new(0.55, 0, 0.55, 0)
+AnchorIcon.Position = UDim2.new(0.225, 0, 0.225, 0)
+AnchorIcon.BackgroundTransparency = 1
+AnchorIcon.Image = "rbxassetid://357069505" -- Anchor Icon
+AnchorIcon.Parent = AnchorBtn
+AnchorBtn.MouseButton1Click:Connect(PerformAnchor)
 
 AnchorSec:AddToggle({
     Name = "Anchor (K)",
@@ -1602,8 +1652,10 @@ AnchorSec:AddToggle({
     Callback = function(v)
         if v then
             ContextActionService:BindAction("AnchorK", onAnchorAction, false, Enum.KeyCode.K)
+            if IsMobile() then AnchorBtn.Visible = true end
         else
             ContextActionService:UnbindAction("AnchorK")
+            AnchorBtn.Visible = false
         end
     end
 })
