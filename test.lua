@@ -1,4 +1,4 @@
-
+-- 各種サービスを取得
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -1424,7 +1424,7 @@ end
 -- Mobile Teleport Button (Bliz Style)
 local TeleportBtn = Instance.new("ImageButton")
 TeleportBtn.Name = "TeleportButton"
-TeleportBtn.Size = UDim2.new(0, 45, 0, 45)
+TeleportBtn.Size = UDim2.new(0, 48, 0, 48)
 TeleportBtn.Position = UDim2.new(1, -70, 1, -115)
 TeleportBtn.Image = "rbxassetid://97166444"
 TeleportBtn.ImageColor3 = Color3.fromRGB(142, 142, 142)
@@ -1433,13 +1433,23 @@ TeleportBtn.ImageTransparency = 0.2
 TeleportBtn.Visible = false
 TeleportBtn.Parent = gui
 
+TeleportBtn.MouseButton1Down:Connect(function()
+    TeleportBtn.ImageTransparency = 0
+end)
+
+TeleportBtn.MouseButton1Up:Connect(function()
+    TeleportBtn.ImageTransparency = 0.2
+end)
+
 local TeleportIcon = Instance.new("ImageLabel")
-TeleportIcon.Size = UDim2.new(0.6, 0, 0.6, 0)
-TeleportIcon.Position = UDim2.new(0.2, 0, 0.2, 0)
+TeleportIcon.Size = UDim2.new(0.7, 0, 0.7, 0)
+TeleportIcon.Position = UDim2.new(0.15, 0, 0.15, 0)
 TeleportIcon.BackgroundTransparency = 1
 TeleportIcon.Image = "rbxassetid://10650996837" -- Teleport Icon
 TeleportIcon.Parent = TeleportBtn
+
 TeleportBtn.MouseButton1Click:Connect(PerformTeleport)
+
 
 TeleportSec:AddToggle({
     Name = "Teleport (Z)",
@@ -1629,14 +1639,24 @@ end
 -- Mobile Anchor Button (Bliz Style)
 local AnchorBtn = Instance.new("ImageButton")
 AnchorBtn.Name = "AnchorButton"
-AnchorBtn.Size = UDim2.new(0, 45, 0, 45)
-AnchorBtn.Position = UDim2.new(1, -70, 1, -163)
+AnchorBtn.Size = UDim2.new(0, 48, 0, 48)
+AnchorBtn.Position = UDim2.new(1, -70, 1, -67)
 AnchorBtn.Image = "rbxassetid://97166444"
 AnchorBtn.ImageColor3 = Color3.fromRGB(142, 142, 142)
 AnchorBtn.BackgroundTransparency = 1
 AnchorBtn.ImageTransparency = 0.2
 AnchorBtn.Visible = false
 AnchorBtn.Parent = gui
+
+AnchorBtn.MouseButton1Down:Connect(function()
+    AnchorBtn.ImageTransparency = 0
+end)
+
+AnchorBtn.MouseButton1Up:Connect(function()
+    AnchorBtn.ImageTransparency = 0.2
+end)
+
+
 
 local AnchorIcon = Instance.new("ImageLabel")
 AnchorIcon.Size = UDim2.new(0.55, 0, 0.55, 0)
@@ -1645,6 +1665,7 @@ AnchorIcon.BackgroundTransparency = 1
 AnchorIcon.Image = "rbxassetid://357069505" -- Anchor Icon
 AnchorIcon.Parent = AnchorBtn
 AnchorBtn.MouseButton1Click:Connect(PerformAnchor)
+
 
 AnchorSec:AddToggle({
     Name = "Anchor (K)",
