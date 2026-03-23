@@ -1668,7 +1668,7 @@ end
 local AnchorBtn = Instance.new("ImageButton")
 AnchorBtn.Name = "AnchorButton"
 AnchorBtn.Size = UDim2.new(0, 60, 0, 60)
-AnchorBtn.Position = UDim2.new(1, - 390, 1, - 80)
+AnchorBtn.Position = UDim2.new(1, - 410, 1, - 80)
 AnchorBtn.Image = "rbxassetid://97166444"
 AnchorBtn.ImageColor3 = Color3.fromRGB(142, 142, 142)
 AnchorBtn.BackgroundTransparency = 1
