@@ -1,4 +1,4 @@
--- 各種サービスを取得
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -1437,8 +1437,8 @@ end
 -- Mobile Teleport Button (Bliz Style)
 local TeleportBtn = Instance.new("ImageButton")
 TeleportBtn.Name = "TeleportButton"
-TeleportBtn.Size = UDim2.new(0, 48, 0, 48)
-TeleportBtn.Position = UDim2.new(1, -70, 1, -115)
+TeleportBtn.Size = UDim2.new(0, 45, 0, 45)
+TeleportBtn.Position = UDim2.new(1, - 70, 1, - 259)
 TeleportBtn.Image = "rbxassetid://97166444"
 TeleportBtn.ImageColor3 = Color3.fromRGB(142, 142, 142)
 TeleportBtn.BackgroundTransparency = 1
@@ -1667,7 +1667,7 @@ end
 -- Mobile Anchor Button (Bliz Style)
 local AnchorBtn = Instance.new("ImageButton")
 AnchorBtn.Name = "AnchorButton"
-AnchorBtn.Size = UDim2.new(0, 48, 0, 48)
+AnchorBtn.Size = UDim2.new(0, 45, 0, 45)
 AnchorBtn.Position = UDim2.new(1, -70, 1, -67)
 AnchorBtn.Image = "rbxassetid://97166444"
 AnchorBtn.ImageColor3 = Color3.fromRGB(142, 142, 142)
