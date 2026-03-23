@@ -1,4 +1,4 @@
-
+-- 各種サービスを取得
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -39,53 +39,6 @@ end)
 -- UI要素を管理するテーブル
 local UIElements = {}
 
--- [[ Mobile Support & Shared GUI ]] --
--- モバイル判定と共通GUIを先に定義
-local function IsMobile()
-    if UserInputService.TouchEnabled or LocalPlayer.PlayerGui:FindFirstChild("ContextActionGui") then
-        return true
-    end
-    return false
-end
-
-local MobileGui = Instance.new("ScreenGui")
-MobileGui.ResetOnSpawn = false
-MobileGui.Name = "BlizMobileUI"
-if LocalPlayer.PlayerGui:FindFirstChild("ContextActionGui") then
-    MobileGui.Parent = LocalPlayer.PlayerGui
-else
-    -- 読み込み待ち
-    task.spawn(function()
-        if LocalPlayer.PlayerGui:WaitForChild("ContextActionGui", 10) then
-            MobileGui.Parent = LocalPlayer.PlayerGui
-        else
-            MobileGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
-        end
-    end)
-end
-
--- 共通ボタンスタイル設定関数
-local function createBlizButton(name, position, iconId)
-    local btn = Instance.new("ImageButton")
-    btn.Name = name
-    btn.Size = UDim2.new(0, 45, 0, 45)
-    btn.Position = position
-    btn.Image = "rbxassetid://97166444" -- Bliz Circle Background
-    btn.BackgroundTransparency = 1
-    btn.ImageTransparency = 0.2
-    btn.Visible = false
-    btn.ImageColor3 = Color3.fromRGB(142, 142, 142)
-    btn.Parent = MobileGui
-    
-    local img = Instance.new("ImageLabel")
-    img.Size = UDim2.new(0.65, 0, 0.65, 0)
-    img.Position = UDim2.new(0.175, 0, 0.175, 0)
-    img.Image = iconId
-    img.BackgroundTransparency = 1
-    img.Parent = btn
-    return btn
-end
-
 -- [[ Bliz Line Extender & Mobile Support ]] --
 -- 変数定義 (Bliz初期値準拠)
 local IncreaseLineExtend = 3
@@ -93,8 +46,21 @@ local pcDistance = 0
 local senv = nil
 local minDistance = 3
 
--- Line Extender Buttons (Existing reuse via new helper or manual def to match exact existing structure if preferred, but updating to use MobileGui)
--- 既存コードのスタイルを維持しつつMobileGuiに統合
+-- GUI作成
+local gui = Instance.new("ScreenGui")
+gui.ResetOnSpawn = false
+gui.Name = "LineExtendGUI"
+if LocalPlayer.PlayerGui:FindFirstChild("ContextActionGui") then
+    gui.Parent = LocalPlayer.PlayerGui
+end
+
+local function IsMobile()
+    if LocalPlayer.PlayerGui:FindFirstChild("ContextActionGui") then
+        return true
+    end
+    return false
+end
+
 local imageButton = Instance.new("ImageButton")
 imageButton.Size = UDim2.new(0, 45, 0, 45)
 imageButton.Position = UDim2.new(1, -70, 1, -259)
@@ -103,7 +69,7 @@ imageButton.BackgroundTransparency = 1
 imageButton.ImageTransparency = 0.2
 imageButton.Visible = false
 imageButton.ImageColor3 = Color3.fromRGB(142, 142, 142)
-imageButton.Parent = MobileGui -- Parent updated
+imageButton.Parent = gui
 local imageLabel = Instance.new("ImageLabel")
 imageLabel.Size = UDim2.new(1, 0, 1, 0)
 imageLabel.Image = "rbxassetid://9603831913"
@@ -118,7 +84,7 @@ imageButtonDe.BackgroundTransparency = 1
 imageButtonDe.ImageTransparency = 0.2
 imageButtonDe.Visible = false
 imageButtonDe.ImageColor3 = Color3.fromRGB(142, 142, 142)
-imageButtonDe.Parent = MobileGui -- Parent updated
+imageButtonDe.Parent = gui
 local imageLabelDe = Instance.new("ImageLabel")
 imageLabelDe.Size = UDim2.new(1, 0, 1, 0)
 imageLabelDe.Image = "rbxassetid://9603826756"
@@ -1438,27 +1404,6 @@ local keyboardTargetName = ""
 -- 1. Teleport Section
 local TeleportSec = KeyboardTab:AddSection({ Name = "Teleport" })
 
--- スマホ用テレポートボタン (位置: -163, サイズ45x45)
-local TeleportBtn = createBlizButton("TeleportBtn", UDim2.new(1, -70, 1, -163), "rbxassetid://14539659349") -- Teleport Icon
-
-TeleportBtn.MouseButton1Click:Connect(function()
-    local char = LocalPlayer.Character
-    if char and char:FindFirstChild("HumanoidRootPart") then
-        -- カメラの中心に向かってレイキャスト
-        local params = RaycastParams.new()
-        params.FilterDescendantsInstances = {char}
-        params.FilterType = Enum.RaycastFilterType.Exclude
-        
-        local direction = Camera.CFrame.LookVector * 1000
-        local result = Workspace:Raycast(Camera.CFrame.Position, direction, params)
-        
-        if result then
-            -- ヒット位置の少し上に移動
-            char.HumanoidRootPart.CFrame = CFrame.new(result.Position + Vector3.new(0, 5, 0))
-        end
-    end
-end)
-
 local function onTeleportAction(actionName, inputState, inputObject)
     if inputState == Enum.UserInputState.Begin then
         local mouse = LocalPlayer:GetMouse()
@@ -1478,10 +1423,8 @@ TeleportSec:AddToggle({
     Callback = function(v)
         if v then
             ContextActionService:BindAction("TeleportZ", onTeleportAction, false, Enum.KeyCode.Z)
-            if IsMobile() then TeleportBtn.Visible = true end
         else
             ContextActionService:UnbindAction("TeleportZ")
-            TeleportBtn.Visible = false
         end
     end
 })
@@ -1490,145 +1433,6 @@ TeleportSec:AddToggle({
 local AnchorSec = KeyboardTab:AddSection({ Name = "Anchor Objects" })
 
 local AnchoredObjects = {}
-
--- スマホ用アンカーボタン (位置: -115, サイズ45x45)
-local AnchorBtn = createBlizButton("AnchorBtn", UDim2.new(1, -70, 1, -115), "rbxassetid://6031225816") -- Anchor Icon
-
--- 共通処理関数 (ターゲットを指定して処理)
-local function ProcessAnchor(target)
-    if not target then return end
-    local model = target:FindFirstAncestorOfClass("Model")
-    local targetToProcess = model or target
-    local mainPart = targetToProcess
-    if targetToProcess:IsA("Model") then
-        mainPart = targetToProcess.PrimaryPart or targetToProcess:FindFirstChildWhichIsA("BasePart", true)
-    end
-
-    -- アンカーロジックの実行
-    -- 既存のロジックと合わせるため、IsAnchored属性をトグル
-    local currentAnchorState = targetToProcess:GetAttribute("IsAnchored")
-    local newAnchorState = not currentAnchorState
-    targetToProcess:SetAttribute("IsAnchored", newAnchorState)
-
-    -- 所有権要求
-    if mainPart and GrabEvents and GrabEvents:FindFirstChild("SetNetworkOwner") then
-         task.spawn(function()
-            pcall(function() GrabEvents.SetNetworkOwner:FireServer(mainPart, mainPart.CFrame) end)
-        end)
-    end
-
-    OrionLib:MakeNotification({
-        Name = "Anchor",
-        Content = (newAnchorState and "[Anchored] " or "[Unanchored] ") .. targetToProcess.Name,
-        Time = 1
-    })
-
-    -- Visual & Physics Logic
-    local highlightName = "BlizAnchor"
-    local existing = targetToProcess:FindFirstChild(highlightName)
-    if existing then existing:Destroy() end
-
-    if newAnchorState and mainPart then
-        -- 固定処理 (BodyMovers)
-        local connections = {}
-        local function setupOwnerListener(po)
-            if not po then return end
-            if po.Value ~= LocalPlayer.Name then targetToProcess:SetAttribute("AnchorOwnership", nil) end
-            local conn = po:GetPropertyChangedSignal("Value"):Connect(function()
-                if po.Value ~= LocalPlayer.Name then targetToProcess:SetAttribute("AnchorOwnership", nil) end
-            end)
-            table.insert(connections, conn)
-        end
-        
-        connections[#connections+1] = targetToProcess.DescendantAdded:Connect(function(desc)
-            if desc.Name == "PartOwner" then setupOwnerListener(desc) end
-        end)
-        for _, desc in ipairs(targetToProcess:GetDescendants()) do
-            if desc.Name == "PartOwner" then setupOwnerListener(desc) end
-        end
-        
-        AnchoredObjects[targetToProcess] = {Part = mainPart, Connections = connections}
-        
-        local bp = Instance.new("BodyPosition", mainPart)
-        bp.Name = "BlizAnchorBP"; bp.MaxForce = Vector3.new(math.huge, math.huge, math.huge); bp.P = 40000; bp.D = 950
-        bp.Position = mainPart.Position
-        
-        local bg = Instance.new("BodyGyro", mainPart)
-        bg.Name = "BlizAnchorBG"; bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge); bg.P = 40000; bg.D = 950
-        bg.CFrame = mainPart.CFrame
-        
-        local sb = Instance.new("SelectionBox", targetToProcess)
-        sb.Name = highlightName; sb.Adornee = targetToProcess; sb.Color3 = Color3.fromRGB(0, 255, 255); sb.LineThickness = 0.05
-        
-        task.spawn(function()
-            local initialPos = mainPart.Position
-            while targetToProcess:GetAttribute("IsAnchored") and bp.Parent do
-                bp.Position = initialPos + Vector3.new(0, 0.001, 0)
-                task.wait()
-                bp.Position = initialPos
-            end
-        end)
-    elseif mainPart then
-        -- 解除処理
-        local data = AnchoredObjects[targetToProcess]
-        if data and data.Connections then for _, conn in ipairs(data.Connections) do conn:Disconnect() end end
-        AnchoredObjects[targetToProcess] = nil
-        if mainPart:FindFirstChild("BlizAnchorBP") then mainPart.BlizAnchorBP:Destroy() end
-        if mainPart:FindFirstChild("BlizAnchorBG") then mainPart.BlizAnchorBG:Destroy() end
-        
-        local sb = Instance.new("SelectionBox", targetToProcess)
-        sb.Adornee = targetToProcess; sb.Color3 = Color3.fromRGB(255, 0, 0); sb.LineThickness = 0.05
-        DebrisService:AddItem(sb, 0.5)
-    end
-end
-
-AnchorBtn.MouseButton1Click:Connect(function()
-    -- モバイル用: カメラ中心のオブジェクトを取得
-    local params = RaycastParams.new()
-    params.FilterDescendantsInstances = {LocalPlayer.Character}
-    params.FilterType = Enum.RaycastFilterType.Exclude
-    
-    local direction = Camera.CFrame.LookVector * 1000
-    local result = Workspace:Raycast(Camera.CFrame.Position, direction, params)
-    
-    if result and result.Instance then
-        local target = result.Instance
-        -- アンカー済み属性のチェック用モデル
-        local model = target:FindFirstAncestorOfClass("Model")
-        local checkObj = model or target
-        
-        -- Bliz仕様: 掴んでいない時は、既にIsAnchoredなものだけ操作可能、または新規なら掴み中のみ
-        -- ただしボタン操作の利便性のため、モバイルでは直接アンカーも許可するか、PC版ロジックに準拠するか。
-        -- ここではPC版のonAnchorActionロジックを再利用して整合性を保つ
-        
-        local targetToProcess = nil
-        local grabPartsFolder = Workspace:FindFirstChild("GrabParts")
-        
-        if grabPartsFolder and grabPartsFolder:FindFirstChild("GrabPart") and grabPartsFolder.GrabPart:FindFirstChild("WeldConstraint") then
-            local grabbedPart = grabPartsFolder.GrabPart.WeldConstraint.Part1
-            if grabbedPart then
-                local map = Workspace:FindFirstChild("Map")
-                if not (grabbedPart.Locked or (map and grabbedPart:IsDescendantOf(map))) then
-                     local m = grabbedPart:FindFirstAncestorOfClass("Model")
-                     targetToProcess = m or grabbedPart
-                end
-            end
-        elseif checkObj:GetAttribute("IsAnchored") then
-            targetToProcess = checkObj
-        end
-        
-        if targetToProcess then
-            ProcessAnchor(targetToProcess)
-        else
-            -- モバイルUX向上: 何も掴んでいないが対象が明確ならアンカーを試みる
-            -- (Bliz仕様から少し逸脱するが、タップでアンカーしたい場合のため)
-             local map = Workspace:FindFirstChild("Map")
-             if not (target.Locked or (map and target:IsDescendantOf(map))) then
-                  ProcessAnchor(checkObj)
-             end
-        end
-    end
-end)
 
 local function onAnchorAction(actionName, inputState, inputObject)
     if inputState == Enum.UserInputState.Begin then
@@ -1663,7 +1467,131 @@ local function onAnchorAction(actionName, inputState, inputObject)
         end
 
         if targetToProcess then
-            ProcessAnchor(targetToProcess)
+            -- トグル処理 (属性IsAnchoredを基準にする)
+            local currentAnchorState = targetToProcess:GetAttribute("IsAnchored")
+            local newAnchorState = not currentAnchorState
+            
+            -- 属性を更新
+            targetToProcess:SetAttribute("IsAnchored", newAnchorState)
+
+            -- メインパーツ特定 (BodyMover用)
+            local mainPart = targetToProcess
+            if targetToProcess:IsA("Model") then
+                mainPart = targetToProcess.PrimaryPart or targetToProcess:FindFirstChildWhichIsA("BasePart", true)
+            end
+
+            -- Network Ownership Request (Bliz Logic: Ensure control before anchoring)
+            if mainPart and GrabEvents and GrabEvents:FindFirstChild("SetNetworkOwner") and not partToDrop then
+                task.spawn(function()
+                    pcall(function() GrabEvents.SetNetworkOwner:FireServer(mainPart, mainPart.CFrame) end)
+                end)
+            end
+
+            OrionLib:MakeNotification({
+                Name = "Anchor",
+                Content = (newAnchorState and "[Anchored] " or "[Unanchored] ") .. targetToProcess.Name,
+                Time = 1
+            })
+            -- エフェクト用 (Bliz参考)
+            local highlightName = "BlizAnchor"
+
+            local existing = targetToProcess:FindFirstChild(highlightName)
+            if existing then existing:Destroy() end
+
+            if newAnchorState and mainPart then
+                -- 固定時: BodyMoversで固定 (Fake Anchor - Bliz仕様)
+                local connections = {}
+                
+                -- PartOwnerの監視関数
+                local function setupOwnerListener(po)
+                    if not po then return end
+                    if po.Value ~= LocalPlayer.Name then
+                        targetToProcess:SetAttribute("AnchorOwnership", nil)
+                    end
+                    local conn = po:GetPropertyChangedSignal("Value"):Connect(function()
+                        if po.Value ~= LocalPlayer.Name then
+                            targetToProcess:SetAttribute("AnchorOwnership", nil)
+                        end
+                    end)
+                    table.insert(connections, conn)
+                end
+                
+                connections[#connections+1] = targetToProcess.DescendantAdded:Connect(function(desc)
+                    if desc.Name == "PartOwner" then setupOwnerListener(desc) end
+                end)
+                connections[#connections+1] = targetToProcess.DescendantRemoving:Connect(function(descendant)
+                    if descendant.Name == "PartOwner" then
+                        targetToProcess:SetAttribute("AnchorOwnership", nil)
+                    end
+                end)
+                
+                -- 既存のPartOwnerに対しても監視を設定（ここが重要）
+                for _, desc in ipairs(targetToProcess:GetDescendants()) do
+                    if desc.Name == "PartOwner" then
+                        setupOwnerListener(desc)
+                    end
+                end
+                
+                AnchoredObjects[targetToProcess] = {Part = mainPart, Connections = connections}
+                
+                -- Bliz仕様: BodyPosition (重力落下防止)
+                local bp = mainPart:FindFirstChild("BlizAnchorBP") or Instance.new("BodyPosition")
+                bp.Name = "BlizAnchorBP"
+                bp.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+                bp.P = 40000
+                bp.D = 950 -- Blizの値に合わせる
+                bp.Position = mainPart.Position
+                bp.Parent = mainPart
+
+                local bg = mainPart:FindFirstChild("BlizAnchorBG") or Instance.new("BodyGyro")
+                bg.Name = "BlizAnchorBG"
+                bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+                bg.P = 40000
+                bg.D = 950
+                bg.CFrame = mainPart.CFrame
+                bg.Parent = mainPart
+
+                local sb = mainPart:FindFirstChild(highlightName) or Instance.new("SelectionBox")
+                sb.Name = highlightName
+                sb.Adornee = targetToProcess
+                sb.Parent = targetToProcess
+                sb.Color3 = Color3.fromRGB(0, 255, 255) -- Cyan
+                sb.LineThickness = 0.05
+
+                -- Bliz仕様: 位置を微調整し続けて物理演算を維持する (Jitter Loop)
+                task.spawn(function()
+                    local initialPos = mainPart.Position
+                    while targetToProcess:GetAttribute("IsAnchored") and bp.Parent do
+                        bp.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+                        bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+                        
+                        bp.Position = initialPos + Vector3.new(0, 0.001, 0)
+                        task.wait()
+                        bp.Position = initialPos
+                    end
+                end)
+
+            elseif mainPart then
+                -- 解除時: BodyMoversを削除
+                local data = AnchoredObjects[targetToProcess]
+                if data and data.Connections then
+                    for _, conn in ipairs(data.Connections) do
+                        conn:Disconnect()
+                    end
+                end
+                AnchoredObjects[targetToProcess] = nil
+                local bp = mainPart:FindFirstChild("BlizAnchorBP")
+                if bp then bp:Destroy() end
+                local bg = mainPart:FindFirstChild("BlizAnchorBG")
+                if bg then bg:Destroy() end
+
+                local sb = Instance.new("SelectionBox")
+                sb.Adornee = targetToProcess
+                sb.Parent = targetToProcess
+                sb.Color3 = Color3.fromRGB(255, 0, 0) -- Red
+                sb.LineThickness = 0.05
+                DebrisService:AddItem(sb, 0.5)
+            end
         end
     end
 end
@@ -1674,10 +1602,8 @@ AnchorSec:AddToggle({
     Callback = function(v)
         if v then
             ContextActionService:BindAction("AnchorK", onAnchorAction, false, Enum.KeyCode.K)
-            if IsMobile() then AnchorBtn.Visible = true end
         else
             ContextActionService:UnbindAction("AnchorK")
-            AnchorBtn.Visible = false
         end
     end
 })
