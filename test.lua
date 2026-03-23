@@ -1,355 +1,2861 @@
--- 各種サービスを取得
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
 local DebrisService = game:GetService("Debris")
+local HttpService = game:GetService("HttpService")
+local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ContextActionService = game:GetService("ContextActionService")
 
--- GrabEventsを安全に取得 (タイムアウト付きで待機し、無限ロードを防ぐ)
-local GrabEvents = ReplicatedStorage:WaitForChild("GrabEvents", 5)
-if not GrabEvents then
-    warn("GrabEvents not found. Some features may not work.")
-end
+-- test.luaから持ってきたイベント定義
+local GrabEvents = ReplicatedStorage:WaitForChild("GrabEvents")
+local SetNetworkOwner = GrabEvents:WaitForChild("SetNetworkOwner")
 
 local LocalPlayer = Players.LocalPlayer
-local Camera = game.Workspace.CurrentCamera
+local Camera = Workspace.CurrentCamera
 
--- Orion Lib (HolonHubのUIライブラリ) をロード
-local OrionUrl = "https://raw.githubusercontent.com/hololove1021/HolonHUB/refs/heads/main/source.txt"
-local success, lib = pcall(function()
-    return loadstring(game:HttpGet(OrionUrl))()
-end)
+-- 作者情報の定義
+local AuthorName = "holon_calm"
+local RobloxID = "najayou777"
+local DetailIcon = "rbxassetid://7733964719"
 
-if not success then
-    warn("Failed to load OrionLib: " .. tostring(lib))
-    return -- Stop the script if OrionLib fails to load
-end
-
-local OrionLib = lib
-
--- 既存のUIを強制削除（二重表示防止, holonhub.lua参考）
-pcall(function()
-    if game:GetService("CoreGui"):FindFirstChild("Orion") then 
-        game:GetService("CoreGui").Orion:Destroy() 
-    end
-end)
-
--- UI要素を管理するテーブル
-local UIElements = {}
-
--- [[ Bliz Line Extender & Mobile Support ]] --
--- 変数定義 (Bliz初期値準拠)
-local IncreaseLineExtend = 3
-local pcDistance = 0
-local senv = nil
-local minDistance = 3
-
--- GUI作成
-local gui = Instance.new("ScreenGui")
-gui.ResetOnSpawn = false
-gui.Name = "LineExtendGUI"
-if LocalPlayer.PlayerGui:FindFirstChild("ContextActionGui") then
-    gui.Parent = LocalPlayer.PlayerGui
-end
-
-local function IsMobile()
-    if LocalPlayer.PlayerGui:FindFirstChild("ContextActionGui") then
-        return true
-    end
-    return false
-end
-
-local imageButton = Instance.new("ImageButton")
-imageButton.Size = UDim2.new(0, 45, 0, 45)
-imageButton.Position = UDim2.new(1, -70, 1, -259)
-imageButton.Image = "rbxassetid://97166444"
-imageButton.BackgroundTransparency = 1
-imageButton.ImageTransparency = 0.2
-imageButton.Visible = false
-imageButton.ImageColor3 = Color3.fromRGB(142, 142, 142)
-imageButton.Parent = gui
-local imageLabel = Instance.new("ImageLabel")
-imageLabel.Size = UDim2.new(1, 0, 1, 0)
-imageLabel.Image = "rbxassetid://9603831913"
-imageLabel.BackgroundTransparency = 1
-imageLabel.Parent = imageButton
-
-local imageButtonDe = Instance.new("ImageButton")
-imageButtonDe.Size = UDim2.new(0, 45, 0, 45)
-imageButtonDe.Position = UDim2.new(1, -70, 1, -211)
-imageButtonDe.Image = "rbxassetid://97166444"
-imageButtonDe.BackgroundTransparency = 1
-imageButtonDe.ImageTransparency = 0.2
-imageButtonDe.Visible = false
-imageButtonDe.ImageColor3 = Color3.fromRGB(142, 142, 142)
-imageButtonDe.Parent = gui
-local imageLabelDe = Instance.new("ImageLabel")
-imageLabelDe.Size = UDim2.new(1, 0, 1, 0)
-imageLabelDe.Image = "rbxassetid://9603826756"
-imageLabelDe.BackgroundTransparency = 1
-imageLabelDe.Parent = imageButtonDe
-
-local function updateSenv()
-    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-    local script = char:WaitForChild("GrabbingScript", 10)
-    if script and getsenv then
-        senv = getsenv(script)
-    end
-end
-LocalPlayer.CharacterAdded:Connect(updateSenv)
-task.spawn(updateSenv)
-
-local function buttonClicked()
-    if senv and (senv.distance and _G.FutherExtend) then
-        senv.distance = (senv.distance or 0) + IncreaseLineExtend
-        if senv.distance < minDistance then
-            senv.distance = minDistance
-        end
-    end
-end
-
-local function buttonClickedDE()
-    if senv and (senv.distance and _G.FutherExtend) then
-        senv.distance = (senv.distance or 0) - IncreaseLineExtend
-        if senv.distance < minDistance then
-            senv.distance = minDistance
-        end
-    end
-end
-
-local buttonClickedFlag = false
-local function runButtonLoop(func)
-    while buttonClickedFlag do
-        func()
-        task.wait(0.1)
-    end
-end
-
-imageButton.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch then
-        buttonClickedFlag = true
-        task.spawn(function() runButtonLoop(buttonClicked) end)
-    end
-end)
-imageButton.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch then
-        buttonClickedFlag = false
-    end
-end)
-
-imageButtonDe.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch then
-        buttonClickedFlag = true
-        task.spawn(function() runButtonLoop(buttonClickedDE) end)
-    end
-end)
-imageButtonDe.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.Touch then
-        buttonClickedFlag = false
-    end
-end)
-
--- PC用マウスホイール操作
-UserInputService.InputChanged:Connect(function(inputObject)
-    if inputObject.UserInputType == Enum.UserInputType.MouseWheel then
-        if pcDistance < 11 then
-            pcDistance = 11
-        end
-        if inputObject.Position.Z <= 0 then
-            if inputObject.Position.Z < 0 then
-                pcDistance = pcDistance - IncreaseLineExtend
-            end
-        else
-            pcDistance = pcDistance + IncreaseLineExtend
-        end
-    end
-end)
-
-local function toggleButtonState(visible)
-    if visible and _G.FutherExtend and IsMobile() then
-        imageButton.Visible = true
-        imageButton.Active = true
-        imageButtonDe.Visible = true
-        imageButtonDe.Active = true
-    else
-        imageButton.Visible = false
-        imageButton.Active = false
-        imageButtonDe.Visible = false
-        imageButtonDe.Active = false
-    end
-end
-
-local function toggleDefaultExtendButtons(visible)
-    local CAG = LocalPlayer.PlayerGui:FindFirstChild("ContextActionGui")
-    if CAG then
-        for _, desc in pairs(CAG:GetDescendants()) do
-            if desc:IsA("ImageLabel") and (desc.Image == "rbxassetid://9603826756" or desc.Image == "rbxassetid://9603831913") then
-                desc.Parent.Visible = visible
-            end
-        end
-    end
-end
-
--- BlizのLine Extenderロジックを移植
-Workspace.ChildAdded:Connect(function(child)
-    if child.Name == "GrabParts" and child:IsA("Model") then
-        -- PC用の処理
-        if _G.FutherExtend and not IsMobile() then
-            local grabPartModel = child
-            local dragPart = grabPartModel:WaitForChild("DragPart", 2)
-            if not dragPart then return end
-
-            local dragPartClone = dragPart:Clone()
-            dragPartClone.Name = "DragPart1"
-            dragPartClone.AlignPosition.Attachment1 = dragPartClone.DragAttach
-            dragPartClone.Parent = grabPartModel
-
-            pcDistance = (dragPartClone.Position - Camera.CFrame.Position).Magnitude
-            dragPartClone.AlignOrientation.Enabled = false
-            dragPart.AlignPosition.Enabled = false
-
+-- リンク集を表示する共通関数（認証画面とメイン画面で使い回せます）
+local function AddDetailContent(Tab)
+    Tab:AddButton({
+        Name = "EN version copy and launch",
+        Callback = function()
+            setclipboard("loadstring(game:HttpGet(\"https://raw.githubusercontent.com/hololove1021/HolonHUB/refs/heads/main/language/hub-en.lua\"))()")
             task.spawn(function()
-                while grabPartModel.Parent do
-                    dragPartClone.Position = Camera.CFrame.Position + Camera.CFrame.LookVector * pcDistance
-                    task.wait()
-                end
-                pcDistance = 0
+                loadstring(game:HttpGet("https://raw.githubusercontent.com/hololove1021/HolonHUB/refs/heads/main/language/hub-en.lua"))()
             end)
         end
+    })
 
-        -- モバイル用の処理
-        if _G.FutherExtend and IsMobile() then
-            toggleDefaultExtendButtons(false)
-            toggleButtonState(true)
+    Tab:AddButton({
+        Name = "TikTok",
+        Callback = function()
+            setclipboard("https://www.tiktok.com/@holon_calm")
+            OrionLib:MakeNotification({Name = "リンク", Content = "TikTokのリンクをコピーしました", Time = 3})
+        end
+    })
+    
+    Tab:AddButton({
+        Name = "Discord",
+        Callback = function()
+            setclipboard("https://discord.gg/EHBXqgZZYN")
+            OrionLib:MakeNotification({Name = "リンク", Content = "Discordの招待リンクをコピーしました", Time = 3})
+        end
+    })
+    
+    Tab:AddButton({
+        Name = "YouTube",
+        Callback = function()
+            setclipboard("https://www.youtube.com/@Holoncalm")
+            OrionLib:MakeNotification({Name = "リンク", Content = "YouTubeのリンクをコピーしました", Time = 3})
+        end
+    })
+    Tab:AddLabel("作者: " .. AuthorName)
+    Tab:AddLabel("Roblox ID: " .. RobloxID)
+end
+
+-- BodyMover作成関数
+local function createBodyMovers(part)
+    -- 既存のMoverがあれば削除
+    for _, child in ipairs(part:GetChildren()) do
+        if child:IsA("BodyPosition") or child:IsA("BodyGyro") then
+            child:Destroy()
         end
     end
-end)
 
--- [[ End Bliz Logic ]] --
+    local bodyPosition = Instance.new("BodyPosition")
+    local bodyGyro = Instance.new("BodyGyro")
 
--- 各種変数
-local superStrengthEnabled = false
-local strengthValue = 400
-local deathGrabEnabled = false
-local noclipGrabEnabled = false
-local perspectiveGrabEnabled = false
-local perspectiveSpeed = 50
-local crazyLineEnabled = false
-local invisibleLineEnabled = false
+    bodyPosition.P = 20000
+    bodyPosition.D = 500
+    bodyPosition.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    bodyPosition.Parent = part
 
-local lastGrabbedPart = nil
-local noclipOriginalCollisions = {}
-local auto_back_position = false
-local targetPlayerName = "" -- ターゲットプレイヤー名を保存する変数
+    bodyGyro.P = 3000
+    bodyGyro.D = 100
+    bodyGyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+    bodyGyro.Parent = part
+
+    return bodyPosition, bodyGyro
+end
+
+local function getActiveTargetMain()
+    if targetMainName == "" then return LocalPlayer end
+    -- 名前から「今現在」のプレイヤーを探し直す
+    return Players:FindFirstChild(targetMainName) or LocalPlayer
+end
+
+-- プロット位置を自動取得する関数
+local function getMyPlotCFrame()
+    local plots = Workspace:FindFirstChild("Plots")
+    if not plots then 
+        warn("Holon HUB: Plots folder not found in Workspace")
+        return nil 
+    end
+
+    local myName = LocalPlayer.Name
+
+    for _, plot in ipairs(plots:GetChildren()) do
+        -- 教えていただいた構造: Plot○ -> PlotSign -> ThisPlotsOwners -> Value -> Data -> Value
+        local plotSign = plot:FindFirstChild("PlotSign")
+        local ownerValObj = plotSign and plotSign:FindFirstChild("ThisPlotsOwners")
+        local valueFolder = ownerValObj and ownerValObj:FindFirstChild("Value")
+        local dataObj = valueFolder and valueFolder:FindFirstChild("Data")
+
+        -- StringValue である Data.Value の中身をチェック
+        if dataObj and dataObj:IsA("StringValue") then
+            if dataObj.Value == myName then
+                print("Holon HUB: Plot found! Target:", plot.Name)
+                return plot:GetPivot() -- プロットの中心座標を返す
+            end
+        end
+    end
+    
+    warn("Holon HUB: Your plot was not found.")
+    return nil
+end
+
+-- ■ 1. getMusicKeyboard 関数の修正 (おもちゃリスト同様の探索ロジックに変更)
+local function getMusicKeyboard()
+    local myName = LocalPlayer.Name
+    
+    -- 1. SpawnedInToys から探す
+    local spawnedToys = Workspace:FindFirstChild(myName .. "SpawnedInToys")
+    if spawnedToys then
+        local kb = spawnedToys:FindFirstChild("MusicKeyboard")
+        if kb then return kb end
+    end
+
+    -- 2. Plots から探す
+    local plots = Workspace:FindFirstChild("Plots")
+    local plotItems = Workspace:FindFirstChild("PlotItems")
+
+    if plots and plotItems then
+        for _, plot in ipairs(plots:GetChildren()) do
+            local sign = plot:FindFirstChild("PlotSign")
+            local ownerObj = sign and (sign:FindFirstChild("ThisPlotsOwners") or sign:FindFirstChild("Owner"))
+            if ownerObj then
+                local val = ownerObj:FindFirstChild("Value") or ownerObj
+                local data = val:FindFirstChild("Data") or val
+                if (data:IsA("StringValue") and data.Value == myName) then
+                    -- PlotItemsフォルダ内を検索 (startEffectを参考)
+                    local myPlotItems = plotItems:FindFirstChild(plot.Name)
+                    if myPlotItems then
+                        local kb = myPlotItems:FindFirstChild("MusicKeyboard")
+                        if kb then return kb end
+                    end
+                    -- 念のためBuild内も検索
+                    local build = plot:FindFirstChild("Build")
+                    local kb = build and build:FindFirstChild("MusicKeyboard")
+                    if kb then return kb end
+                end
+            end
+        end
+    end
+
+    -- 3. Workspace全体から所有権のある MusicKeyboard を探す
+    for _, item in ipairs(Workspace:GetChildren()) do
+        if item.Name == "MusicKeyboard" and item:IsA("Model") then
+            local ownerValue = item:FindFirstChild("Owner") or item:FindFirstChild("PartOwner")
+            if ownerValue and ownerValue:IsA("StringValue") and ownerValue.Value == myName then
+                return item
+            end
+        end
+    end
+
+    return nil
+end
+
+-- ピアノ機能用の変数 (関数の前に定義して、関数から見えるようにする)
+local pianoEnabled = false
+local pianoFollowEnabled = true
+local selectedSongFile = nil
+local selectedSongData = nil
+local pianoKeyboard = nil
+local isPlayingSong = false
+local pianoUpdateConnection = nil
+local lastPianoCF = nil
+local pianoOriginalCollisions = {}
+local manualPlayEnabled = false -- 手動演奏UIの状態管理
+
+-- 録音機能用変数
+local isRecording = false
+local recordedNotes = {}
+local recordStartTime = 0
+
+-- ピアノ手動演奏UI
+local pianoUIGui = nil
+local function createPianoUI()
+    if pianoUIGui and pianoUIGui.Parent then return end
+
+    pianoUIGui = Instance.new("ScreenGui")
+    pianoUIGui.Name = "HolonPianoUI"
+    pianoUIGui.Parent = game:GetService("CoreGui")
+    pianoUIGui.Enabled = manualPlayEnabled
+    pianoUIGui.ZIndexBehavior = Enum.ZIndexBehavior.Global
+    pianoUIGui.DisplayOrder = 100 -- 最前面に表示
+    pianoUIGui.ResetOnSpawn = false
+
+    local mainFrame = Instance.new("Frame")
+    mainFrame.AnchorPoint = Vector2.new(0.5, 1)
+    mainFrame.Position = UDim2.new(0.5, 0, 0.95, 0)
+    mainFrame.Size = UDim2.new(0, 500, 0, 140) -- サイズ縮小
+    mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    mainFrame.BackgroundTransparency = 0.3
+    mainFrame.Parent = pianoUIGui
+    
+    -- 閉じるボタン
+    local closeBtn = Instance.new("TextButton", mainFrame)
+    closeBtn.Size = UDim2.new(0, 20, 0, 20)
+    closeBtn.Position = UDim2.new(1, -25, 0, 5)
+    closeBtn.Text = "X"
+    closeBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    closeBtn.TextColor3 = Color3.new(1,1,1)
+    closeBtn.MouseButton1Click:Connect(function()
+        stopSong()
+        manualPlayEnabled = false
+        pianoUIGui.Enabled = false
+        if UIElements.PianoManualUIToggle then
+            UIElements.PianoManualUIToggle:Set(false)
+        end
+    end)
+
+    -- 録音・保存UI
+    local recFrame = Instance.new("Frame", mainFrame)
+    recFrame.Size = UDim2.new(1, -40, 0, 25)
+    recFrame.Position = UDim2.new(0, 10, 0, 5)
+    recFrame.BackgroundTransparency = 1
+    
+    local recBtn = Instance.new("TextButton", recFrame)
+    recBtn.Size = UDim2.new(0, 50, 1, 0)
+    recBtn.Text = "録音"
+    recBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+    recBtn.TextColor3 = Color3.new(1,1,1)
+    recBtn.MouseButton1Click:Connect(function()
+        isRecording = not isRecording
+        if isRecording then
+            recordedNotes = {}
+            recordStartTime = tick()
+            recBtn.Text = "停止"
+            OrionLib:MakeNotification({Name="録音", Content="録音を開始しました", Time=2})
+        else
+            recBtn.Text = "録音"
+            OrionLib:MakeNotification({Name="録音", Content="録音を停止しました", Time=2})
+        end
+    end)
+    
+    local nameBox = Instance.new("TextBox", recFrame)
+    nameBox.Size = UDim2.new(0, 120, 1, 0)
+    nameBox.Position = UDim2.new(0, 60, 0, 0)
+    nameBox.PlaceholderText = "ファイル名"
+    nameBox.Text = ""
+    nameBox.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+    nameBox.TextColor3 = Color3.new(1,1,1)
+
+    local saveBtn = Instance.new("TextButton", recFrame)
+    saveBtn.Size = UDim2.new(0, 50, 1, 0)
+    saveBtn.Position = UDim2.new(0, 190, 0, 0)
+    saveBtn.Text = "保存"
+    saveBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 50)
+    saveBtn.TextColor3 = Color3.new(1,1,1)
+    saveBtn.MouseButton1Click:Connect(function()
+        if _G.HolonSaveRecording then _G.HolonSaveRecording(nameBox.Text) end
+    end)
+
+    local keysContainer = Instance.new("Frame", mainFrame)
+    keysContainer.Size = UDim2.new(1, 0, 1, -35)
+    keysContainer.Position = UDim2.new(0, 0, 0, 35)
+    keysContainer.BackgroundTransparency = 1
+
+    local whiteKeysFrame = Instance.new("Frame", keysContainer)
+    whiteKeysFrame.Size = UDim2.new(1, 0, 1, 0)
+    whiteKeysFrame.BackgroundTransparency = 1
+    local whiteLayout = Instance.new("UIListLayout", whiteKeysFrame)
+    whiteLayout.FillDirection = Enum.FillDirection.Horizontal
+    whiteLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+    local blackKeysFrame = Instance.new("Frame", keysContainer)
+    blackKeysFrame.Size = UDim2.new(1, 0, 0.6, 0)
+    blackKeysFrame.BackgroundTransparency = 1
+    blackKeysFrame.ZIndex = 2
+
+    local whiteKeys = {
+        "Key1C", "Key1D", "Key1E", "Key1F", "Key1G", "Key1A", "Key1B",
+        "Key2C", "Key2D", "Key2E", "Key2F", "Key2G", "Key2A", "Key2B", "Key3C"
+    }
+    local blackKeys = {
+        ["Key1C"] = "Key1Csharp", ["Key1D"] = "Key1Dsharp",
+        ["Key1F"] = "Key1Fsharp", ["Key1G"] = "Key1Gsharp", ["Key1A"] = "Key1Asharp",
+        ["Key2C"] = "Key2Csharp", ["Key2D"] = "Key2Dsharp",
+        ["Key2F"] = "Key2Fsharp", ["Key2G"] = "Key2Gsharp", ["Key2A"] = "Key2Asharp"
+    }
+
+    local whiteKeyWidth = 1 / #whiteKeys
+    for i, keyName in ipairs(whiteKeys) do
+        local btn = Instance.new("TextButton", whiteKeysFrame)
+        btn.Name = keyName; btn.Size = UDim2.new(whiteKeyWidth, -1, 1, 0); btn.BackgroundColor3 = Color3.new(1, 1, 1); btn.BorderColor3 = Color3.new(0, 0, 0); btn.LayoutOrder = i; btn.Text = ""
+        btn.MouseButton1Click:Connect(function()
+            task.spawn(pressPianoKey, keyName)
+        end)
+        
+        -- キー表示
+        if _G.HolonPianoKeyMapReverse then
+            btn.Text = _G.HolonPianoKeyMapReverse[keyName] or ""
+            btn.TextSize = 14
+            btn.TextColor3 = Color3.new(0,0,0)
+            btn.TextYAlignment = Enum.TextYAlignment.Bottom
+        end
+
+        if blackKeys[keyName] then
+            local blackKeyName = blackKeys[keyName]
+            local blackBtn = Instance.new("TextButton", blackKeysFrame)
+            blackBtn.Name = blackKeyName; blackBtn.AnchorPoint = Vector2.new(0.5, 0); blackBtn.Position = UDim2.new(whiteKeyWidth * i, 0, 0, 0); blackBtn.Size = UDim2.new(whiteKeyWidth * 0.6, 0, 1, 0); blackBtn.BackgroundColor3 = Color3.new(0, 0, 0); blackBtn.BorderColor3 = Color3.new(0.5, 0.5, 0.5); blackBtn.Text = ""; blackBtn.ZIndex = 3
+            blackBtn.MouseButton1Click:Connect(function()
+                task.spawn(pressPianoKey, blackKeyName)
+            end)
+            if _G.HolonPianoKeyMapReverse then
+                blackBtn.Text = _G.HolonPianoKeyMapReverse[blackKeyName] or ""
+                blackBtn.TextColor3 = Color3.new(1,1,1)
+                blackBtn.TextSize = 12
+                blackBtn.TextYAlignment = Enum.TextYAlignment.Bottom
+            end
+        end
+    end
+end
+
+-- ピアノを腰の前に追従させる関数
+local function setupPianoFollow()
+    -- pianoKeyboardがnilなら再取得
+    if not pianoKeyboard then pianoKeyboard = getMusicKeyboard() end
+    if not pianoKeyboard then return end
+    
+    -- 既に実行中の場合は何もしない
+    if pianoUpdateConnection then return end
+
+    -- ★修正: Mainパーツを探す (なければPrimaryPart)
+    local mainPart = pianoKeyboard:FindFirstChild("Main", true) or pianoKeyboard.PrimaryPart
+    if not mainPart then 
+        warn("Holon HUB: ピアノのMainパーツが見つかりません")
+        return 
+    end
+    print("Holon HUB: ピアノのセットアップを開始:", pianoKeyboard.Name)
+    
+    -- startEffect同様の初期設定
+    for _, part in ipairs(pianoKeyboard:GetDescendants()) do
+        if part:IsA("BasePart") then
+            -- ★追加: 元の当たり判定を保存
+            if pianoOriginalCollisions[part] == nil then
+                pianoOriginalCollisions[part] = part.CanCollide
+            end
+            part.CanCollide = false
+            part.CanTouch = false
+            part.CanQuery = false
+            part.Anchored = false
+            part.Massless = true
+            part.AssemblyLinearVelocity = Vector3.zero
+            part.AssemblyAngularVelocity = Vector3.zero
+            -- 所有権を取得 (startEffectの方式に合わせる)
+            pcall(function() part:SetNetworkOwner(LocalPlayer) end)
+        end
+    end
+    
+    local pp = mainPart
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if root then
+        local offset = CFrame.new(0, -1.5, -2) * CFrame.Angles(0, math.rad(180), 0)
+        pp.CFrame = root.CFrame * offset
+    end
+    
+    local a0 = Instance.new("Attachment", pp)
+    local ap = Instance.new("AlignPosition", pp)
+    ap.Attachment0 = a0
+    ap.Mode = Enum.PositionAlignmentMode.OneAttachment
+    ap.MaxForce = 1e9
+    ap.Responsiveness = 800
+    local ao = Instance.new("AlignOrientation", pp)
+    ao.Attachment0 = a0
+    ao.Mode = Enum.OrientationAlignmentMode.OneAttachment
+    ao.MaxTorque = 1e9
+    ao.Responsiveness = 800
+    
+    pianoUpdateConnection = RunService.RenderStepped:Connect(function()
+        local char = LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if not root then return end
+        if not pianoKeyboard or not pianoKeyboard.Parent then 
+            stopPiano()
+            return 
+        end
+
+        -- 所有権維持 (startEffectの方式に合わせる)
+        if math.random() < 0.05 then
+             pcall(function() pp:SetNetworkOwner(LocalPlayer) end)
+        end
+
+        local baseCF = root.CFrame
+        local offset = CFrame.new(0, -1.5, -2) * CFrame.Angles(0, math.rad(180), 0)
+        local targetCF = baseCF * offset
+        ap.Position = targetCF.Position
+        ao.CFrame = targetCF
+    end)
+    print("Holon HUB: ピアノの追従を開始しました")
+end
+
+-- ピアノを停止・解放する関数
+local function stopPiano()
+    if pianoUpdateConnection then
+        pianoUpdateConnection:Disconnect()
+        pianoUpdateConnection = nil
+    end
+    if pianoKeyboard and pianoKeyboard.Parent then
+        local pp = pianoKeyboard:FindFirstChild("Main", true) or pianoKeyboard.PrimaryPart
+        if not pp then return end
+        -- AlignPosition/Orientation を削除
+        for _, child in ipairs(pp:GetChildren()) do
+            if child:IsA("Attachment") or child:IsA("AlignPosition") or child:IsA("AlignOrientation") then
+                child:Destroy()
+            end
+        end
+    end
+    
+    -- ★追加: 当たり判定を元に戻す
+    for part, canCollide in pairs(pianoOriginalCollisions) do
+        if part and part.Parent then
+            part.CanCollide = canCollide
+        end
+    end
+    pianoOriginalCollisions = {} -- テーブルをクリア
+
+    print("Holon HUB: ピアノの追従を停止しました")
+end
+
+-- ピアノのキーマッピング（画像の配置に対応）
+local pianoKeyMap = {
+    -- 白鍵
+    ["1"] = "Key1C", ["2"] = "Key1D", ["3"] = "Key1E", ["4"] = "Key1F", 
+    ["5"] = "Key1G", ["6"] = "Key1A", ["7"] = "Key1B", ["8"] = "Key2C",
+    ["9"] = "Key2D", ["0"] = "Key2E", ["q"] = "Key2F", ["w"] = "Key2G",
+    ["e"] = "Key2A", ["r"] = "Key2B", ["t"] = "Key3C",
+    
+    -- 黒鍵
+    ["f"] = "Key1Csharp", ["g"] = "Key1Dsharp", ["h"] = "Key1Fsharp",
+    ["j"] = "Key1Gsharp", ["k"] = "Key1Asharp", ["l"] = "Key2Csharp",
+    ["z"] = "Key2Dsharp", ["x"] = "Key2Fsharp", ["c"] = "Key2Gsharp",
+    ["v"] = "Key2Asharp"
+}
+
+-- 逆引きマップをグローバルに保存してUIから参照可能にする
+_G.HolonPianoKeyMapReverse = {}
+for k, v in pairs(pianoKeyMap) do
+    _G.HolonPianoKeyMapReverse[v] = k:upper()
+end
+
+-- 1. 鍵盤を叩く関数
+local function canPressPianoKey()
+    return pianoEnabled
+end
+local function pressPianoKey(keyName)
+    if not canPressPianoKey() then return end
+
+    -- 毎回直接 MusicKeyboard を探しに行く
+    local targetKeyboard = getMusicKeyboard()
+    
+    -- 見つからなければ終了
+    if not targetKeyboard then return end
+
+   local key = targetKeyboard:FindFirstChild(keyName, true)
+    if key and key:IsA("BasePart") then
+        -- ネットワークオーナーの設定（サーバーへ通知）
+        SetNetworkOwner:FireServer(key, key.CFrame)
+        
+        -- 指定の待機時間
+        task.wait(0.15)
+    end
+    
+    -- 録音処理
+    if isRecording and canPressPianoKey() then
+        table.insert(recordedNotes, {key = keyName, time = tick()})
+    end
+end
+
+-- 2. JSON再生関数
+local function playSongFromJSON(jsonData)
+    if isPlayingSong then return end
+    
+    local songData
+    local success, err = pcall(function()
+        -- 文字列ならデコード、テーブルならそのまま使う
+        if type(jsonData) == "string" then
+            return HttpService:JSONDecode(jsonData)
+        else
+            return jsonData
+        end
+    end)
+    
+    if not success or type(err) ~= "table" then
+        warn("JSONデータの読み込みに失敗しました")
+        return
+    end
+    songData = err
+
+    isPlayingSong = true
+    print("演奏を開始します: " .. #songData .. " 音符")
+    
+    task.spawn(function()
+        -- 演奏開始前に一度だけピアノを探す
+        if not pianoKeyboard then pianoKeyboard = getMusicKeyboard() end
+        
+        for i, note in ipairs(songData) do
+            -- ボタンで「停止」を押したときだけ止まるようにする
+            if not isPlayingSong then break end
+            
+            local rawKey = tostring(note.key)
+            -- JSONのキーが "Key" で始まる場合は変換せずそのまま使う（誤変換防止）
+            local keyName = rawKey
+            if not string.match(rawKey, "^Key") then
+                keyName = pianoKeyMap[rawKey] or rawKey
+            end
+            
+            local delayTime = note.delay or 0.1
+            
+            -- テストと同じ仕組みで叩く
+            task.spawn(function()
+                pressPianoKey(keyName)
+            end)
+            
+            -- 次の音まで待機
+            task.wait(delayTime)
+        end
+        
+        isPlayingSong = false
+        print("演奏が終了しました")
+    end)
+end
+
+-- 曲の再生を停止
+local function stopSong()
+    isPlayingSong = false
+end
+
+-- 録音保存関数 (UIから呼び出し)
+_G.HolonSaveRecording = function(filename)
+    if #recordedNotes == 0 then 
+        OrionLib:MakeNotification({Name="保存", Content="録音データがありません", Time=3})
+        return 
+    end
+    
+    -- ノート間の遅延を計算して保存用データを作成
+    local finalData = {}
+    for i = 1, #recordedNotes do
+        local current = recordedNotes[i]
+        local nextNote = recordedNotes[i+1]
+        local delay = 0.1
+        if nextNote then
+            delay = nextNote.time - current.time
+        end
+        table.insert(finalData, {key = current.key, delay = delay})
+    end
+    
+    local fname = filename
+    if not fname or fname == "" then
+        -- 自動命名: Test_1, Test_2 ...
+        local idx = 1
+        while isfile("FTAP_Notes/Test_" .. idx .. ".json") do
+            idx = idx + 1
+        end
+        fname = "Test_" .. idx
+    end
+    
+    if not fname:match("%.json$") then fname = fname .. ".json" end
+    
+    local success, json = pcall(function() return HttpService:JSONEncode(finalData) end)
+    if success then
+        writefile("FTAP_Notes/" .. fname, json)
+        OrionLib:MakeNotification({Name="保存", Content=fname.." を保存しました", Time=3})
+        -- 録音状態リセット
+        isRecording = false
+    else
+        warn("JSON Encode Error")
+    end
+end
+
+--------------------------------------------------------------------------------
+-- [データ定義] ベクターパス / 形状データ
+--------------------------------------------------------------------------------
+local Paths = {
+    -- アルファベット (A-Z, Space) の簡易ストロークデータ
+    Alpha = {
+        ["A"]={Vector2.new(0,0),Vector2.new(1,2),Vector2.new(2,0),Vector2.new(1.5,1),Vector2.new(0.5,1)},
+        ["B"]={Vector2.new(0,0),Vector2.new(0,2),Vector2.new(1.5,2),Vector2.new(1.5,1),Vector2.new(0,1),Vector2.new(1.5,1),Vector2.new(1.5,0),Vector2.new(0,0)},
+        ["C"]={Vector2.new(2,2),Vector2.new(0,2),Vector2.new(0,0),Vector2.new(2,0)},
+        ["D"]={Vector2.new(0,0),Vector2.new(0,2),Vector2.new(1.5,1.5),Vector2.new(1.5,0.5),Vector2.new(0,0)},
+        ["E"]={Vector2.new(2,2),Vector2.new(0,2),Vector2.new(0,1),Vector2.new(1.5,1),Vector2.new(0,1),Vector2.new(0,0),Vector2.new(2,0)},
+        ["F"]={Vector2.new(0,0),Vector2.new(0,2),Vector2.new(2,2),Vector2.new(0,2),Vector2.new(0,1),Vector2.new(1.5,1)},
+        ["G"]={Vector2.new(2,2),Vector2.new(0,2),Vector2.new(0,0),Vector2.new(2,0),Vector2.new(2,1),Vector2.new(1,1)},
+        ["H"]={Vector2.new(0,2),Vector2.new(0,0),Vector2.new(0,1),Vector2.new(2,1),Vector2.new(2,2),Vector2.new(2,0)},
+        ["I"]={Vector2.new(0,2),Vector2.new(2,2),Vector2.new(1,2),Vector2.new(1,0),Vector2.new(0,0),Vector2.new(2,0)},
+        ["J"]={Vector2.new(0,0.5),Vector2.new(1,0),Vector2.new(2,0.5),Vector2.new(2,2)},
+        ["K"]={Vector2.new(0,2),Vector2.new(0,0),Vector2.new(0,1),Vector2.new(2,2),Vector2.new(0,1),Vector2.new(2,0)},
+        ["L"]={Vector2.new(0,2),Vector2.new(0,0),Vector2.new(2,0)},
+        ["M"]={Vector2.new(0,0),Vector2.new(0,2),Vector2.new(1,1),Vector2.new(2,2),Vector2.new(2,0)},
+        ["N"]={Vector2.new(0,0),Vector2.new(0,2),Vector2.new(2,0),Vector2.new(2,2)},
+        ["O"]={Vector2.new(0,0),Vector2.new(0,2),Vector2.new(2,2),Vector2.new(2,0),Vector2.new(0,0)},
+        ["P"]={Vector2.new(0,0),Vector2.new(0,2),Vector2.new(2,2),Vector2.new(2,1),Vector2.new(0,1)},
+        ["Q"]={Vector2.new(0,0),Vector2.new(0,2),Vector2.new(2,2),Vector2.new(2,0),Vector2.new(0,0),Vector2.new(1,0.5),Vector2.new(2,-0.5)},
+        ["R"]={Vector2.new(0,0),Vector2.new(0,2),Vector2.new(2,2),Vector2.new(2,1),Vector2.new(0,1),Vector2.new(2,0)},
+        ["S"]={Vector2.new(2,2),Vector2.new(0,2),Vector2.new(0,1),Vector2.new(2,1),Vector2.new(2,0),Vector2.new(0,0)},
+        ["T"]={Vector2.new(0,2),Vector2.new(2,2),Vector2.new(1,2),Vector2.new(1,0)},
+        ["U"]={Vector2.new(0,2),Vector2.new(0,0),Vector2.new(2,0),Vector2.new(2,2)},
+        ["V"]={Vector2.new(0,2),Vector2.new(1,0),Vector2.new(2,2)},
+        ["W"]={Vector2.new(0,2),Vector2.new(0.5,0),Vector2.new(1,1),Vector2.new(1.5,0),Vector2.new(2,2)},
+        ["X"]={Vector2.new(0,2),Vector2.new(2,0),Vector2.new(1,1),Vector2.new(0,0),Vector2.new(2,2)},
+        ["Y"]={Vector2.new(0,2),Vector2.new(1,1),Vector2.new(2,2),Vector2.new(1,1),Vector2.new(1,0)},
+        ["Z"]={Vector2.new(0,2),Vector2.new(2,2),Vector2.new(0,0),Vector2.new(2,0)},
+        ["0"]={Vector2.new(0,0),Vector2.new(2,0),Vector2.new(2,2),Vector2.new(0,2),Vector2.new(0,0),Vector2.new(2,2)},
+        ["1"]={Vector2.new(0.5,1.5),Vector2.new(1,2),Vector2.new(1,0)},
+        ["2"]={Vector2.new(0,2),Vector2.new(2,2),Vector2.new(2,1),Vector2.new(0,1),Vector2.new(0,0),Vector2.new(2,0)},
+        ["3"]={Vector2.new(0,2),Vector2.new(2,2),Vector2.new(2,1),Vector2.new(0.5,1),Vector2.new(2,1),Vector2.new(2,0),Vector2.new(0,0)},
+        ["4"]={Vector2.new(1.5,0),Vector2.new(1.5,2),Vector2.new(0,0.5),Vector2.new(2,0.5)},
+        ["5"]={Vector2.new(2,2),Vector2.new(0,2),Vector2.new(0,1),Vector2.new(2,1),Vector2.new(2,0),Vector2.new(0,0)},
+        ["6"]={Vector2.new(2,2),Vector2.new(0,2),Vector2.new(0,0),Vector2.new(2,0),Vector2.new(2,1),Vector2.new(0,1)},
+        ["7"]={Vector2.new(0,2),Vector2.new(2,2),Vector2.new(0,0)},
+        ["8"]={Vector2.new(1,1),Vector2.new(2,2),Vector2.new(0,2),Vector2.new(2,0),Vector2.new(0,0),Vector2.new(1,1)},
+        ["9"]={Vector2.new(2,0),Vector2.new(2,2),Vector2.new(0,2),Vector2.new(0,1),Vector2.new(2,1)},
+        [" "]={Vector2.new(0,0), Vector2.new(0,0)}
+    },
+    -- マカバ (Merkaba) 立体頂点
+    Merkaba = { 
+        Vector3.new(1,1,1),Vector3.new(-1,-1,1),Vector3.new(-1,1,-1),Vector3.new(1,-1,-1),
+        Vector3.new(1,1,1),Vector3.new(-1,-1,-1),Vector3.new(1,1,-1),Vector3.new(1,-1,1),
+        Vector3.new(-1,1,1),Vector3.new(-1,-1,-1) 
+    },
+    -- 五芒星
+    Star = (function() local t={}; for i=0,5 do local a=math.rad(i*144+90); table.insert(t, Vector2.new(math.cos(a),math.sin(a))) end; return t end)(),
+    -- 円
+    Circle = (function() local t={}; for i=0,20 do local a=math.rad(i*18); table.insert(t, Vector2.new(math.cos(a),math.sin(a))) end; return t end)(),
+    MagicCircle2 = (function()
+        local t = {}
+        -- 外側の大きな円
+        for i = 0, 36 do
+            local a = math.rad(i * 10)
+            table.insert(t, Vector2.new(math.cos(a) * 2, math.sin(a) * 2))
+        end
+        -- 中間の円
+        for i = 0, 24 do
+            local a = math.rad(i * 15)
+            table.insert(t, Vector2.new(math.cos(a) * 1.5, math.sin(a) * 1.5))
+        end
+        -- 内側の円
+        for i = 0, 18 do
+            local a = math.rad(i * 20)
+            table.insert(t, Vector2.new(math.cos(a), math.sin(a)))
+        end
+        return t
+    end)(),
+    
+    MagicCircle3 = (function()
+        local t = {}
+        -- 多重円構造
+        for layer = 1, 5 do
+            local radius = 2.5 - (layer * 0.4)
+            local points = 12 + (layer * 4)
+            for i = 0, points do
+                local a = math.rad((360 / points) * i)
+                table.insert(t, Vector2.new(math.cos(a) * radius, math.sin(a) * radius))
+            end
+        end
+        return t
+    end)(),
+}
+
+--------------------------------------------------------------------------------
+-- [コンフィグ & 変数管理]
+--------------------------------------------------------------------------------
+local defaultConfig = {
+    Wing = { Size = 30, Gap = 3.0, Speed = 6, Height = 0.5, Back = 0, Joints = 3, V_Angle = 0, Tilt = 0, Strength = 15, RootFixed = true, Curve = false, CurveAmount = 10 },
+    Heart = { Size = 8, Speed = 2, Height = 5, Back = 2 },
+    Star = { Size = 10, Speed = 2, Height = 5, Back = 0 },
+    Vortex = { Size = 30, Speed = 10, Height = 20, Back = 0 },
+    Sphere = { Size = 30, Speed = 30, Height = 5, Back = 0 },
+    Rotate = { Size = 15, Speed = 6, Height = 7, Back = 0, Wave = false, WaveSpeed = 2, WaveAmp = 2 },
+    Pet = { Size = 8, Speed = 2, Height = 4, Back = 12, Count = 2, Joints = 3, Gap = 13 },
+    Text = { Size = 10, Speed = 5, Height = 6, Back = 2, Content = "HELLO", Mirror = false },
+    MagicCircle = { Size = 12, Speed = 2, Height = -3, Back = 0 },
+    MagicCircle2 = { Size = 15, Speed = 1, Height = -2, Back = 0, Layers = 3 },
+    MagicCircle3 = { Size = 20, Speed = 0.5, Height = 5, Back = 0, Complexity = 5 },
+    FloatStone = { Size = 10, Speed = 2, Height = 2, Back = 0, Chaos = false },
+    Merkaba = { Size = 8, Speed = 2, Height = 7, Back = 0 },
+    Cube = { Size = 5, Speed = 1, Height = 5, Back = 0 },
+    Pyramid = { Size = 5, Speed = 1, Height = 5, Back = 0 },
+    MirrorPlayer = { Size = 60, Speed = 10, Height = 0, Back = 0, Scale = 1, EdgeSpacing = 1 },
+    Beam = { Size = 60, Speed = 50, Height = 0.5, Back = 0, Count = 8 },
+    BackGuard = { Size = 10, Speed = 2, Height = 2, Back = 15 },
+    Tornado = { Size = 20, Speed = 15, Height = 0, Back = 0, Radius = 5, TopRadius = 20 },
+    Gyro = { Size = 20, Speed = 5, Height = 5, Back = 0, InnerSize = 12, CenterType = "Sphere" },
+    Combined = {Mode1 = "Wing", Mode2 = "Merkaba", Mode3 = "なし", Mode1Count = 15, Mode2Count = 15, Mode3Count = 0},
+    AnimSpeed = 1.0,
+    PlotReturn = { Enabled = false, Interval = 30, PlotCFrame = nil},
+    GrabMod = { Kill = false, Noclip = false, Spin = false, SuperThrow = false, ThrowPower = 500 },
+    Global = { MaxToys = 30, EffectRotation = Vector3.new(0,0,0), IndividualRotation = Vector3.new(0, -90, 0) },
+}
+
+-- Deep Copy Helper
+local function deepCopy(target)
+    local copy = {}
+    for k, v in pairs(target) do copy[k] = (type(v) == "table") and deepCopy(v) or v end
+    return copy
+end
+
+local selectedItemName = "全てのおもちゃ" 
+local detectedItems = {}
+
+local cfg = deepCopy(defaultConfig)
+local useOtherToys = false
+local isEnabled, currentMode, combinedActive = false, "Wing", false
+local followMethod = "プレイヤー"
+local lastBaseCF = nil
+local targetMain, targetSub = LocalPlayer, LocalPlayer    
+local autoWidth = true
+local activeToys = {}        -- {A0, A1, AP, AO, Part}
+local lowLatencyMode = false
+local originalCollisions = {} -- {Part: Boolean}
+local updateConnection = nil
+local isReturningToPlot = false -- Plot帰還中のフラグ（重要）
+
+-- ジャイロ用物理変数
+local gyroInnerAngularVelocity = 0
+local gyroInnerAngle = 0
+local lastUpdateTick = 0
+
+local espCache = {}
+local espCfg = { Enabled = false, Names = true, Tracers = false, Hitbox = false, HitboxSize = 10, ESPColor = Color3.new(1, 0, 0), TargetOnly = false }
+
+-- プレイヤー設定用変数
+local walkSpeed = 16
+local jumpPower = 25
+local infiniteJump = false
+local useWalkSpeed = false
+local useJumpPower = false
+local antiExplosion = false
+local noclip = false
+local antiFire = false
+local antiGrab = false
 local counterMode = "Repulsion"
-
--- Blobman Kick用
-local levitateRunning = false
-local tpTargetName = ""
 _G.AutoAttacker = false
-_G.CounterMode = "Repulsion"
-local loopKillEnabled = false
-local loopKillTargetName = ""
-
--- Bliz Aura Variables
+_G.AntiKickToy = false
 _G.DeathAura = false
 _G.AttractionAura = false
 _G.FlingAura = false
 _G.FlingStrength = 400
 _G.FlingTarget = "Players"
 
--- Helper Functions from Bliz (Moved up for wider scope)
-local function CheckNetworkOwnerShipOnPart(part)
-    local po = part:FindFirstChild("PartOwner")
-    return po and po.Value == LocalPlayer.Name
-end
+--------------------------------------------------------------------------------
+-- [計算ロジック] 各モードの座標計算
+--------------------------------------------------------------------------------
+local function getPositionForMode(mode, i, count, time)
+    local c = cfg[mode] or cfg.Wing
+    
+    -- iは1からcountまで。比率を計算
+    local ratio = (i-1) / (count > 1 and count-1 or 1)
+    
+    if mode == "Wing" then
+    local side, idx, totalSide
 
-local function SNOWship(part)
-    if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and part then
-        -- Blizのオリジナルでは距離チェックが30
-        if (LocalPlayer.Character.HumanoidRootPart.Position - part.Position).Magnitude <= 30 then
-             pcall(function()
-                if GrabEvents and GrabEvents:FindFirstChild("SetNetworkOwner") then
-                    GrabEvents.SetNetworkOwner:FireServer(part, CFrame.lookAt(LocalPlayer.Character.HumanoidRootPart.Position, part.Position))
+    if combinedActive then
+        -- 【合体モード】
+        -- i は全体の通し番号(1,2,3,4...)なので、そのまま奇数/偶数で分ける
+        side = (i % 2 == 1) and -1 or 1 -- 1->左(-1), 2->右(1)
+        idx = math.ceil(i / 2)          -- 1,2番目は1段目、3,4番目は2段目...
+        totalSide = math.ceil(count / 2)
+    else
+        -- 【単体モード】
+        -- 自分のパーツ内での順番通りに並べる
+        side = (i % 2 == 1) and -1 or 1
+        idx = math.ceil(i / 2)
+        totalSide = math.ceil(count / 2)
+    end
+
+    -- 以降の計算は共通
+    local distRatio = idx / math.max(1, totalSide)
+    
+    local flapPhase = time * c.Speed
+    if c.Joints > 0 then
+        flapPhase = flapPhase - (idx * (0.5 / math.max(1, c.Joints)))
+    end
+
+    local flap = math.sin(flapPhase) * c.Strength
+    if c.RootFixed then
+        flap = flap * distRatio
+    end
+    
+    local horizontalOffset = c.Gap + (c.Size * distRatio)
+    local pos = Vector3.new(horizontalOffset * side, flap, 0)
+    
+    local rotCF = CFrame.Angles(
+        math.rad(c.Tilt), 
+        math.rad(c.V_Angle * side), 
+        0
+    )
+
+    -- カーブ（反り）の計算：羽ばたきに連動させる
+    if c.Curve then
+        local curve_amount = c.CurveAmount or 10
+        -- 羽ばたきの現在の位相（-1から1）を取得
+        local flap_ratio = math.sin(flapPhase)
+        -- 羽ばたきの上下両方で、先端にいくほど強く反る角度を計算
+        local soar_angle = math.rad(flap_ratio * curve_amount * distRatio)
+        -- 翼の根元を軸に回転させることで「反り」を表現
+        rotCF = rotCF * CFrame.Angles(0, 0, soar_angle * side)
+    end
+    
+    return (rotCF * pos) + Vector3.new(0, c.Height, c.Back)
+        
+    elseif mode == "Heart" then
+        local t = (ratio * math.pi * 2) + time * c.Speed
+        local x = 16 * math.sin(t)^3
+        local y = 13 * math.cos(t) - 5 * math.cos(2*t) - 2 * math.cos(3*t) - math.cos(4*t)
+        return Vector3.new(x * c.Size * 0.1, y * c.Size * 0.1 + c.Height, c.Back)
+
+    elseif mode == "Star" then
+        -- 綺麗な五芒星を描くためのロジック（直線補間）
+        local totalPoints = 10 -- 5つの頂点 + 5つの谷
+        -- アニメーション進行度
+        local cycle = (time * c.Speed * 0.2 + ratio) % 1
+        local currentStep = cycle * totalPoints
+        
+        local idx1 = math.floor(currentStep)
+        local idx2 = (idx1 + 1) % totalPoints
+        local alpha = currentStep % 1 -- 2点間のどこにいるか
+
+        -- 星の頂点座標を計算するローカル関数
+        local function getStarPoint(i)
+            -- 36度ずつ回転、+90度で頂点を真上に
+            local theta = math.rad(i * 36 + 90) 
+            -- 偶数は外側(Size)、奇数は内側(Size * 0.382 -> 黄金比に近い鋭さ)
+            local r = (i % 2 == 0) and c.Size or (c.Size * 0.382)
+            -- Xを反転させると時計回り/反時計回りが調整可能（ここではそのまま）
+            return Vector2.new(-math.cos(theta) * r, math.sin(theta) * r)
+        end
+
+        local p1 = getStarPoint(idx1)
+        local p2 = getStarPoint(idx2)
+        
+        -- 丸みを消すため、計算した2点間を直線で結ぶ(Lerp)
+        local p = p1:Lerp(p2, alpha)
+
+        -- Heartモードと同じ向き（垂直）にする
+        -- X=横幅, Y=高さ(縦幅), Z=奥行き(固定)
+        return Vector3.new(p.X, p.Y + c.Height, c.Back)
+        
+    elseif mode == "Vortex" then
+        -- 平らな渦
+        local spiral = (i / count) * math.pi * 4 + time * c.Speed
+        local dist = (i / count) * c.Size
+        
+        local x = math.cos(spiral) * dist
+        local z = math.sin(spiral) * dist
+        
+        return Vector3.new(x, c.Height, z + c.Back)
+        
+    elseif mode == "Sphere" then
+        -- 球体配置
+        local phi = math.acos(-1 + (2 * i) / count)
+        local theta = math.sqrt(count * math.pi) * phi + time * c.Speed
+        
+        local x = c.Size * math.cos(theta) * math.sin(phi)
+        local y = c.Size * math.sin(theta) * math.sin(phi)
+        local z = c.Size * math.cos(phi)
+        
+        return Vector3.new(x, y + c.Height, z + c.Back)
+
+    elseif mode == "Rotate" or mode == "MagicCircle" then
+    -- 回転・八卦：星形または円
+    local shape = (mode == "MagicCircle" and (i % 2 == 0)) and Paths.Star or Paths.Circle
+    local speed = c.Speed
+    local totalPoints = #shape
+    
+    -- ★完全に書き直し
+    local cycle = (time * speed * 0.1 + ratio) % 1
+    local currentStep = cycle * totalPoints
+    
+    local idx1 = math.floor(currentStep) % totalPoints + 1
+    local idx2 = (math.floor(currentStep) + 1) % totalPoints + 1
+    local alpha = currentStep % 1
+    
+    -- 安全なLerp
+    local p1 = shape[idx1]
+    local p2 = shape[idx2]
+    if not p1 or not p2 then return Vector3.zero end
+    
+    local p = p1:Lerp(p2, alpha)
+    
+    -- Y軸回転を追加
+    local rotAngle = time * speed * 0.3
+    local rotX = p.X * math.cos(rotAngle) - p.Y * math.sin(rotAngle)
+    local rotY = p.X * math.sin(rotAngle) + p.Y * math.cos(rotAngle)
+    
+    local waveY = 0
+    if c.Wave then
+        waveY = math.sin(time * (c.WaveSpeed or 2) + i * 0.5) * (c.WaveAmp or 2)
+    end
+    
+    return Vector3.new(rotX * c.Size, c.Height + waveY, rotY * c.Size + c.Back)
+
+elseif mode == "MagicCircle2" then
+    -- 画像1のような放射状の魔法陣
+    local totalPoints = #Paths.MagicCircle2
+    local cycle = (time * c.Speed * 0.05 + ratio) % 1
+    local currentStep = cycle * totalPoints
+    
+    local idx1 = math.floor(currentStep) % totalPoints + 1
+    local idx2 = (math.floor(currentStep) + 1) % totalPoints + 1
+    local alpha = currentStep % 1
+    
+    local p1 = Paths.MagicCircle2[idx1]
+    local p2 = Paths.MagicCircle2[idx2]
+    if not p1 or not p2 then return Vector3.zero end
+    
+    local p = p1:Lerp(p2, alpha)
+    
+    -- Y軸回転
+    local rotAngle = time * c.Speed * 0.2
+    local rotX = p.X * math.cos(rotAngle) - p.Y * math.sin(rotAngle)
+    local rotZ = p.X * math.sin(rotAngle) + p.Y * math.cos(rotAngle)
+    
+    -- 上下の波動
+    local wave = math.sin(time * c.Speed + i * 0.5) * 0.5
+    
+    return Vector3.new(rotX * c.Size, c.Height + wave, rotZ * c.Size + c.Back)
+
+elseif mode == "MagicCircle3" then
+    -- 画像2のような垂直ビーム風の魔法陣
+    local totalPoints = #Paths.MagicCircle3
+    local cycle = (time * c.Speed * 0.03 + ratio) % 1
+    local currentStep = cycle * totalPoints
+    
+    local idx1 = math.floor(currentStep) % totalPoints + 1
+    local idx2 = (math.floor(currentStep) + 1) % totalPoints + 1
+    local alpha = currentStep % 1
+    
+    local p1 = Paths.MagicCircle3[idx1]
+    local p2 = Paths.MagicCircle3[idx2]
+    if not p1 or not p2 then return Vector3.zero end
+    
+    local p = p1:Lerp(p2, alpha)
+    
+    -- ゆっくり回転
+    local rotAngle = time * c.Speed * 0.1
+    local rotX = p.X * math.cos(rotAngle) - p.Y * math.sin(rotAngle)
+    local rotZ = p.X * math.sin(rotAngle) + p.Y * math.cos(rotAngle)
+    
+    return Vector3.new(rotX * c.Size, c.Height, rotZ * c.Size + c.Back)
+
+    elseif mode == "Pet" then
+        -- 設定から各種パラメータを取得
+        local petCountSetting = cfg.Pet.Count or 2
+        local totalFws = count -- 使用可能な全花火数
+        
+        -- 1体あたりの花火数を計算
+        local fwsPerPet = math.floor(totalFws / petCountSetting)
+        if fwsPerPet < 1 then fwsPerPet = 1 end
+
+        -- 現在の花火(i)が、何体目のペットの、何番目のパーツか
+        local petIndex = math.ceil(i / fwsPerPet)
+        local partIndexInPet = (i - 1) % fwsPerPet 
+        
+        -- 指定したペット数を超える余り花火は非表示
+        if petIndex > petCountSetting then
+            return Vector3.new(0, -1000, 0)
+        end
+
+        -- パーツの役割分担 (0:体, 1:左羽, 2:右羽)
+        local role = 0 
+        local sideIndex = 0
+        if partIndexInPet == 0 then
+            role = 0 -- 最初の1個は体
+        elseif partIndexInPet <= math.ceil((fwsPerPet - 1) / 2) then
+            role = 1 -- 左羽
+            sideIndex = partIndexInPet
+        else
+            role = 2 -- 右羽
+            sideIndex = partIndexInPet - math.ceil((fwsPerPet - 1) / 2)
+        end
+
+        -- ペット自体の配置（Gapを使用して間隔を調整）
+        local petSide = (petIndex % 2 == 0) and 1 or -1
+        local horizontalOffset = (c.Gap or 5) + (math.floor((petIndex - 1) / 2) * 8)
+        
+        -- 共通の浮遊ムーブ
+        local hover = math.sin(time * c.Speed) * 1.2
+        local bob = math.cos(time * c.Speed * 0.5) * 1
+        
+        local basePos = Vector3.new(
+            petSide * horizontalOffset,
+            c.Height + hover,
+            c.Back + bob
+        )
+
+        if role == 0 then
+            return basePos
+        else
+            -- 羽の計算
+            local wingSide = (role == 1) and -1 or 1
+            
+            -- ★ここを修正：c.Size を羽の広がり（幅）に直接反映
+            -- sideIndex（羽の中のパーツ番号）に比例して、c.Sizeの分だけ外に広がります
+            local wingSpread = (sideIndex * (c.Size * 0.1)) 
+            
+            local flapPhase = time * c.Speed * 3 - (sideIndex * 0.3)
+            local flap = math.sin(flapPhase) * 2
+            
+            local jointFactor = (c.Joints or 3) * 0.2
+            
+            return basePos + Vector3.new(
+                wingSide * (1 + jointFactor + wingSpread), -- c.Sizeがここにかかる
+                flap * (1 + jointFactor),
+                -0.5 + (sideIndex * 0.1)
+            )
+        end
+
+    elseif mode == "FloatStone" then
+        -- アニメーションの「カオス展開」の動きを計算に導入
+        local rTime = time * cfg[mode].Speed
+        local spread = cfg[mode].Size
+        
+        -- 複数の正弦波を組み合わせて不規則な軌道を生成
+        local x = math.cos(rTime + i * 1.5) * spread
+        local y = math.sin(rTime * 0.7 + i) * (spread * 0.5) + cfg[mode].Height
+        local z = math.sin(rTime * 1.2 + i * 2.2) * spread + cfg[mode].Back
+        
+        return Vector3.new(x, y, z)
+
+-- [Textモードの計算ロジック抜粋] 
+
+    elseif mode == "Text" then
+        local str = cfg.Text.Content
+        local chars = {}
+        for char in str:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
+            table.insert(chars, char)
+        end
+        local numChars = #chars
+        if numChars == 0 then return Vector3.zero end
+    
+        local fwsPerChar = math.max(1, math.floor(count / numChars))
+        local charIndex = math.clamp(math.ceil(i / fwsPerChar), 1, numChars)
+    
+        local charStr = chars[charIndex]
+        local path = Paths.Alpha[charStr:upper()] or Paths.Alpha[" "]
+        
+        -- アニメーション計算
+        local totalPoints = #path
+        local speed = math.max(1, math.floor(c.Speed)) * 0.5
+        local cycle = (time * speed + (i % fwsPerChar) * 0.1) % 2 
+        local tP = (cycle < 1) and (cycle * (totalPoints - 1)) or ((2 - cycle) * (totalPoints - 1))
+        local idx1 = math.floor(tP) + 1
+        local idx2 = math.min(idx1 + 1, totalPoints)
+        local p = path[idx1]:Lerp(path[idx2] or path[idx1], tP % 1)
+        
+        -- ★ 文字間隔の自動調節
+        -- サイズ(c.Size)が大きくなれば間隔(spacing)も広がるように設定
+        local charSizeScale = c.Size * 0.4
+        local spacing = c.Size * 1.2 -- 1.2倍の間隔で自動調整
+        local totalWidth = (numChars - 1) * spacing
+        
+        -- 配置計算 (反転なし、常に正面)
+        local xPos = p.X * charSizeScale * -1 -- 文字の形が正しく見える向き
+        local yPos = p.Y * charSizeScale
+        local xOffset = ((charIndex - 1) * spacing - (totalWidth / 2)) * -1
+        
+        return Vector3.new(xOffset + xPos, yPos + c.Height, -c.Back)
+
+    elseif mode == "Merkaba" then
+        -- マカバ：3D回転
+        local totalP = #Paths.Merkaba
+        local tP = (time * c.Speed + ratio * totalP) % totalP
+        local p1 = Paths.Merkaba[math.floor(tP) + 1]
+        local p2 = Paths.Merkaba[(math.floor(tP) % totalP) + 1]
+        
+        local p = p1:Lerp(p2, tP % 1) * c.Size
+        
+        -- 複雑な3軸回転
+        local rot = CFrame.Angles(time, time * 1.5, 0)
+        return (rot * p) + Vector3.new(0, c.Height + math.sin(time * 2), c.Back)
+
+    elseif mode == "Cube" then
+        -- 立方体の頂点定義
+        local size = c.Size
+        local v = {
+            Vector3.new(size, size, size),      -- 1: 右上前
+            Vector3.new(-size, size, size),     -- 2: 左上前
+            Vector3.new(size, -size, size),     -- 3: 右下前
+            Vector3.new(-size, -size, size),    -- 4: 左下前
+            Vector3.new(size, size, -size),     -- 5: 右上後
+            Vector3.new(-size, size, -size),    -- 6: 左上後
+            Vector3.new(size, -size, -size),    -- 7: 右下後
+            Vector3.new(-size, -size, -size)    -- 8: 左下後
+        }
+
+        -- ■ 変更点: 「辺」ではなく「面（4頂点のループ）」を定義
+        local faces = {
+            {v[1], v[2], v[4], v[3]}, -- 前面ループ
+            {v[5], v[6], v[8], v[7]}, -- 背面ループ
+            {v[1], v[5], v[6], v[2]}, -- 上面ループ
+            {v[3], v[7], v[8], v[4]}, -- 底面ループ
+            {v[1], v[5], v[7], v[3]}, -- 右面ループ
+            {v[2], v[6], v[8], v[4]}  -- 左面ループ
+        }
+
+        local numFaces = #faces
+        
+        -- 1. おもちゃを6つの面に順番に割り振る
+        local faceIdx = ((i - 1) % numFaces) + 1
+        local currentFace = faces[faceIdx]
+
+        -- 2. 進行具合の計算 (周回ループ)
+        local speed = c.Speed * 0.5 
+        -- おもちゃごとに位置をずらす (i * 0.25) ことで重なりを防ぐ
+        local totalProgress = (time * speed) + (i * 0.25)
+        
+        -- 3. 現在どの辺(0~3)にいるか、その辺のどこ(0.0~1.0)にいるか
+        local edgeIndex = math.floor(totalProgress) % 4 + 1
+        local nextEdgeIndex = (edgeIndex % 4) + 1 -- 次の頂点
+        local alpha = totalProgress % 1 -- 辺の上の進捗 (0.0 -> 1.0)
+
+        -- 4. 座標を計算
+        local p1 = currentFace[edgeIndex]
+        local p2 = currentFace[nextEdgeIndex]
+        
+        local pos = p1:Lerp(p2, alpha)
+        
+        return pos + Vector3.new(0, c.Height, c.Back)
+
+    elseif mode == "Pyramid" then
+        local s = c.Size
+        -- ピラミッドの頂点定義
+        local top = Vector3.new(0, s, 0)
+        local fl = Vector3.new(-s, -s, s)  -- 前左
+        local fr = Vector3.new(s, -s, s)   -- 前右
+        local br = Vector3.new(s, -s, -s)  -- 後右
+        local bl = Vector3.new(-s, -s, -s) -- 後左
+        
+        -- 面（頂点のループ）を定義
+        local faces = {
+            {top, fl, fr}, -- 前面
+            {top, fr, br}, -- 右面
+            {top, br, bl}, -- 後面
+            {top, bl, fl}, -- 左面
+            {fl, fr, br, bl} -- 底面
+        }
+        
+        local numFaces = #faces
+        local faceIdx = ((i - 1) % numFaces) + 1
+        local currentFace = faces[faceIdx]
+        local numVerts = #currentFace
+        
+        local speed = c.Speed * 0.5
+        local totalProgress = (time * speed) + (i * 0.25)
+        
+        local edgeIndex = math.floor(totalProgress) % numVerts + 1
+        local nextEdgeIndex = (edgeIndex % numVerts) + 1
+        local alpha = totalProgress % 1
+        
+        local p1 = currentFace[edgeIndex]
+        local p2 = currentFace[nextEdgeIndex]
+        
+        return p1:Lerp(p2, alpha) + Vector3.new(0, c.Height, c.Back)
+
+    elseif mode == "MirrorPlayer" then
+        local char = targetMain.Character
+        if not char then return Vector3.new(0,0,0) end
+        local root = char:FindFirstChild("HumanoidRootPart")
+        if not root then return Vector3.new(0,0,0) end
+
+        -- 1. R6パーツ定義（サイズと名前をセット）
+        local bodyParts = {
+            { name = "Head",      size = Vector3.new(1.2, 1.2, 1.2) },
+            { name = "Torso",     size = Vector3.new(2, 2, 1) },
+            { name = "Left Arm",  size = Vector3.new(1, 2, 1) },
+            { name = "Right Arm", size = Vector3.new(1, 2, 1) },
+            { name = "Left Leg",  size = Vector3.new(1, 2, 1) },
+            { name = "Right Leg", size = Vector3.new(1, 2, 1) }
+        }
+
+        local toysPerPart = math.max(1, math.floor(count / #bodyParts))
+        local partIdx = math.min(math.ceil(i / toysPerPart), #bodyParts)
+        local localIdx = ((i - 1) % toysPerPart) + 1
+        local data = bodyParts[partIdx]
+        
+        -- 対象の部位を特定
+        local targetPart = char:FindFirstChild(data.name) or root
+
+        -- 2. サイズと形状の計算（ここはおもちゃの形を作る）
+        local s = data.size * c.Size * 0.5
+        local t = (time * c.Speed) % 4
+        local step = t % 1
+        local edge = math.floor(t)
+        local faceIdx = (localIdx - 1) % 6
+        local p = Vector3.new(0,0,0)
+
+        if faceIdx == 0 then p = (edge==0 and Vector3.new(-s.X+s.X*2*step,-s.Y,s.Z) or edge==1 and Vector3.new(s.X,-s.Y+s.Y*2*step,s.Z) or edge==2 and Vector3.new(s.X-s.X*2*step,s.Y,s.Z) or Vector3.new(-s.X,s.Y-s.Y*2*step,s.Z))
+        elseif faceIdx == 1 then p = (edge==0 and Vector3.new(-s.X+s.X*2*step,-s.Y,-s.Z) or edge==1 and Vector3.new(s.X,-s.Y+s.Y*2*step,-s.Z) or edge==2 and Vector3.new(s.X-s.X*2*step,s.Y,-s.Z) or Vector3.new(-s.X,s.Y-s.Y*2*step,-s.Z))
+        elseif faceIdx == 2 then p = (edge==0 and Vector3.new(s.X,-s.Y,-s.Z+s.Z*2*step) or edge==1 and Vector3.new(s.X,-s.Y+s.Y*2*step,s.Z) or edge==2 and Vector3.new(s.X,s.Y,s.Z-s.Z*2*step) or Vector3.new(s.X,s.Y-s.Y*2*step,-s.Z))
+        elseif faceIdx == 3 then p = (edge==0 and Vector3.new(-s.X,-s.Y,-s.Z+s.Z*2*step) or edge==1 and Vector3.new(-s.X,-s.Y+s.Y*2*step,s.Z) or edge==2 and Vector3.new(-s.X,s.Y,s.Z-s.Z*2*step) or Vector3.new(-s.X,s.Y-s.Y*2*step,-s.Z))
+        elseif faceIdx == 4 then p = (edge==0 and Vector3.new(-s.X+s.X*2*step,s.Y,-s.Z) or edge==1 and Vector3.new(s.X,s.Y,-s.Z+s.Z*2*step) or edge==2 and Vector3.new(s.X-s.X*2*step,s.Y,s.Z) or Vector3.new(-s.X,s.Y,s.Z-s.Z*2*step))
+        else p = (edge==0 and Vector3.new(-s.X+s.X*2*step,-s.Y,-s.Z) or edge==1 and Vector3.new(s.X,-s.Y,-s.Z+s.Z*2*step) or edge==2 and Vector3.new(s.X-s.X*2*step,-s.Y,s.Z) or Vector3.new(-s.X,-s.Y,s.Z-s.Z*2*step)) end
+
+        -- 3. 【これが「位置」を直す魔法の式】
+        -- 自分の各部位が「RootPartから見てどこにいるか」というオフセットを計算
+        -- PointToObjectSpace を使うことで、エモート等でズレた位置も自動計算されます
+        local partRelativePos = root.CFrame:PointToObjectSpace(targetPart.Position)
+        
+        -- 背後距離(Back)と高さ(Height)のオフセット
+        local extraOffset = Vector3.new(0, c.Height, -c.Back)
+        
+        -- 回転情報を適用（部位が傾けばおもちゃの枠も傾く）
+        local rotatedBoxPoint = (root.CFrame:Inverse() * targetPart.CFrame).Rotation * p
+
+        -- 全部を足して返す
+        -- [部位の相対位置] + [一筆書きの頂点] + [ユーザー設定のズレ]
+        return partRelativePos + rotatedBoxPoint + extraOffset
+
+    elseif mode == "Beam" then
+        -- Y方向の光の柱
+        local ang = (i % c.Count) * (math.pi * 2 / c.Count)
+        local radius = c.Size * 0.3
+        
+        -- 円周配置
+        local x = math.cos(ang) * radius
+        local z = math.sin(ang) * radius
+        
+        -- Y軸高速往復
+        local yOsc = math.sin(time * c.Speed + (i / count) * math.pi * 2)
+        local y = yOsc * c.Size
+        
+        return Vector3.new(x, y + c.Height, z + c.Back)
+
+    elseif mode == "BackGuard" then
+        local spread = c.Size
+    
+         -- 各石のランダム位置(固定シードで再現性確保)
+        local seed = i * 123.456
+        local randomX = (math.sin(seed) * 2 - 1) * spread  -- 左右にバラバラ
+        local randomY = (math.cos(seed * 1.3) * 2 - 1) * (spread * 0.3) + c.Height  -- 上下にバラバラ
+    
+        -- 後ろ側に配置
+        local backDistance = c.Back + math.abs(math.sin(seed * 0.7)) * spread * 0.5
+    
+        -- 微妙な浮遊動作
+        local hover = math.sin(time * c.Speed + i * 0.5) * 0.5
+    
+        return Vector3.new(randomX, randomY + hover, -backDistance)
+
+    elseif mode == "Tornado" then
+        local r1 = c.Radius or 5
+        local r2 = c.TopRadius or 20
+        local h = c.Size -- Sizeを高さとして使用
+        local ratio = (i - 1) / (count > 1 and count - 1 or 1)
+        local currentR = r1 + (r2 - r1) * ratio
+        local currentH = h * ratio
+
+        if c.Pyramid then
+            -- 四角形の経路
+            local totalProgress = (time * c.Speed * 0.2) + (ratio * 4)
+            local side = math.floor(totalProgress) % 4
+            local progressOnSide = totalProgress % 1
+            
+            local x, z
+            if side == 0 then -- 上
+                x = -currentR + (currentR * 2 * progressOnSide)
+                z = currentR
+            elseif side == 1 then -- 右
+                x = currentR
+                z = currentR - (currentR * 2 * progressOnSide)
+            elseif side == 2 then -- 下
+                x = currentR - (currentR * 2 * progressOnSide)
+                z = -currentR
+            else -- 左
+                x = -currentR
+                z = -currentR + (currentR * 2 * progressOnSide)
+            end
+            return Vector3.new(x, currentH + c.Height, z + c.Back)
+        else
+            local theta = time * c.Speed + ratio * math.pi * 4
+            return Vector3.new(math.cos(theta) * currentR, currentH + c.Height, math.sin(theta) * currentR + c.Back)
+        end
+
+    elseif mode == "Gyro" then
+        local outerLimit = math.ceil(count * 0.5)
+        local innerLimit = math.ceil(count * 0.8)
+        local finalPos
+        
+        if i <= outerLimit then
+            -- 外側の縦向き円 (XY平面)
+            local idx = i
+            local total = outerLimit
+            local r = c.Size
+            local angle = (idx / total) * math.pi * 2 + time * c.Speed -- 外側も回転させる
+            
+            local x = math.cos(angle) * r
+            local y = math.sin(angle) * r
+            finalPos = Vector3.new(x, y, 0)
+            
+        else
+            -- 内側（内側の円 + 中心）
+            if i <= innerLimit then
+                -- 内側の円 (斜めに回転)
+                local idx = i - outerLimit
+                local total = innerLimit - outerLimit
+                local r = c.Size
+                local angle = (idx / total) * math.pi * 2 + time * c.Speed
+                
+                -- YZ平面の円をベースにする
+                local y = math.cos(angle) * r
+                local z = math.sin(angle) * r
+                
+                -- Z軸周りに45度回転させて斜めにする
+                local tilt = math.rad(45)
+                local tx = -y * math.sin(tilt) -- x(0) * cos - y * sin
+                local ty = y * math.cos(tilt)  -- x(0) * sin + y * cos
+                
+                finalPos = Vector3.new(tx, ty, z)
+            else
+                -- 中心オブジェクト (選択可能)
+                local idx = i - innerLimit
+                local total = count - innerLimit
+                local r = (c.InnerSize or (c.Size * 0.6)) * 0.4
+                local cType = c.CenterType or "Sphere"
+                
+                if cType == "Sphere" then
+                    local phi = math.acos(-1 + (2 * idx) / total)
+                    local theta = math.sqrt(total * math.pi) * phi + time * c.Speed * 2
+                    local x = r * math.cos(theta) * math.sin(phi)
+                    local y = r * math.sin(theta) * math.sin(phi)
+                    local z = r * math.cos(phi)
+                    finalPos = Vector3.new(x, y, z)
+                elseif cType == "Cube" then
+                    local t = time * c.Speed
+                    local x = math.clamp(math.sin(t + idx) * r * 1.5, -r, r)
+                    local y = math.clamp(math.cos(t * 1.1 + idx) * r * 1.5, -r, r)
+                    local z = math.clamp(math.sin(t * 1.3 + idx) * r * 1.5, -r, r)
+                    finalPos = Vector3.new(x, y, z)
+                elseif cType == "Vertical" then
+                    local angle = (idx / total) * math.pi * 2 + time * c.Speed * 4
+                    local x = math.cos(angle) * r
+                    local y = math.sin(angle) * r
+                    finalPos = Vector3.new(x, y, 0)
+                else -- Random
+                    local seed = idx * 13.37
+                    local x = math.sin(time * 2 + seed) * r
+                    local y = math.cos(time * 2.5 + seed) * r
+                    local z = math.sin(time * 1.5 + seed) * r
+                    finalPos = Vector3.new(x, y, z)
                 end
-             end)
-             return CheckNetworkOwnerShipOnPart(part)
+            end
+
+            -- 内側のみエフェクト全体（構造）を回転させる
+            local rotAngle = gyroInnerAngle -- 物理ベースの角度を使用
+            local rx = finalPos.X * math.cos(rotAngle) - finalPos.Z * math.sin(rotAngle)
+            local rz = finalPos.X * math.sin(rotAngle) + finalPos.Z * math.cos(rotAngle)
+            finalPos = Vector3.new(rx, finalPos.Y, rz)
+        end
+        
+        if not finalPos then return Vector3.zero end
+
+        -- エフェクト全体は回転させず、オフセットのみ適用
+        return Vector3.new(finalPos.X, finalPos.Y + c.Height, finalPos.Z + c.Back)
+    end
+    
+    return Vector3.zero
+end
+
+--------------------------------------------------------------------------------
+-- [メイン機能] エフェクト制御 (Start / Stop / Update)
+--------------------------------------------------------------------------------
+local function stopEffect()
+    isEnabled = false
+    if updateConnection then 
+        updateConnection:Disconnect()
+        updateConnection = nil 
+    end
+    
+    -- ジャイロの状態をリセット
+    gyroInnerAngularVelocity = 0
+    gyroInnerAngle = 0
+    
+    -- アタッチメント削除 & 固定化
+    for _, v in ipairs(activeToys) do
+        pcall(function() 
+            v.Part.Anchored = false 
+            v.A0:Destroy()
+            v.A1:Destroy()
+            v.AP:Destroy()
+            v.AO:Destroy() 
+        end)
+    end
+    activeToys = {}
+    
+    -- 当たり判定復元
+    for part, val in pairs(originalCollisions) do
+        if part and part.Parent then 
+            part.CanCollide = val 
         end
     end
-    return false
+    originalCollisions = {}
 end
 
-local function SNOWshipPlayer(player)
-    if player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Head") then
-        -- Blizはプレイヤーの所有権チェックにHeadを使用
-        local head = player.Character.Head
-        if CheckNetworkOwnerShipOnPart(head) then return true end
-        return SNOWship(player.Character.HumanoidRootPart)
+local function startEffect()
+    stopEffect()
+    activeToys = {}
+    lastUpdateTick = tick() -- 物理計算用の時間リセット
+
+    if not targetMain or not targetMain.Character then return end
+    local root = targetMain.Character:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    
+    local fws = {}
+    local myName = LocalPlayer.Name
+    
+    local maxCount
+    if combinedActive then
+        local c1 = (cfg.Combined.Mode1 ~= "なし") and (cfg.Combined.Mode1Count or 15) or 0
+        local c2 = (cfg.Combined.Mode2 ~= "なし") and (cfg.Combined.Mode2Count or 15) or 0
+        local c3 = (cfg.Combined.Mode3 ~= "なし") and (cfg.Combined.Mode3Count or 0) or 0
+        maxCount = c1 + c2 + c3
+    else
+        maxCount = cfg.Global.MaxToys or 30 
     end
-    return false
-end
 
--- Bliz Logic: Check Objects Around Player
-local function CheckObjectsAroundPlayer()
-    if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return {} end
-    local myRoot = LocalPlayer.Character.HumanoidRootPart
-    
-    local params = OverlapParams.new()
-    params.FilterDescendantsInstances = {LocalPlayer.Character, Workspace:FindFirstChild("Map"), Workspace:FindFirstChild("Plots")}
-    params.FilterType = Enum.RaycastFilterType.Exclude
-    
-    local parts = Workspace:GetPartBoundsInRadius(myRoot.Position, 30, params)
-    local objects = {}
-    
-    for _, part in ipairs(parts) do
-        if part:IsA("BasePart") and not part.Anchored and part.Name ~= "Handle" and part.Parent and not part.Parent:FindFirstChild("Humanoid") then
-             table.insert(objects, part)
+    local allMyItems = {}
+    local plotsFolder = Workspace:FindFirstChild("Plots")
+    local plotItemsFolder = Workspace:FindFirstChild("PlotItems")
+
+    -- 0. Get items from SpawnedInToys (Cosmic style)
+    if useOtherToys then
+        for _, folder in ipairs(Workspace:GetChildren()) do
+            if folder.Name:match("SpawnedInToys$") then
+                for _, item in ipairs(folder:GetChildren()) do
+                    table.insert(allMyItems, item)
+                end
+            end
+        end
+    else
+        local spawnedToys = Workspace:FindFirstChild(myName .. "SpawnedInToys")
+        if spawnedToys then
+            for _, item in ipairs(spawnedToys:GetChildren()) do
+                table.insert(allMyItems, item)
+            end
         end
     end
-    return objects
+
+    -- 1. Get items from my plot
+    if plotsFolder and plotItemsFolder then
+        for _, plot in ipairs(plotsFolder:GetChildren()) do
+            local sign = plot:FindFirstChild("PlotSign")
+            local ownerObj = sign and (sign:FindFirstChild("ThisPlotsOwners") or sign:FindFirstChild("Owner"))
+            if ownerObj then
+                local val = ownerObj:FindFirstChild("Value") or ownerObj
+                local data = val:FindFirstChild("Data") or val
+                local isMine = (data:IsA("StringValue") and data.Value == myName)
+                
+                if isMine or useOtherToys then
+                    local myPlotName = plot.Name
+                    local targetFolder = plotItemsFolder:FindFirstChild(myPlotName)
+                    if targetFolder then
+                        for _, item in ipairs(targetFolder:GetChildren()) do
+                            table.insert(allMyItems, item)
+                        end
+                    end
+                    if isMine and not useOtherToys then break end
+                end
+            end
+        end
+    end
+
+    -- 2. Get items directly from Workspace that I own
+    for _, item in ipairs(Workspace:GetChildren()) do
+        local ownerValue = item:FindFirstChild("Owner") or item:FindFirstChild("PartOwner")
+        if item:IsA("Model") and ownerValue and ownerValue:IsA("StringValue") then
+            if (ownerValue.Value == myName or useOtherToys) and not table.find(allMyItems, item) then
+                 table.insert(allMyItems, item)
+            end
+        end
+    end
+
+    -- 3. Filter items based on selection and add to fws
+    for _, item in ipairs(allMyItems) do
+        if #fws >= maxCount then break end
+        if item:IsA("Model") and item.PrimaryPart and (selectedItemName == "全てのおもちゃ" or item.Name == selectedItemName) then
+            table.insert(fws, item)
+        end
+    end
+
+    -- 4. Ensure network ownership for all found items
+    for _, item in ipairs(fws) do
+        for _, part in ipairs(item:GetDescendants()) do
+            if part:IsA("BasePart") then
+                pcall(function() part:SetNetworkOwner(LocalPlayer) end)
+            end
+        end
+    end
+
+    if #fws == 0 then
+        warn("おもちゃが見つかりませんでした。")
+        return
+    end
+
+        print("おもちゃを " .. #fws .. " 個捕捉しました。 (目標数: " .. maxCount .. ")")
+
+   -- ネットワークオーナーシップを強制的に取得
+    for i, model in ipairs(fws) do
+        local pp = model.PrimaryPart
+        
+        -- 全パーツの勢いを殺す
+        for _, d in ipairs(model:GetDescendants()) do 
+            if d:IsA("BasePart") then
+                d.AssemblyLinearVelocity = Vector3.zero
+                d.AssemblyAngularVelocity = Vector3.zero
+                pcall(function() d:SetNetworkOwner(LocalPlayer) end)
+            end
+        end
+        
+        -- スタート時の爆発を防ぐため、計算上の初期位置に直接配置する
+        if root then
+            local m, relIdx, relTotal
+            if combinedActive then
+                local c1 = (cfg.Combined.Mode1 ~= "なし") and (cfg.Combined.Mode1Count or 15) or 0
+                local c2 = (cfg.Combined.Mode2 ~= "なし") and (cfg.Combined.Mode2Count or 15) or 0
+                
+                if i <= c1 then
+                    m = cfg.Combined.Mode1
+                    relIdx = i
+                    relTotal = c1
+                elseif i <= c1 + c2 then
+                    m = cfg.Combined.Mode2
+                    relIdx = i - c1
+                    relTotal = c2
+                else
+                    m = cfg.Combined.Mode3
+                    relIdx = i - c1 - c2
+                    relTotal = cfg.Combined.Mode3Count or 0
+                end
+            else
+                m = currentMode
+                relIdx = i
+                relTotal = #fws
+            end
+            if m and m ~= "なし" then
+                local relativePos = getPositionForMode(m, relIdx, relTotal, tick())
+                pp.CFrame = root.CFrame:ToWorldSpace(CFrame.new(relativePos))
+            end
+        end
+        
+        pp.Anchored = false -- 配置が終わってから物理を有効化
+        pcall(function() pp:SetNetworkOwner(LocalPlayer) end)
+
+        -- 当たり判定無効化
+        for _, d in ipairs(model:GetDescendants()) do 
+            if d:IsA("BasePart") then 
+                if originalCollisions[d] == nil then originalCollisions[d] = d.CanCollide end
+                d.CanCollide = false
+                d.CanTouch = false
+                d.CanQuery = false
+            end 
+        end
+        
+        -- (AttachmentやAlignPositionの設定はそのまま...)
+        local a0 = Instance.new("Attachment", pp)
+        local ap = Instance.new("AlignPosition", pp)
+        ap.Attachment0 = a0
+        ap.Mode = Enum.PositionAlignmentMode.OneAttachment
+        ap.MaxForce = 1e9
+        ap.Responsiveness = 800
+        
+        local ao = Instance.new("AlignOrientation", pp)
+        ao.Attachment0 = a0
+        ao.Mode = Enum.OrientationAlignmentMode.OneAttachment
+        ao.MaxTorque = 1e9
+        ao.Responsiveness = 800
+        
+        table.insert(activeToys, {A0=a0, AP=ap, AO=ao, Part=pp})
+    end
+    
+    isEnabled = true
+
+    local frameCounter = 0
+    updateConnection = RunService.RenderStepped:Connect(function()
+    if lowLatencyMode and targetMain ~= LocalPlayer then
+        frameCounter = frameCounter + 1
+        if frameCounter % 2 == 0 then return end
+    end
+
+    local char = targetMain.Character
+    local rootPart = char and char:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return end
+
+    -- ジャイロの物理演算
+    local now = tick()
+    local deltaTime = now - lastUpdateTick
+    lastUpdateTick = now
+
+    local playerVelocity = rootPart.AssemblyLinearVelocity * Vector3.new(1, 0, 1)
+    local playerSpeed = playerVelocity.Magnitude
+    local targetAngularVelocity = playerSpeed * 0.1 -- 速度に応じて目標回転速度を設定
+    local damping = 0.97 -- 慣性の強さ (1に近いほど強い)
+    gyroInnerAngularVelocity = gyroInnerAngularVelocity * damping + targetAngularVelocity * (1 - damping)
+    gyroInnerAngle = gyroInnerAngle + gyroInnerAngularVelocity * deltaTime
+
+    local baseCF
+    if isReturningToPlot then
+        if not lastBaseCF then lastBaseCF = rootPart.CFrame end
+        baseCF = lastBaseCF
+    else
+        if followMethod == "プレイヤー" then
+            baseCF = rootPart.CFrame
+            lastBaseCF = baseCF
+        elseif followMethod == "視線の先" then
+            local rayOrigin = Camera.CFrame.Position
+            local rayDirection = Camera.CFrame.LookVector * 1000
+            local rayParams = RaycastParams.new()
+            rayParams.FilterDescendantsInstances = {LocalPlayer.Character}
+            rayParams.FilterType = Enum.RaycastFilterType.Exclude
+            local rayResult = Workspace:Raycast(rayOrigin, rayDirection, rayParams)
+
+            if rayResult then
+                baseCF = CFrame.new(rayResult.Position)
+                lastBaseCF = baseCF
+            else
+                baseCF = lastBaseCF or (Camera.CFrame * CFrame.new(0, 0, -20))
+            end
+        else -- "固定"
+            if not lastBaseCF then lastBaseCF = rootPart.CFrame end
+            baseCF = lastBaseCF
+        end
+    end
+
+    local t = tick()
+    
+    -- エフェクト全体の回転を計算
+    local effectRot = cfg.Global.EffectRotation or Vector3.zero
+    local effectRotationCF = CFrame.Angles(math.rad(effectRot.X), math.rad(effectRot.Y), math.rad(effectRot.Z))
+    local rotatedBaseCF = baseCF * effectRotationCF
+
+    -- おもちゃ個別の回転を計算
+    local indivRot = cfg.Global.IndividualRotation or Vector3.new(0, -90, 0)
+    local individualRotation = CFrame.Angles(math.rad(indivRot.X), math.rad(indivRot.Y), math.rad(indivRot.Z))
+    
+    local c1, c2
+    if combinedActive then
+        c1 = (cfg.Combined.Mode1 ~= "なし") and (cfg.Combined.Mode1Count or 15) or 0
+        c2 = (cfg.Combined.Mode2 ~= "なし") and (cfg.Combined.Mode2Count or 15) or 0
+    end
+
+    for i, fw in ipairs(activeToys) do
+        local m, relIdx, relTotal
+        if combinedActive then
+            if i <= c1 then
+                m = cfg.Combined.Mode1
+                relIdx = i
+                relTotal = c1
+            elseif i <= c1 + c2 then
+                m = cfg.Combined.Mode2
+                relIdx = i - c1
+                relTotal = c2
+            else
+                m = cfg.Combined.Mode3
+                relIdx = i - c1 - c2
+                relTotal = cfg.Combined.Mode3Count or 0
+            end
+        else
+            m = currentMode
+            relIdx = i
+            relTotal = #activeToys
+        end
+
+        if m and m ~= "なし" then
+            local relativePos = getPositionForMode(m, relIdx, relTotal, t)
+            local worldPos = rotatedBaseCF:PointToWorldSpace(relativePos)
+            
+            if worldPos.Y < -85 then worldPos = Vector3.new(worldPos.X, -85, worldPos.Z) end
+            
+            fw.AP.Position = worldPos
+            if m == "BackGuard" then
+                fw.AO.CFrame = CFrame.lookAt(worldPos, rotatedBaseCF.Position) * individualRotation
+            elseif m == "Rotate" or m == "MagicCircle" or m == "FloatStone" or m == "Merkaba" or m == "Cube" or m == "Tornado" or m == "Pyramid" or m == "Gyro" then
+                -- CFrame.lookAtが同じ座標でエラーを起こしフリーズするのを防ぐ
+                local nextPos = rotatedBaseCF:PointToWorldSpace(getPositionForMode(m, relIdx, relTotal, t + 0.05))
+                if nextPos.Y < -85 then nextPos = Vector3.new(nextPos.X, -85, nextPos.Z) end
+
+                if (worldPos - nextPos).Magnitude < 0.001 then
+                    -- 座標が同じ場合はデフォルトの向きを使い、エラーを回避
+                    fw.AO.CFrame = rotatedBaseCF * individualRotation
+                else
+                    fw.AO.CFrame = CFrame.lookAt(worldPos, nextPos) * individualRotation
+                end
+            else
+                fw.AO.CFrame = rotatedBaseCF * individualRotation
+            end
+        else
+            fw.AP.Position = Vector3.new(0, -10000, 0)
+        end
+    end -- for ループの閉じ
+end)
 end
 
--- UIを生成
-local Window = OrionLib:MakeWindow({
-    Name = "Test Hub",
-    HidePremium = false,
-    SaveConfig = false, -- 保存機能を無効化 (クラッシュ防止)
-    ConfigFolder = "TestHub",
-    IntroEnabled = true,
-    IntroText = "ホロンハブ追加予定"
-})
+--------------------------------------------------------------------------------
+-- [汎用ベースポイント帰還機能]
+--------------------------------------------------------------------------------
+local selectedHouseCF = nil 
+local houseCoords = {
+    ["桜の家"] = CFrame.new(548, 123, -73),
+    ["水色の家"] = CFrame.new(509, 83, -338),
+    ["紫の家"] = CFrame.new(255, -7, 449),
+    ["緑の家"] = CFrame.new(-534, -7, 89),
+    ["ピンクの家"] = CFrame.new(-485, -7, -163)
+}
+local plotNames = {
+    [1] = "緑の家", [2] = "ピンクの家", [3] = "紫の家", [4] = "水色の家", [5] = "桜の家"
+}
+local HomeStatus = nil -- UIアクセス用
 
--- タブ作成
-local GrabTab = Window:MakeTab({
-	Name = "掴む",
-	Icon = "rbxassetid://4483345998" -- Grab Icon
-})
+task.spawn(function()
+    while true do
+        task.wait(1)
+        if cfg.PlotReturn.Enabled then
+            local char = LocalPlayer.Character
+            local root = char and char:FindFirstChild("HumanoidRootPart")
+            
+            if root then
+                local found = false
+                pcall(function()
+                    local plots = Workspace:FindFirstChild("Plots")
+                    if plots then
+                        for i = 1, 5 do
+                            local plot = plots:FindFirstChild("Plot" .. i)
+                            if plot then
+                                local sign = plot:FindFirstChild("PlotSign")
+                                local owners = sign and sign:FindFirstChild("ThisPlotsOwners")
+                                
+                                if owners then
+                                    local ownerName = nil
+                                    local timeVal = 0
+                                    
+                                    local valObj = owners:FindFirstChild("Value")
+                                    if valObj and valObj:IsA("StringValue") then
+                                        ownerName = valObj.Value
+                                        local t = valObj:FindFirstChild("TimeRemainingNum")
+                                        if t then timeVal = t.Value end
+                                    elseif owners:IsA("StringValue") then
+                                        ownerName = owners.Value
+                                        local t = owners:FindFirstChild("TimeRemainingNum")
+                                        if t then timeVal = t.Value end
+                                    end
 
-local DefenseTab = Window:MakeTab({
-    Name = "無敵 (Invincibility)",
-    Icon = "rbxassetid://7734056608"
-})
+                                    if ownerName == LocalPlayer.Name then
+                                        found = true
+                                        local houseName = plotNames[i] or "Unknown"
+                                        if HomeStatus then
+                                            HomeStatus:Set("家: " .. houseName .. "\n残り時間: " .. tostring(timeVal) .. "秒")
+                                        end
+                                        
+                                        if timeVal <= 20 and timeVal > 0 then
+                                            local targetCF = houseCoords[houseName]
+                                            if targetCF then
+                                                isReturningToPlot = true
+                                                local oldCF = root.CFrame
+                                                
+                                                -- 家にテレポート
+                                                root.CFrame = targetCF
+                                                
+                                                -- 時間が回復するまで待機 (最大3秒)
+                                                local waitStart = tick()
+                                                while tick() - waitStart < 3 do
+                                                    local currentT = 0
+                                                    if valObj and valObj:FindFirstChild("TimeRemainingNum") then
+                                                        currentT = valObj.TimeRemainingNum.Value
+                                                    elseif owners:FindFirstChild("TimeRemainingNum") then
+                                                        currentT = owners.TimeRemainingNum.Value
+                                                    end
+                                                    
+                                                    if currentT > 20 then break end
+                                                    task.wait(0.1)
+                                                end
 
-local ActionTab = Window:MakeTab({
-    Name = "アクション",
-    Icon = "rbxassetid://7743875962" -- Player Icon
-})
+                                                root.CFrame = oldCF
+                                                isReturningToPlot = false
+                                                task.wait(2) -- 連続テレポート防止
+                                            end
+                                        end
+                                        break
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end)
+                
+                if not found and HomeStatus then
+                    HomeStatus:Set("家が見つかりません (Plotに入ってください)")
+                end
+            end
+        else
+            if HomeStatus then
+                HomeStatus:Set("自動リセット無効")
+            end
+        end
+    end
+end)
 
-local AuraTab = Window:MakeTab({
-	Name = "オーラ",
-	Icon = "rbxassetid://7733955740"
-})
+--------------------------------------------------------------------------------
+-- [ESP & サブ機能] 更新ループ (Prometheus対応版)
+--------------------------------------------------------------------------------
+-- 共通のクリーンアップ関数（退出時や非表示時に使用）
+local function removeESP(p)
+    local esp = espCache[p]
+    if esp then
+        if esp.H then pcall(function() esp.H:Destroy() end) end
+        if esp.B then pcall(function() esp.B:Destroy() end) end
+        if esp.T then 
+            pcall(function() 
+                esp.T.Visible = false 
+                esp.T:Remove() -- DrawingオブジェクトはRemove()で完全に消去
+            end) 
+        end
+        espCache[p] = nil
+    end
+end
 
-local KeyboardTab = Window:MakeTab({
-	Name = "キーボード",
-	Icon = "rbxassetid://10734950309" -- Config Icon
-})
+-- プレイヤーがサーバーを抜けた時に即座に実行
+Players.PlayerRemoving:Connect(removeESP)
 
--- プレイヤーリスト取得関数 (holonhub.luaより)
+local function updateSubFeatures()
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then
+            local char = p.Character
+            local root = char and char:FindFirstChild("HumanoidRootPart")
+            local hum = char and char:FindFirstChild("Humanoid")
+            
+            local shouldShow = false
+            local isTarget = (not espCfg.TargetOnly) or (espCfg.TargetOnly and p == targetSub)
+            
+            -- 設定が有効、かつターゲット一致、かつ生存している場合
+            if espCfg.Enabled and isTarget and root and hum and hum.Health > 0 then
+                shouldShow = true
+            end
+
+            local esp = espCache[p] or {}
+            
+            if shouldShow then
+                -- 1. ハイライト処理
+                if not esp.H or esp.H.Parent ~= char then 
+                    esp.H = Instance.new("Highlight")
+                    esp.H.Parent = char
+                    esp.H.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+                end
+                esp.H.Enabled = true
+                esp.H.FillColor = espCfg.ESPColor
+
+                -- 2. アイコン付き名前表示 (確実に動くURL形式)
+                if not esp.B or esp.B.Parent ~= root then
+                    esp.B = Instance.new("BillboardGui")
+                    esp.B.Parent = root
+                    esp.B.Size = UDim2.new(0, 250, 0, 50)
+                    esp.B.AlwaysOnTop = true
+                    esp.B.ExtentsOffset = Vector3.new(0, 3, 0)
+
+                    local frame = Instance.new("Frame", esp.B)
+                    frame.Size = UDim2.new(1, 0, 1, 0)
+                    frame.BackgroundTransparency = 1
+
+                    local icon = Instance.new("ImageLabel", frame)
+                    icon.Name = "Icon"
+                    icon.Size = UDim2.new(0, 30, 0, 30)
+                    icon.Position = UDim2.new(0, 0, 0.5, -15)
+                    icon.BackgroundTransparency = 1
+                    -- アイコンが表示されていた形式のURLを使用
+                    icon.Image = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. p.UserId .. "&width=420&height=420&format=png"
+
+                    local l = Instance.new("TextLabel", frame)
+                    l.Name = "NameLabel"
+                    l.Size = UDim2.new(1, -35, 1, 0)
+                    l.Position = UDim2.new(0, 35, 0, 0)
+                    l.BackgroundTransparency = 1
+                    l.TextXAlignment = Enum.TextXAlignment.Left
+                    l.TextStrokeTransparency = 0
+                    l.Font = Enum.Font.SourceSansBold
+                    l.TextSize = 14
+                    
+                    esp.L = l
+                    esp.I = icon
+                end
+                esp.B.Enabled = espCfg.Names
+                esp.L.Text = p.DisplayName .. " (@" .. p.Name .. ")"
+                esp.L.TextColor3 = espCfg.ESPColor
+
+                -- 3. トレーサー (改善版)
+                if espCfg.Tracers then
+                    if not esp.T then
+                        esp.T = Drawing.new("Line")
+                        esp.T.Thickness = 1
+                        esp.T.Transparency = 1
+                    end
+                    
+                    local screenPos, onScreen = Camera:WorldToViewportPoint(root.Position)
+                    esp.T.From = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y)
+                    esp.T.Color = espCfg.ESPColor
+                    
+                    if onScreen then
+                        esp.T.To = Vector2.new(screenPos.X, screenPos.Y)
+                        esp.T.Visible = true
+                    else
+                        -- 画面外のトレーサー処理（不要な場合は visible = false に）
+                        esp.T.Visible = false 
+                    end
+                elseif esp.T then
+                    esp.T.Visible = false
+                end
+
+                -- 4. ヒットボックス
+                if espCfg.Hitbox then
+                    root.Size = Vector3.new(espCfg.HitboxSize, espCfg.HitboxSize, espCfg.HitboxSize)
+                    root.Transparency = 0.5
+                    root.Color = espCfg.ESPColor
+                    root.CanCollide = false
+                else
+                    root.Size = Vector3.new(2, 2, 1)
+                    root.Transparency = 1
+                end
+                espCache[p] = esp
+            else
+                -- 表示不要（退出・死亡・設定OFF）になったら即座にクリーンアップ
+                removeESP(p)
+                -- ヒットボックスのサイズも元に戻す
+                if root and root.Parent then
+                    root.Size = Vector3.new(2, 2, 1)
+                    root.Transparency = 1
+                end
+            end
+        end
+    end
+end
+
+RunService.Heartbeat:Connect(updateSubFeatures)
+
+-- プレイヤー機能ループ
+UserInputService.JumpRequest:Connect(function()
+    if infiniteJump and LocalPlayer.Character then
+        local hum = LocalPlayer.Character:FindFirstChild("Humanoid")
+        if hum then hum:ChangeState(Enum.HumanoidStateType.Jumping) end
+    end
+end)
+
+RunService.Stepped:Connect(function(time, deltaTime)
+    if not LocalPlayer.Character then return end
+    local hum = LocalPlayer.Character:FindFirstChild("Humanoid")
+    local root = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+
+    if hum then
+        if useWalkSpeed and root and hum.MoveDirection.Magnitude > 0 then
+            -- CFrameによる移動 (Cosmic Hub参考)
+            local extraSpeed = math.max(0, walkSpeed - 16)
+            root.CFrame = root.CFrame + (hum.MoveDirection * (extraSpeed * deltaTime))
+        end
+        if useJumpPower then 
+            hum.UseJumpPower = true
+            hum.JumpPower = jumpPower
+            -- UseJumpPowerが強制的にfalseにされる場合への対策 (JumpHeightを使用)
+            if not hum.UseJumpPower then
+                hum.JumpHeight = jumpPower * 0.2 -- 概算
+            end
+        end
+    end
+    
+    if antiFire then
+        for _, v in ipairs(LocalPlayer.Character:GetDescendants()) do
+            if v:IsA("Fire") then v:Destroy() end
+        end
+    end
+    
+    if antiGrab then
+        local char = LocalPlayer.Character
+        if char then
+            -- Cosmic style Anti-Grab Loop
+            local head = char:FindFirstChild("Head")
+            local isHeldVal = LocalPlayer:FindFirstChild("IsHeld")
+            local isHeld = (head and head:FindFirstChild("PartOwner")) or (isHeldVal and isHeldVal.Value)
+            local struggleEvt = ReplicatedStorage:FindFirstChild("CharacterEvents") and ReplicatedStorage.CharacterEvents:FindFirstChild("Struggle")
+
+            if isHeld then
+                -- 掴まれている間、固定して抵抗し続ける
+                for _, p in ipairs(char:GetChildren()) do
+                    if p:IsA("BasePart") then p.Anchored = true end
+                end
+                
+                if struggleEvt then
+                    struggleEvt:FireServer(LocalPlayer) -- 引数追加
+                end
+            else
+                -- 掴まれていない、かつアンチ爆発(ラグドール)中でなければ固定解除
+                local isRagdolled = antiExplosion and char:FindFirstChild("Humanoid") and char.Humanoid:FindFirstChild("Ragdolled") and char.Humanoid.Ragdolled.Value
+                if not isRagdolled then
+                    for _, p in ipairs(char:GetChildren()) do
+                        if p:IsA("BasePart") then p.Anchored = false end
+                    end
+                end
+            end
+        end
+    end
+
+    -- Noclip
+    if noclip and LocalPlayer.Character then
+        for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
+            if part:IsA("BasePart") and part.CanCollide then
+                part.CanCollide = false
+            end
+        end
+    end
+end)
+
+Workspace.DescendantAdded:Connect(function(v)
+    if antiExplosion and v:IsA("Explosion") then
+        v.BlastPressure = 0
+        v.BlastRadius = 0
+        v.Visible = false
+        task.wait()
+        v:Destroy()
+    end
+end)
+
+-- Anti-Explosion (Ragdoll Anchor) & Anti-Fire (Extinguish) Loop 修正版
+local extOriginalCFrame = nil
+local extPart = nil
+
+task.spawn(function()
+    while true do
+        task.wait(0.1)
+        local char = LocalPlayer.Character
+        if char then
+            -- Anti-Explosion: Ragdoll Anchor (修正: 解除処理を追加)
+            if antiExplosion then
+                local hum = char:FindFirstChild("Humanoid")
+                if hum then
+                    local rag = hum:FindFirstChild("Ragdolled")
+                    if rag and rag.Value then
+                        -- ラグドール中は固定
+                        for _, p in ipairs(char:GetChildren()) do
+                            if p:IsA("BasePart") then p.Anchored = true end
+                        end
+                    else
+                        -- ラグドール解除後は固定解除 (動けるようにする)
+                        for _, p in ipairs(char:GetChildren()) do
+                            if p:IsA("BasePart") then p.Anchored = false end
+                        end
+                    end
+                end
+            end
+
+            -- Anti-Fire: Extinguish Part (修正: 紫の物体を元の位置に戻す)
+            if antiFire then
+                local hrp = char:FindFirstChild("HumanoidRootPart")
+                local hasFire = hrp and (hrp:FindFirstChild("FireLight") or hrp:FindFirstChild("FireParticleEmitter"))
+                
+                -- パーツを一度だけ取得・保存
+                if not extPart then
+                    local map = Workspace:FindFirstChild("Map")
+                    local hole = map and map:FindFirstChild("Hole")
+                    local poison = hole and hole:FindFirstChild("PoisonBigHole")
+                    extPart = poison and poison:FindFirstChild("ExtinguishPart")
+                    if extPart then extOriginalCFrame = extPart.CFrame end
+                end
+                
+                if extPart then
+                    if hasFire then
+                        -- 炎があるなら消火パーツを自分に持ってくる
+                        extPart.CFrame = hrp.CFrame
+                    elseif extOriginalCFrame then
+                        -- 炎が消えたら元の位置に戻す (紫の物体を隠す)
+                        extPart.CFrame = extOriginalCFrame
+                    end
+                end
+            end
+        end
+    end
+end)
+
+
+--------------------------------------------------------------------------------
+-- [設定]保存、見た目 
+--------------------------------------------------------------------------------
+-- --- 設定読み込み用関数 ---
+-- 設定ファイルのリストをリアルタイムに取得する関数
+local function getConfigFileList()
+    local files = {}
+    if not isfolder("holon_config") then makefolder("holon_config") end
+    
+    for _, file in ipairs(listfiles("holon_config")) do
+        if file:sub(-5) == ".json" then
+            -- パスを除去してファイル名だけにする
+            local name = file:gsub("holon_config\\", ""):gsub("holon_config/", "")
+            table.insert(files, name)
+        end
+    end
+    if #files == 0 then table.insert(files, "ファイルなし") end
+    return files
+end
+
+-- 1. cfgの中にUIの項目がない場合のエラーを防止する
+if not cfg.UI then
+    cfg.UI = {
+        Transparency = 0.1,
+        BackgroundColor = Color3.fromRGB(25, 25, 25),
+        AccentColor = Color3.fromRGB(128, 128, 128),
+        BackgroundImage = ""
+    }
+end
+
+-- UI外観をリアルタイムに反映させるエンジン
+local function applyCustomStyle()
+    -- 安全策: cfg.UIが存在しない場合の初期化（ロード直後対策）
+    if not cfg.UI then
+        cfg.UI = {
+            Transparency = 0.1,
+            BackgroundColor = Color3.fromRGB(25, 25, 25),
+            AccentColor = Color3.fromRGB(128, 128, 128),
+            BackgroundImage = ""
+        }
+    end
+
+    local gui = game:GetService("CoreGui"):FindFirstChild("HorionUI")
+    if not gui then
+        gui = LocalPlayer:FindFirstChild("PlayerGui") and LocalPlayer.PlayerGui:FindFirstChild("HorionUI")
+    end
+
+    if gui then
+        local main = gui:FindFirstChild("Main")
+        if not main then
+            for _, child in ipairs(gui:GetChildren()) do
+                if child:IsA("Frame") and child:FindFirstChild("TopBar") then
+                    main = child
+                    break
+                end
+            end
+        end
+        
+        if main then
+            local bgColor = cfg.UI.BackgroundColor or Color3.fromRGB(25, 25, 25)
+            local trans = cfg.UI.Transparency or 0.1
+            local accent = cfg.UI.AccentColor or Color3.fromRGB(128, 128, 128)
+    
+            main.BackgroundColor3 = bgColor
+            main.BackgroundTransparency = trans
+            
+            -- 子要素を再帰的に探索してスタイル適用
+            for _, desc in ipairs(main:GetDescendants()) do
+                -- 1. 枠線 (UIStroke)
+                if desc:IsA("UIStroke") then
+                    desc.Color = accent
+                end
+                -- 2. 区切り線 (Lineという名前のFrame)
+                if desc:IsA("Frame") and desc.Name == "Line" then
+                    desc.BackgroundColor3 = accent
+                end
+                -- 3. サイドバーとトップバー
+                if desc:IsA("Frame") and (desc.Name == "SideBar" or desc.Name == "TopBar") then
+                    desc.BackgroundColor3 = bgColor
+                    desc.BackgroundTransparency = trans
+                    -- ヘッダーの角を丸くする
+                    if desc.Name == "TopBar" then
+                        local corner = desc:FindFirstChild("UICorner") or Instance.new("UICorner", desc)
+                        corner.CornerRadius = UDim.new(0, 9)
+                    end
+                end
+                -- 4. ボタンとタブ (TextButton)
+                -- 透明でないものだけ適用（見えないヒットボックスが表示されるのを防ぐ）
+                if desc:IsA("TextButton") and desc.BackgroundTransparency < 1 then
+                    desc.BackgroundColor3 = bgColor
+                    desc.BackgroundTransparency = trans
+                end
+            end
+            
+            -- メインフレーム自体の角も確実に丸くする
+            local mainCorner = main:FindFirstChild("UICorner") or Instance.new("UICorner", main)
+            mainCorner.CornerRadius = UDim.new(0, 9)
+        
+        -- 背景画像のリアルタイム処理
+        local bgImage = main:FindFirstChild("CustomBG")
+        if cfg.UI.BackgroundImage and cfg.UI.BackgroundImage ~= "" then
+            if not bgImage then
+                bgImage = Instance.new("ImageLabel")
+                bgImage.Name = "CustomBG"
+                bgImage.Parent = main
+                bgImage.Size = UDim2.new(1, 0, 1, 0)
+                bgImage.Position = UDim2.new(0, 0, 0, 0)
+                bgImage.ZIndex = 0
+                bgImage.BackgroundTransparency = 1
+            end
+            
+            local imgId = tostring(cfg.UI.BackgroundImage)
+            if not imgId:match("^rbxassetid://") then
+                imgId = "rbxassetid://" .. imgId
+            end
+            
+            bgImage.Image = imgId
+            bgImage.ImageTransparency = trans
+            bgImage.Visible = true
+        else
+            if bgImage then bgImage.Visible = false end
+        end
+        end
+    end
+end
+
+--------------------------------------------------------------------------------
+-- [UI 構築] orion lib
+--------------------------------------------------------------------------------
+local KeyFileName = "HolonHub_Key.txt"
+local CorrectKey = "holox"
+local OrionUrl = "https://raw.githubusercontent.com/hololove1021/HolonHUB/refs/heads/main/source.txt"
+
+-- [[ 1. メイン画面の関数 ]]
+local function StartHolonHUB()
+    -- スマホ対策：OrionLibを関数内で読み込み直す
+    local OrionLib = loadstring(game:HttpGet(OrionUrl))()
+    
+    -- 既存のUIを強制削除（二重表示防止）
+    pcall(function()
+        if game:GetService("CoreGui"):FindFirstChild("Orion") then 
+            game:GetService("CoreGui").Orion:Destroy() 
+        end
+    end)
+
+    local Window = OrionLib:MakeWindow({
+        Name = "Holon HUB v1.4.3",
+        HidePremium = false,
+        SaveConfig = false, -- 初期化時の干渉を防ぐため無効化
+        ConfigFolder = "HolonHUB",
+        IntroEnabled = true,
+        IntroText = "Holon HUB Load!"
+    })
+
+    -- test.luaベースの掴み機能
+    local superStrengthEnabled = false
+    local strengthValue = 400
+    local deathGrabEnabled = false
+    local noclipGrabEnabled = false
+    local perspectiveGrabEnabled = false
+    local perspectiveSpeed = 50
+    local invisibleLineEnabled = false
+
+    local lastGrabbedPart = nil
+    local noclipOriginalCollisions = {}
+
+    -- Line Extender (test.lua同等)
+    local IncreaseLineExtend = 3
+    local pcDistance = 0
+    local senv = nil
+    local minDistance = 3
+    _G.FutherExtend = _G.FutherExtend or false
+
+    local lineExtendGui = Instance.new("ScreenGui")
+    lineExtendGui.ResetOnSpawn = false
+    lineExtendGui.Name = "LineExtendGUI_Holon"
+    if LocalPlayer.PlayerGui:FindFirstChild("ContextActionGui") then
+        lineExtendGui.Parent = LocalPlayer.PlayerGui
+    end
+
+    local function isMobile()
+        return LocalPlayer.PlayerGui:FindFirstChild("ContextActionGui") ~= nil
+    end
+
+    local imageButton = Instance.new("ImageButton")
+    imageButton.Size = UDim2.new(0, 45, 0, 45)
+    imageButton.Position = UDim2.new(1, -70, 1, -259)
+    imageButton.Image = "rbxassetid://97166444"
+    imageButton.BackgroundTransparency = 1
+    imageButton.ImageTransparency = 0.2
+    imageButton.Visible = false
+    imageButton.ImageColor3 = Color3.fromRGB(142, 142, 142)
+    imageButton.Parent = lineExtendGui
+    local imageLabel = Instance.new("ImageLabel")
+    imageLabel.Size = UDim2.new(1, 0, 1, 0)
+    imageLabel.Image = "rbxassetid://9603831913"
+    imageLabel.BackgroundTransparency = 1
+    imageLabel.Parent = imageButton
+
+    local imageButtonDe = Instance.new("ImageButton")
+    imageButtonDe.Size = UDim2.new(0, 45, 0, 45)
+    imageButtonDe.Position = UDim2.new(1, -70, 1, -211)
+    imageButtonDe.Image = "rbxassetid://97166444"
+    imageButtonDe.BackgroundTransparency = 1
+    imageButtonDe.ImageTransparency = 0.2
+    imageButtonDe.Visible = false
+    imageButtonDe.ImageColor3 = Color3.fromRGB(142, 142, 142)
+    imageButtonDe.Parent = lineExtendGui
+    local imageLabelDe = Instance.new("ImageLabel")
+    imageLabelDe.Size = UDim2.new(1, 0, 1, 0)
+    imageLabelDe.Image = "rbxassetid://9603826756"
+    imageLabelDe.BackgroundTransparency = 1
+    imageLabelDe.Parent = imageButtonDe
+
+    local function updateSenv()
+        local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+        local scriptObj = char:WaitForChild("GrabbingScript", 10)
+        if scriptObj and getsenv then
+            senv = getsenv(scriptObj)
+        end
+    end
+    LocalPlayer.CharacterAdded:Connect(updateSenv)
+    task.spawn(updateSenv)
+
+    local function buttonClicked()
+        if senv and (senv.distance and _G.FutherExtend) then
+            senv.distance = (senv.distance or 0) + IncreaseLineExtend
+            if senv.distance < minDistance then
+                senv.distance = minDistance
+            end
+        end
+    end
+
+    local function buttonClickedDE()
+        if senv and (senv.distance and _G.FutherExtend) then
+            senv.distance = (senv.distance or 0) - IncreaseLineExtend
+            if senv.distance < minDistance then
+                senv.distance = minDistance
+            end
+        end
+    end
+
+    local buttonClickedFlag = false
+    local function runButtonLoop(func)
+        while buttonClickedFlag do
+            func()
+            task.wait(0.1)
+        end
+    end
+
+    imageButton.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch then
+            buttonClickedFlag = true
+            task.spawn(function() runButtonLoop(buttonClicked) end)
+        end
+    end)
+    imageButton.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch then
+            buttonClickedFlag = false
+        end
+    end)
+
+    imageButtonDe.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch then
+            buttonClickedFlag = true
+            task.spawn(function() runButtonLoop(buttonClickedDE) end)
+        end
+    end)
+    imageButtonDe.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch then
+            buttonClickedFlag = false
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(inputObject)
+        if inputObject.UserInputType == Enum.UserInputType.MouseWheel then
+            if pcDistance < 11 then pcDistance = 11 end
+            if inputObject.Position.Z <= 0 then
+                if inputObject.Position.Z < 0 then
+                    pcDistance = pcDistance - IncreaseLineExtend
+                end
+            else
+                pcDistance = pcDistance + IncreaseLineExtend
+            end
+        end
+    end)
+
+    local function toggleButtonState(visible)
+        if visible and _G.FutherExtend and isMobile() then
+            imageButton.Visible = true
+            imageButton.Active = true
+            imageButtonDe.Visible = true
+            imageButtonDe.Active = true
+        else
+            imageButton.Visible = false
+            imageButton.Active = false
+            imageButtonDe.Visible = false
+            imageButtonDe.Active = false
+        end
+    end
+
+    local function toggleDefaultExtendButtons(visible)
+        local CAG = LocalPlayer.PlayerGui:FindFirstChild("ContextActionGui")
+        if CAG then
+            for _, desc in pairs(CAG:GetDescendants()) do
+                if desc:IsA("ImageLabel") and (desc.Image == "rbxassetid://9603826756" or desc.Image == "rbxassetid://9603831913") then
+                    desc.Parent.Visible = visible
+                end
+            end
+        end
+    end
+
+    Workspace.ChildAdded:Connect(function(child)
+        if child.Name == "GrabParts" and child:IsA("Model") then
+            if _G.FutherExtend and not isMobile() then
+                local grabPartModel = child
+                local dragPart = grabPartModel:WaitForChild("DragPart", 2)
+                if dragPart then
+                    local dragPartClone = dragPart:Clone()
+                    dragPartClone.Name = "DragPart1"
+                    dragPartClone.AlignPosition.Attachment1 = dragPartClone.DragAttach
+                    dragPartClone.Parent = grabPartModel
+
+                    pcDistance = (dragPartClone.Position - Camera.CFrame.Position).Magnitude
+                    dragPartClone.AlignOrientation.Enabled = false
+                    dragPart.AlignPosition.Enabled = false
+
+                    task.spawn(function()
+                        while grabPartModel.Parent do
+                            dragPartClone.Position = Camera.CFrame.Position + Camera.CFrame.LookVector * pcDistance
+                            task.wait()
+                        end
+                        pcDistance = 0
+                    end)
+                end
+            end
+
+            if _G.FutherExtend and isMobile() then
+                toggleDefaultExtendButtons(false)
+                toggleButtonState(true)
+            end
+
+            local grabPart = child:FindFirstChild("GrabPart", true)
+            if not grabPart then return end
+            local weld = grabPart:FindFirstChildOfClass("WeldConstraint")
+
+            if weld and weld.Part1 then
+                lastGrabbedPart = weld.Part1
+                local grabbedModel = lastGrabbedPart.Parent
+
+                if superStrengthEnabled then
+                    local bv = Instance.new("BodyVelocity")
+                    bv.Name = "BlizSuperStrength"
+                    bv.MaxForce = Vector3.new(0, 0, 0)
+                    bv.Velocity = Vector3.new(0, 0, 0)
+                    bv.Parent = lastGrabbedPart
+                end
+
+                if deathGrabEnabled and grabbedModel and grabbedModel:FindFirstChildOfClass("Humanoid") then
+                    local player = Players:GetPlayerFromCharacter(grabbedModel)
+                    local hum = grabbedModel:FindFirstChildOfClass("Humanoid")
+                    local head = grabbedModel:FindFirstChild("Head")
+                    if player and player ~= LocalPlayer and hum and head then
+                        task.spawn(function()
+                            while child and child.Parent and hum.Health > 0 do
+                                if head:FindFirstChild("PartOwner") and head.PartOwner.Value == LocalPlayer.Name then
+                                    hum.BreakJointsOnDeath = false
+                                    hum:ChangeState(Enum.HumanoidStateType.Dead)
+                                    hum.Jump = true
+                                    hum.Sit = false
+                                end
+                                task.wait(0.1)
+                            end
+                        end)
+                    end
+                end
+
+                if noclipGrabEnabled and grabbedModel and not lastGrabbedPart.Anchored then
+                    noclipOriginalCollisions = {}
+                    task.spawn(function()
+                        for _, p in ipairs(grabbedModel:GetDescendants()) do
+                            if p:IsA("BasePart") then noclipOriginalCollisions[p] = p.CanCollide end
+                        end
+                        while child and child.Parent do
+                            for p in pairs(noclipOriginalCollisions) do
+                                if p and p.Parent then p.CanCollide = false end
+                            end
+                            task.wait(0.2)
+                        end
+                    end)
+                end
+
+                if perspectiveGrabEnabled then
+                    if GrabEvents then
+                        GrabEvents.CreateGrabLine:FireServer()
+                    end
+
+                    task.spawn(function()
+                        local char = LocalPlayer.Character
+                        if not char then return end
+                        local hum = char:FindFirstChildOfClass("Humanoid")
+                        local root = char:FindFirstChild("HumanoidRootPart")
+                        if not hum or not root then return end
+
+                        local camPart = Instance.new("Part")
+                        camPart.Name = "PerspectiveFocus"
+                        camPart.Transparency = 1
+                        camPart.CanCollide = false
+                        camPart.Anchored = true
+                        camPart.Parent = Workspace
+                        camPart.CFrame = Camera.CFrame
+
+                        Camera.CameraSubject = camPart
+                        Camera.CameraType = Enum.CameraType.Follow
+
+                        local conn = RunService.Heartbeat:Connect(function(dt)
+                            if not camPart or not camPart.Parent then return end
+
+                            local moveDir = hum.MoveDirection
+                            local finalMove = Vector3.zero
+
+                            if moveDir.Magnitude > 0.01 then
+                                local camCF = Camera.CFrame
+                                local camLookHorizontal = (camCF.LookVector * Vector3.new(1, 0, 1)).Unit
+                                local camRightHorizontal = (camCF.RightVector * Vector3.new(1, 0, 1)).Unit
+                                local forwardAmount = moveDir:Dot(camLookHorizontal)
+                                local rightAmount = moveDir:Dot(camRightHorizontal)
+                                finalMove = (camCF.LookVector * forwardAmount) + (camRightHorizontal * rightAmount)
+                            end
+
+                            if finalMove.Magnitude > 0.01 then
+                                camPart.CFrame = camPart.CFrame + finalMove.Unit * perspectiveSpeed * dt
+                            end
+
+                            root.CFrame = CFrame.new(527, 123, -376)
+                            root.AssemblyLinearVelocity = Vector3.zero
+                        end)
+
+                        while child.Parent do task.wait() end
+
+                        conn:Disconnect()
+                        local finalCamCF = Camera.CFrame
+                        Camera.CameraSubject = hum
+                        Camera.CameraType = Enum.CameraType.Custom
+                        camPart:Destroy()
+                        root.CFrame = finalCamCF
+
+                        if GrabEvents then
+                            GrabEvents.CreateGrabLine:FireServer()
+                        end
+                    end)
+                end
+            end
+        end
+    end)
+
+    Workspace.ChildRemoved:Connect(function(child)
+        if child.Name == "GrabParts" and child:IsA("Model") then
+            toggleButtonState(false)
+            toggleDefaultExtendButtons(true)
+
+            if superStrengthEnabled and lastGrabbedPart and lastGrabbedPart.Parent then
+                local bv = lastGrabbedPart:FindFirstChild("BlizSuperStrength")
+                if bv then
+                    if UserInputService:GetLastInputType() == Enum.UserInputType.MouseButton2 then
+                        bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+                        bv.Velocity = Camera.CFrame.LookVector * strengthValue
+                        DebrisService:AddItem(bv, 1)
+                    else
+                        bv:Destroy()
+                    end
+                end
+            end
+
+            for part, state in pairs(noclipOriginalCollisions) do
+                if part and part.Parent then
+                    pcall(function() part.CanCollide = state end)
+                end
+            end
+            noclipOriginalCollisions = {}
+            lastGrabbedPart = nil
+        end
+    end)
+
+    RunService.Heartbeat:Connect(function()
+        if not GrabEvents then return end
+
+        local grabbedModel = Workspace:FindFirstChild("GrabParts")
+        local currentTarget = lastGrabbedPart
+
+        if grabbedModel then
+            local gp = grabbedModel:FindFirstChild("GrabPart")
+            if gp then
+                local wc = gp:FindFirstChildOfClass("WeldConstraint")
+                if wc and wc.Part1 then
+                    currentTarget = wc.Part1
+                end
+            end
+        end
+
+        if currentTarget and currentTarget.Parent and invisibleLineEnabled then
+            pcall(function()
+                GrabEvents.CreateGrabLine:FireServer()
+            end)
+        end
+    end)
+
+    -- 防御系共通ロジック (test.luaの無敵要素)
+    local gucciConn = nil
+
+    local function setAntiGucciEnabled(v)
+        if v then
+            task.spawn(function()
+                local mt = ReplicatedStorage:FindFirstChild("MenuToys")
+                local st = mt and mt:FindFirstChild("SpawnToyRemoteFunction")
+                if st then
+                    st:InvokeServer("CreatureBlobman", CFrame.new(0, 50000, 0) * CFrame.Angles(-0.7351, 0.9028, 0.6173), Vector3.new(0, 59.667, 0))
+                end
+                task.wait(0.5)
+                local toys = Workspace:FindFirstChild(LocalPlayer.Name .. "SpawnedInToys")
+                local blob = toys and toys:FindFirstChild("CreatureBlobman")
+                if blob then
+                    local head = blob:FindFirstChild("Head")
+                    if head then
+                        head.CFrame = CFrame.new(0, 50000, 0)
+                        head.Anchored = true
+                    end
+
+                    local seat = blob:FindFirstChild("VehicleSeat")
+                    local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid")
+                    if seat and hum then seat:Sit(hum) end
+
+                    if gucciConn then gucciConn:Disconnect() end
+                    gucciConn = RunService.Heartbeat:Connect(function()
+                        local ce = ReplicatedStorage:FindFirstChild("CharacterEvents")
+                        local rr = ce and ce:FindFirstChild("RagdollRemote")
+                        local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                        if rr and hrp then rr:FireServer(hrp, 0) end
+                    end)
+                end
+            end)
+        else
+            if gucciConn then
+                gucciConn:Disconnect()
+                gucciConn = nil
+            end
+        end
+    end
+
+    local function PerformCounterAction(targetPlayer)
+        if not targetPlayer or not targetPlayer.Character then return end
+        local root = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+        local hum = targetPlayer.Character:FindFirstChild("Humanoid")
+        if not root or not hum then return end
+
+        if counterMode == "Repulsion" then
+            local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if myRoot then
+                local lookAtCFrame = CFrame.lookAt(myRoot.Position, root.Position)
+                local bv = Instance.new("BodyVelocity")
+                bv.Name = "RepulsionVelocity"
+                bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+                bv.Velocity = Vector3.new(lookAtCFrame.LookVector.X, 0.5, lookAtCFrame.LookVector.Z) * 100
+                bv.Parent = root
+                DebrisService:AddItem(bv, 0.5)
+
+                if GrabEvents and GrabEvents:FindFirstChild("DestroyGrabLine") then
+                    GrabEvents.DestroyGrabLine:FireServer(root)
+                end
+            end
+        elseif counterMode == "Death" then
+            if GrabEvents and GrabEvents:FindFirstChild("DestroyGrabLine") then
+                if not root:FindFirstChild("SkyVelocity") then
+                    local bv = Instance.new("BodyVelocity", root)
+                    bv.Name = "SkyVelocity"
+                    bv.Velocity = Vector3.new(0, 100000000000000, 0)
+                    bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+                end
+
+                for _ = 0, 20 do
+                    hum.BreakJointsOnDeath = false
+                    hum:ChangeState(Enum.HumanoidStateType.Dead)
+                    hum.Jump = true
+                    hum.Sit = true
+                end
+                task.wait()
+                GrabEvents.DestroyGrabLine:FireServer(root)
+            end
+        end
+    end
+
+    local function AttemptCounter(targetPlayer)
+        if not targetPlayer then return end
+        task.spawn(function()
+            local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if not myRoot then return end
+
+            for _ = 1, 50 do
+                if not targetPlayer.Character or not targetPlayer.Character.Parent then break end
+
+                local root = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+                local head = targetPlayer.Character:FindFirstChild("Head")
+                if not root or not head then task.wait(0.1) continue end
+
+                local po = head:FindFirstChild("PartOwner")
+                if po and po.Value == LocalPlayer.Name then
+                    PerformCounterAction(targetPlayer)
+                    break
+                else
+                    local sno = GrabEvents and GrabEvents:FindFirstChild("SetNetworkOwner")
+                    if sno and (root.Position - myRoot.Position).Magnitude <= 50 then
+                        local lookCF = CFrame.lookAt(myRoot.Position, root.Position)
+                        pcall(function()
+                            sno:FireServer(root, lookCF)
+                        end)
+                    end
+                end
+                task.wait(0.1)
+            end
+        end)
+    end
+
+    local function OnCharacterAdded(char)
+        char.DescendantAdded:Connect(function(descendant)
+            if _G.AutoAttacker and descendant.Name == "PartOwner" then
+                local attackerName = tostring(descendant.Value)
+                local attacker = Players:FindFirstChild(attackerName)
+                if attacker and attacker ~= LocalPlayer then
+                    OrionLib:MakeNotification({ Name = "Counter", Content = "Countering: " .. attackerName, Time = 3 })
+                    AttemptCounter(attacker)
+                end
+            end
+        end)
+    end
+    LocalPlayer.CharacterAdded:Connect(OnCharacterAdded)
+    if LocalPlayer.Character then OnCharacterAdded(LocalPlayer.Character) end
+
+    local function setAntiKickEnabled(enabled)
+        _G.AntiKickToy = enabled
+        if not enabled then return end
+
+        task.spawn(function()
+            local lastt = false
+            while _G.AntiKickToy do
+                pcall(function()
+                    local char = LocalPlayer.Character
+                    if not char then return end
+
+                    local hrp = char:FindFirstChild("HumanoidRootPart")
+                    local hum = char:FindFirstChild("Humanoid")
+                    local rightLeg = char:FindFirstChild("Right Leg")
+                    if not (hrp and hum and rightLeg) or hum.Health <= 0 then return end
+
+                    local inPlot = false
+                    local inPlotVal = LocalPlayer:FindFirstChild("InPlot")
+                    if inPlotVal and inPlotVal.Value then inPlot = true end
+
+                    if not inPlot then
+                        local toysFolder = Workspace:FindFirstChild(LocalPlayer.Name .. "SpawnedInToys")
+                        local shuriken = toysFolder and toysFolder:FindFirstChild("NinjaShuriken")
+                        local menuToys = ReplicatedStorage:FindFirstChild("MenuToys")
+                        local destroyToy = menuToys and menuToys:FindFirstChild("DestroyToy")
+
+                        if shuriken then
+                            local stickyPart = shuriken:FindFirstChild("StickyPart")
+                            local stickyWeld = stickyPart and stickyPart:FindFirstChild("StickyWeld")
+                            local valid = false
+                            if stickyWeld and stickyWeld.Part1 == rightLeg then valid = true end
+                            if not valid and destroyToy then
+                                destroyToy:FireServer(shuriken)
+                                task.wait(0.1)
+                            end
+                        else
+                            local canSpawn = LocalPlayer:FindFirstChild("CanSpawnToy")
+                            if canSpawn and canSpawn.Value then
+                                if lastt then
+                                    lastt = false
+                                    task.wait(0.5)
+                                end
+
+                                local spawnRemote = menuToys and menuToys:FindFirstChild("SpawnToyRemoteFunction")
+                                if spawnRemote then
+                                    local spawnCF = hrp.CFrame - Vector3.new(hrp.CFrame.LookVector.X * 20, -15, hrp.CFrame.LookVector.Z * 20)
+                                    spawnRemote:InvokeServer("NinjaShuriken", spawnCF, Vector3.zero)
+                                end
+
+                                local tStart = tick()
+                                repeat
+                                    task.wait()
+                                    toysFolder = Workspace:FindFirstChild(LocalPlayer.Name .. "SpawnedInToys")
+                                    shuriken = toysFolder and toysFolder:FindFirstChild("NinjaShuriken")
+                                until shuriken or tick() - tStart > 2
+
+                                if shuriken then
+                                    local stickyPart = shuriken:WaitForChild("StickyPart", 1)
+                                    if stickyPart then
+                                        if GrabEvents and GrabEvents:FindFirstChild("SetNetworkOwner") then
+                                            GrabEvents.SetNetworkOwner:FireServer(stickyPart, stickyPart.CFrame)
+                                        end
+                                        local playerEvents = ReplicatedStorage:FindFirstChild("PlayerEvents")
+                                        local stickyEvent = playerEvents and playerEvents:FindFirstChild("StickyPartEvent")
+                                        if stickyEvent then
+                                            stickyEvent:FireServer(stickyPart, rightLeg, CFrame.new(0.0490287527, 0.5, 0.00000000, -0.00000000, 0.00739139877, -0.999561906, -0.998452604, -0.0478846952, 0.0282763243, -0.0476547107, 0.99882561, 0.00000000000))
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    else
+                        lastt = true
+                    end
+                end)
+                task.wait(0.1)
+            end
+        end)
+    end
+
+    -- Aura helper functions (test.lua準拠)
+    local function CheckNetworkOwnerShipOnPart(part)
+        local po = part and part:FindFirstChild("PartOwner")
+        return po and po.Value == LocalPlayer.Name
+    end
+
+    local function SNOWship(part)
+        if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") and part then
+            if (LocalPlayer.Character.HumanoidRootPart.Position - part.Position).Magnitude <= 30 then
+                pcall(function()
+                    if GrabEvents and GrabEvents:FindFirstChild("SetNetworkOwner") then
+                        GrabEvents.SetNetworkOwner:FireServer(part, CFrame.lookAt(LocalPlayer.Character.HumanoidRootPart.Position, part.Position))
+                    end
+                end)
+                return CheckNetworkOwnerShipOnPart(part)
+            end
+        end
+        return false
+    end
+
+    local function SNOWshipPlayer(player)
+        if player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Head") then
+            local head = player.Character.Head
+            if CheckNetworkOwnerShipOnPart(head) then return true end
+            return SNOWship(player.Character.HumanoidRootPart)
+        end
+        return false
+    end
+
+    local function CheckObjectsAroundPlayer()
+        if not LocalPlayer.Character or not LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then return {} end
+        local myRoot = LocalPlayer.Character.HumanoidRootPart
+
+        local params = OverlapParams.new()
+        params.FilterDescendantsInstances = {LocalPlayer.Character, Workspace:FindFirstChild("Map"), Workspace:FindFirstChild("Plots")}
+        params.FilterType = Enum.RaycastFilterType.Exclude
+
+        local parts = Workspace:GetPartBoundsInRadius(myRoot.Position, 30, params)
+        local objects = {}
+
+        for _, part in ipairs(parts) do
+            if part:IsA("BasePart") and not part.Anchored and part.Name ~= "Handle" and part.Parent and not part.Parent:FindFirstChild("Humanoid") then
+                table.insert(objects, part)
+            end
+        end
+        return objects
+    end
+
+    -- プレイヤーリスト取得関数
 local function getPList()
-    local plist = {"選択してください"}
+    local plist = {}
     for _, p in ipairs(Players:GetPlayers()) do
         -- 「表示名 (@ユーザー名)」の形式でテーブルに入れる
         table.insert(plist, p.DisplayName .. " (@" .. p.Name .. ")")
@@ -357,43 +2863,1629 @@ local function getPList()
     return plist
 end
 
--- --- 掴むタブ ---
-local GrabControlSec = GrabTab:AddSection({ Name = "掴み制御" })
+-- UI要素を管理するテーブル
+local UIElements = {}
 
-UIElements.SuperStrengthToggle = GrabControlSec:AddToggle({
-	Name = "SuperStrength (投げ飛ばし)",
+-- 翻訳テーブル
+local modeNames = {
+    ["Wing"] = "翼 (Wing)", ["Heart"] = "ハート (Heart)", ["Star"] = "星 (Star)", ["Vortex"] = "渦 (Vortex)",
+    ["Sphere"] = "球体 (Sphere)", ["Rotate"] = "回転 (Rotate)", ["Pet"] = "ペット (Pet)", ["Text"] = "文字 (Text)",
+    ["MagicCircle"] = "魔法陣 (MagicCircle)", ["MagicCircle2"] = "魔法陣2 (MagicCircle2)", ["MagicCircle3"] = "魔法陣3 (MagicCircle3)",
+    ["FloatStone"] = "浮遊石 (FloatStone)", ["Merkaba"] = "マカバ (Merkaba)", ["Cube"] = "立方体 (Cube)",
+    ["Pyramid"] = "ピラミッド (Pyramid)", ["MirrorPlayer"] = "分身 (MirrorPlayer)", ["Beam"] = "ビーム (Beam)",
+    ["BackGuard"] = "背後ガード (BackGuard)", ["Tornado"] = "竜巻 (Tornado)", ["Gyro"] = "ジャイロ (Gyro)", ["なし"] = "なし"
+}
+local modeKeys = {}
+for k, v in pairs(modeNames) do modeKeys[v] = k end
+local function getModeList()
+    local list = {}
+    local order = {"Wing","Heart","Star","Vortex","Sphere","Rotate","Pet","Text","MagicCircle","MagicCircle2","MagicCircle3","FloatStone","Merkaba","Cube","Pyramid","MirrorPlayer","Beam","BackGuard","Tornado","Gyro"}
+    for _, k in ipairs(order) do table.insert(list, modeNames[k]) end
+    return list
+end
+
+-- --- TAB: MAIN ---
+local MainTab = Window:MakeTab({
+	Name = "メイン",
+	Icon = "rbxassetid://7733960981" -- 適当なアイコンIDに差し替えてください
+})
+
+-- --- TAB: PLAYER ---
+local PlayerTab = Window:MakeTab({
+    Name = "プレイヤー",
+    Icon = "rbxassetid://7743875962"
+})
+
+local DefenseTab = Window:MakeTab({
+    Name = "無敵",
+    Icon = "rbxassetid://7734056608"
+})
+
+local AuraTab = Window:MakeTab({
+    Name = "オーラ",
+    Icon = "rbxassetid://7733955740"
+})
+
+local ActionTab = Window:MakeTab({
+    Name = "アクション",
+    Icon = "rbxassetid://7743875962"
+})
+
+local KeyboardTab = Window:MakeTab({
+    Name = "キーボード",
+    Icon = "rbxassetid://10734950309"
+})
+
+local FriendTab = Window:MakeTab({
+    Name = "ホワイトフレンド",
+    Icon = "rbxassetid://4483345998"
+})
+
+local MoveSec = PlayerTab:AddSection({ Name = "移動設定" })
+
+-- 現在のステータスを初期値にする
+local currentWS = (LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid")) and LocalPlayer.Character.Humanoid.WalkSpeed or 16
+walkSpeed = currentWS
+
+UIElements.WalkSpeedSlider = MoveSec:AddSlider({
+    Name = "歩行スピード", Min = 16, Max = 300, Default = currentWS, Increment = 1,
+    Callback = function(v) walkSpeed = v end
+})
+
+UIElements.WalkSpeedToggle = MoveSec:AddToggle({
+    Name = "歩行スピード有効化", Default = false,
+    Callback = function(v) 
+        useWalkSpeed = v 
+    end
+})
+
+UIElements.JumpPowerSlider = MoveSec:AddSlider({
+    Name = "ジャンプ力", Min = 16, Max = 300, Default = 25, Increment = 1,
+    Callback = function(v) jumpPower = v end
+})
+
+UIElements.JumpPowerToggle = MoveSec:AddToggle({
+    Name = "ジャンプ力有効化", Default = false,
+    Callback = function(v) 
+        useJumpPower = v 
+        if not v and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+            LocalPlayer.Character.Humanoid.JumpPower = 25
+        end
+    end
+})
+
+UIElements.NoclipToggle = MoveSec:AddToggle({
+    Name = "Noclip", Default = false,
+    Callback = function(v) 
+        noclip = v 
+        if not v and LocalPlayer.Character then
+            -- 修正: 全パーツをCanCollide=trueにすると荒ぶるため、主要パーツのみ戻す
+            local char = LocalPlayer.Character
+            local partsToCollide = {"HumanoidRootPart", "Head", "Torso", "UpperTorso", "LowerTorso"}
+            for _, name in ipairs(partsToCollide) do
+                local p = char:FindFirstChild(name)
+                if p and p:IsA("BasePart") then p.CanCollide = true end
+            end
+        end
+    end
+})
+
+UIElements.InfiniteJumpToggle = MoveSec:AddToggle({
+    Name = "無限ジャンプ", Default = false,
+    Callback = function(v) infiniteJump = v end
+})
+
+local vflyEnabled = false
+local vflySpeed = 1
+
+UIElements.VFlyToggle = MoveSec:AddToggle({
+    Name = "VFly",
+    Default = false,
+    Callback = function(v)
+        vflyEnabled = v
+        if v then
+            task.spawn(function()
+                local bv = Instance.new("BodyVelocity")
+                bv.Name = "HolonVFly"
+                bv.MaxForce = Vector3.new(1e9, 1e9, 1e9)
+                bv.Velocity = Vector3.zero
+                
+                local bg = Instance.new("BodyGyro")
+                bg.Name = "HolonVFlyGyro"
+                bg.MaxTorque = Vector3.new(1e9, 1e9, 1e9)
+                bg.P = 10000
+                bg.D = 100
+                
+                while vflyEnabled and LocalPlayer.Character do
+                    local root = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                    local hum = LocalPlayer.Character:FindFirstChild("Humanoid")
+                    if root and hum then
+                        if not root:FindFirstChild("HolonVFly") then bv.Parent = root end
+                        if not root:FindFirstChild("HolonVFlyGyro") then bg.Parent = root end
+                        
+                        bg.CFrame = Camera.CFrame
+                        
+                        local moveDir = hum.MoveDirection
+                        local vel = Vector3.zero
+                        
+                        if moveDir.Magnitude > 0 then
+                            local camLook = Camera.CFrame.LookVector
+                            local camRight = Camera.CFrame.RightVector
+                            local camLookXZ = camLook * Vector3.new(1,0,1)
+                            local camRightXZ = camRight * Vector3.new(1,0,1)
+                            
+                            if camLookXZ.Magnitude > 0.001 then
+                                camLookXZ = camLookXZ.Unit
+                                camRightXZ = camRightXZ.Unit
+                                local fwd = moveDir:Dot(camLookXZ)
+                                local right = moveDir:Dot(camRightXZ)
+                                vel = (camLook * fwd + camRight * right) * (vflySpeed * 50)
+                            else
+                                vel = camLook * (moveDir.Magnitude * vflySpeed * 50)
+                            end
+                        end
+                        
+                        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
+                            vel = vel + Vector3.new(0, vflySpeed * 50, 0)
+                        elseif UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+                            vel = vel - Vector3.new(0, vflySpeed * 50, 0)
+                        end
+                        
+                        bv.Velocity = vel
+                        
+                        if not hum.Sit then
+                            hum.PlatformStand = true
+                        end
+                    else
+                        break
+                    end
+                    RunService.RenderStepped:Wait()
+                end
+                
+                if bv then bv:Destroy() end
+                if bg then bg:Destroy() end
+                if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+                    LocalPlayer.Character.Humanoid.PlatformStand = false
+                end
+            end)
+        end
+    end
+})
+
+UIElements.VFlySpeedSlider = MoveSec:AddSlider({
+    Name = "VFly速度",
+    Min = 1, Max = 10, Default = 1,
+    Callback = function(v) vflySpeed = v end
+})
+
+local ProtectSec = PlayerTab:AddSection({ Name = "保護機能" })
+
+UIElements.AntiExplosionToggle = ProtectSec:AddToggle({ Name = "アンチ爆発", Default = false, Callback = function(v) antiExplosion = v end })
+UIElements.AntiFireToggle = ProtectSec:AddToggle({ Name = "アンチ炎", Default = false, Callback = function(v) antiFire = v end })
+UIElements.AntiGrabToggle = ProtectSec:AddToggle({ Name = "アンチ掴み", Default = false, Callback = function(v) antiGrab = v end })
+
+UIElements.AntiGucciToggle = ProtectSec:AddToggle({ 
+    Name = "アンチグッチ", 
+    Default = false, 
+    Callback = function(v) 
+        setAntiGucciEnabled(v)
+    end 
+})
+
+-- --- TAB: DEFENSE (守る) ---
+local DefenseAntiSec = DefenseTab:AddSection({ Name = "アンチ系" })
+
+UIElements.DefenseAntiExplosionToggle = DefenseAntiSec:AddToggle({
+    Name = "アンチ爆発",
+    Default = false,
+    Callback = function(v)
+        antiExplosion = v
+        if UIElements.AntiExplosionToggle then UIElements.AntiExplosionToggle:Set(v) end
+    end
+})
+
+UIElements.DefenseAntiFireToggle = DefenseAntiSec:AddToggle({
+    Name = "アンチ炎",
+    Default = false,
+    Callback = function(v)
+        antiFire = v
+        if UIElements.AntiFireToggle then UIElements.AntiFireToggle:Set(v) end
+    end
+})
+
+UIElements.DefenseAntiGrabToggle = DefenseAntiSec:AddToggle({
+    Name = "アンチ掴み",
+    Default = false,
+    Callback = function(v)
+        antiGrab = v
+        if UIElements.AntiGrabToggle then UIElements.AntiGrabToggle:Set(v) end
+    end
+})
+
+UIElements.DefenseAntiGucciToggle = DefenseAntiSec:AddToggle({
+    Name = "アンチグッチ",
+    Default = false,
+    Callback = function(v)
+        setAntiGucciEnabled(v)
+        if UIElements.AntiGucciToggle then UIElements.AntiGucciToggle:Set(v) end
+    end
+})
+
+UIElements.DefenseAntiKickToggle = DefenseAntiSec:AddToggle({
+    Name = "アンチキック",
+    Default = false,
+    Callback = function(v)
+        setAntiKickEnabled(v)
+    end
+})
+
+local CounterSec = DefenseTab:AddSection({ Name = "Counter-Attack" })
+CounterSec:AddToggle({
+    Name = "自動反撃",
+    Default = false,
+    Callback = function(v)
+        _G.AutoAttacker = v
+    end,
+    Save = true,
+    Flag = "rinnegan_toggle"
+})
+CounterSec:AddDropdown({
+    Name = "Counter Mode",
+    Default = "Repulsion",
+    Options = {"Repulsion", "Death"},
+    Callback = function(v)
+        counterMode = v
+    end
+})
+
+-- --- TAB: AURA (test.lua準拠) ---
+local NormalAurasSec = AuraTab:AddSection({ Name = "Normal Auras" })
+local FlingAuraSec = AuraTab:AddSection({ Name = "Fling Aura" })
+
+NormalAurasSec:AddToggle({
+    Name = "キルオーラ",
+    Default = false,
+    Callback = function(v)
+        _G.DeathAura = v
+        if v then
+            task.spawn(function()
+                while _G.DeathAura do
+                    for _, p in ipairs(Players:GetPlayers()) do
+                        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character:FindFirstChild("Humanoid") then
+                            if p.Character.Humanoid.Health > 0 then
+                                if SNOWshipPlayer(p) then
+                                    local root = p.Character.HumanoidRootPart
+                                    local hum = p.Character.Humanoid
+                                    pcall(function() GrabEvents.DestroyGrabLine:FireServer(root) end)
+
+                                    if not root:FindFirstChild("SkyVelocity") then
+                                        local bv = Instance.new("BodyVelocity")
+                                        bv.Name = "SkyVelocity"
+                                        bv.Velocity = Vector3.new(0, 100000000000000, 0)
+                                        bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+                                        bv.Parent = root
+                                        DebrisService:AddItem(bv, 1)
+                                    end
+
+                                    hum.BreakJointsOnDeath = false
+                                    hum:ChangeState(Enum.HumanoidStateType.Dead)
+                                    hum.Jump = true
+                                    hum.Sit = false
+                                end
+                            end
+                        end
+                    end
+                    task.wait()
+                end
+            end)
+        end
+    end
+})
+
+NormalAurasSec:AddToggle({
+    Name = "吸い付きオーラ",
+    Default = false,
+    Callback = function(v)
+        _G.AttractionAura = v
+        if v then
+            task.spawn(function()
+                while _G.AttractionAura do
+                    for _, p in ipairs(Players:GetPlayers()) do
+                        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character:FindFirstChild("Humanoid") then
+                            local hum = p.Character.Humanoid
+                            if SNOWshipPlayer(p) then
+                                hum.Sit = false
+                                hum.WalkSpeed = 25
+                                if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                                    hum:MoveTo(LocalPlayer.Character.HumanoidRootPart.Position)
+                                end
+                            end
+                        end
+                    end
+                    task.wait()
+                end
+            end)
+        end
+    end
+})
+
+FlingAuraSec:AddToggle({
+    Name = "吹っ飛ばしオーラ",
+    Default = false,
+    Callback = function(v)
+        _G.FlingAura = v
+        if v then
+            task.spawn(function()
+                while _G.FlingAura do
+                    if _G.FlingTarget == "Players" or _G.FlingTarget == "Players and Objects" then
+                        for _, p in ipairs(Players:GetPlayers()) do
+                            if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                                local root = p.Character.HumanoidRootPart
+                                if SNOWshipPlayer(p) and not root:FindFirstChild("FlingAuraVelocity") and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                                    local myRoot = LocalPlayer.Character.HumanoidRootPart
+                                    local lookCF = CFrame.lookAt(myRoot.Position, root.Position)
+                                    local bv = Instance.new("BodyVelocity")
+                                    bv.Name = "FlingAuraVelocity"
+                                    bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+                                    bv.Velocity = Vector3.new(lookCF.LookVector.X, 0.5, lookCF.LookVector.Z) * _G.FlingStrength
+                                    bv.Parent = root
+                                    DebrisService:AddItem(bv, 0.1)
+                                end
+                            end
+                        end
+                    end
+
+                    if _G.FlingTarget == "Objects" or _G.FlingTarget == "Players and Objects" then
+                        local objects = CheckObjectsAroundPlayer()
+                        for _, part in ipairs(objects) do
+                            if part and part:IsA("BasePart") and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                                if SNOWship(part) and not part:FindFirstChild("FlingAuraVelocity") then
+                                    local myRoot = LocalPlayer.Character.HumanoidRootPart
+                                    local lookCF = CFrame.lookAt(myRoot.Position, part.Position)
+                                    local bv = Instance.new("BodyVelocity")
+                                    bv.Name = "FlingAuraVelocity"
+                                    bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+                                    bv.Velocity = Vector3.new(lookCF.LookVector.X, 0.5, lookCF.LookVector.Z) * _G.FlingStrength
+                                    bv.Parent = part
+                                    DebrisService:AddItem(bv, 0.1)
+                                end
+                            end
+                        end
+                    end
+                    task.wait(0.1)
+                end
+            end)
+        end
+    end
+})
+
+FlingAuraSec:AddSlider({
+    Name = "Strength",
+    Min = 400,
+    Max = 10000,
+    Default = 400,
+    Increment = 100,
+    Callback = function(v) _G.FlingStrength = v end
+})
+
+FlingAuraSec:AddDropdown({
+    Name = "Target",
+    Default = "Players",
+    Options = {"Players", "Objects", "Players and Objects"},
+    Callback = function(v) _G.FlingTarget = v end
+})
+
+local PlayerViewSec = PlayerTab:AddSection({ Name = "視点・カメラ" })
+
+UIElements.ThirdPersonToggle = PlayerViewSec:AddToggle({
+    Name = "三人称視点",
+    Default = false,
+    Callback = function(v) 
+        if v then
+            LocalPlayer.CameraMode = Enum.CameraMode.Classic
+            LocalPlayer.CameraMaxZoomDistance = 500
+            LocalPlayer.CameraMinZoomDistance = 0.5
+        else
+            LocalPlayer.CameraMode = Enum.CameraMode.LockFirstPerson
+            LocalPlayer.CameraMaxZoomDistance = 0.5
+            LocalPlayer.CameraMinZoomDistance = 0.5
+        end
+    end 
+})
+
+local currentFOV = Camera.FieldOfView
+UIElements.FOVSlider = PlayerViewSec:AddSlider({
+    Name = "FOV調整",
+    Min = 30,
+    Max = 120,
+    Default = currentFOV,
+    Increment = 1,
+    Callback = function(v)
+        Camera.FieldOfView = v
+    end    
+})
+
+-- --- MAIN SECTION ---
+
+local MainSec = MainTab:AddSection({
+	Name = "エフェクト制御"
+})
+
+-- メイン対象ドロップダウン（変数として定義）
+local targetMainName = "" -- 名前を保存する変数を新しく用意
+local tpDropdown = nil
+
+local pDropMain
+UIElements.MainTargetDropdown = MainSec:AddDropdown({
+    Name = "メイン対象",
+    Default = LocalPlayer.DisplayName .. " (@" .. LocalPlayer.Name .. ")",
+    Options = getPList(),
+    Callback = function(v)
+        -- @以降を正確に切り出す (アンダーバー等にも対応)
+        local name = v:match("@([^)]+)")
+        targetMainName = name or LocalPlayer.Name
+        targetMain = Players:FindFirstChild(targetMainName) or LocalPlayer
+    end    
+})
+pDropMain = UIElements.MainTargetDropdown
+
+Players.PlayerAdded:Connect(function()
+    task.wait(0.5)
+    pDropMain:Refresh(getPList(), true)
+    if tpDropdown then tpDropdown:Refresh(getPList(), true) end -- テレポート用
+end)
+
+Players.PlayerRemoving:Connect(function()
+    task.wait(0.5)
+    pDropMain:Refresh(getPList(), true)
+    if tpDropdown then tpDropdown:Refresh(getPList(), true) end -- テレポート用
+end)
+
+-- エフェクト有効化トグル
+UIElements.EffectToggle = MainSec:AddToggle({
+	Name = "エフェクト有効化",
 	Default = false,
 	Callback = function(v)
-		superStrengthEnabled = v
+		if v then startEffect() else stopEffect() end
 	end    
 })
 
+-- 追従方法ドロップダウン
+UIElements.FollowMethodDropdown = MainSec:AddDropdown({
+    Name = "追従方法",
+    Default = "プレイヤー",
+    Options = {"プレイヤー", "固定", "視線の先"},
+    Callback = function(v)
+        followMethod = v
+    end
+})
+
+-- モード選択ドロップダウン
+UIElements.ModeDropdown = MainSec:AddDropdown({
+	Name = "モード選択",
+	Default = modeNames["Wing"],
+	Options = getModeList(),
+	Callback = function(v)
+		currentMode = modeKeys[v]
+		combinedActive = false
+	end    
+})
+
+-- 制御対象ドロップダウン
+local itemDropdown
+
+UIElements.ItemDropdown = MainSec:AddDropdown({
+    Name = "制御対象の選択",
+    Default = "なし",
+    Options = {"なし"},
+    Callback = function(v)
+        selectedItemName = v
+    end    
+})
+itemDropdown = UIElements.ItemDropdown
+
+-- おもちゃリストをスキャンしてドロップダウンを更新する共通関数
+local function refreshToyList()
+    detectedItems = {}
+    local myName = LocalPlayer.Name
+    local allMyItems = {}
+    local plotsFolder = Workspace:FindFirstChild("Plots")
+    local plotItemsFolder = Workspace:FindFirstChild("PlotItems")
+
+    -- 0. Get items from SpawnedInToys
+    if useOtherToys then
+        for _, folder in ipairs(Workspace:GetChildren()) do
+            if folder.Name:match("SpawnedInToys$") then
+                for _, item in ipairs(folder:GetChildren()) do
+                    table.insert(allMyItems, item)
+                end
+            end
+        end
+    else
+        local spawnedToys = Workspace:FindFirstChild(myName .. "SpawnedInToys")
+        if spawnedToys then
+            for _, item in ipairs(spawnedToys:GetChildren()) do
+                table.insert(allMyItems, item)
+            end
+        end
+    end
+
+    -- 1. Get items from my plot
+    if plotsFolder and plotItemsFolder then
+        for _, plot in ipairs(plotsFolder:GetChildren()) do
+            local sign = plot:FindFirstChild("PlotSign")
+            local ownerObj = sign and (sign:FindFirstChild("ThisPlotsOwners") or sign:FindFirstChild("Owner"))
+            if ownerObj then
+                local val = ownerObj:FindFirstChild("Value") or ownerObj
+                local data = val:FindFirstChild("Data") or val
+                local isMine = (data:IsA("StringValue") and data.Value == myName)
+                
+                if isMine or useOtherToys then
+                    local myPlotName = plot.Name
+                    local targetFolder = plotItemsFolder:FindFirstChild(myPlotName)
+                    if targetFolder then
+                        for _, item in ipairs(targetFolder:GetChildren()) do
+                            table.insert(allMyItems, item)
+                        end
+                        -- ★このフォルダの増減を監視開始 (初回のみ)
+                        if isMine and not _G.ToyWatcher then
+                            _G.ToyWatcher = true
+                            targetFolder.ChildAdded:Connect(function() task.wait(0.1) refreshToyList() end)
+                            targetFolder.ChildRemoved:Connect(function() task.wait(0.1) refreshToyList() end)
+                        end
+                    end
+                    if isMine and not useOtherToys then break end
+                end
+            end
+        end
+    end
+
+    -- 2. Get items directly from Workspace that I own
+    for _, item in ipairs(Workspace:GetChildren()) do
+        local ownerValue = item:FindFirstChild("Owner") or item:FindFirstChild("PartOwner")
+        if item:IsA("Model") and ownerValue and ownerValue:IsA("StringValue") then
+            if (ownerValue.Value == myName or useOtherToys) and not table.find(allMyItems, item) then
+                 table.insert(allMyItems, item)
+            end
+        end
+    end
+
+    -- 3. Process all found items to create the name list
+    for _, item in ipairs(allMyItems) do
+        if item:IsA("Model") and item.PrimaryPart then
+            local itemName = tostring(item.Name)
+            if not table.find(detectedItems, itemName) then
+                table.insert(detectedItems, itemName)
+            end
+        end
+    end
+    
+    -- 4. Update dropdown
+    local newValues = {"全てのおもちゃ"}
+    for _, name in ipairs(detectedItems) do table.insert(newValues, name) end
+    itemDropdown:Refresh(newValues, true)
+end
+
+MainSec:AddButton({
+    Name = "おもちゃリスト更新",
+    Callback = function()
+        refreshToyList()
+        OrionLib:MakeNotification({ Name = "更新", Content = "おもちゃリストを再スキャンしました", Time = 3 })
+    end
+})
+
+UIElements.OtherToysToggle = MainSec:AddToggle({
+    Name = "他人のおもちゃも使用",
+    Default = false,
+    Callback = function(v)
+        useOtherToys = v
+        refreshToyList()
+    end
+})
+
+-- 起動時に一度実行
+task.spawn(refreshToyList)
+
+
+-- --- アニメーションセクション ---
+local AnimSec = MainTab:AddSection({
+	Name = "アニメーション"
+})
+
+local seqRunning = false
+AnimSec:AddToggle({
+	Name = "変形シーケンス",
+    Default = false,
+	Callback = function(v)
+        seqRunning = v
+        if v then
+            task.spawn(function()
+                local s = 1 / cfg.AnimSpeed
+                currentMode = "MagicCircle"
+                cfg.MagicCircle.Height = -10
+                startEffect()
+                for i = -10, 5, 0.5 do 
+                    if not seqRunning then break end
+                    cfg.MagicCircle.Height = i
+                    task.wait(0.2 * s) 
+                end
+                if not seqRunning then return end
+                currentMode = "Merkaba"
+                task.wait(6 * s)
+                if not seqRunning then return end
+                currentMode = "FloatStone"
+                cfg.FloatStone.Chaos = true
+                cfg.FloatStone.Size = 2
+                for i = 2, 15, 0.5 do
+                    if not seqRunning then break end
+                    cfg.FloatStone.Size = i
+                    task.wait(0.05 * s)
+                end
+            end)
+        end
+	end
+})
+
+local surgeRunning = false
+AnimSec:AddToggle({
+	Name = "Surge",
+    Default = false,
+	Callback = function(v)
+        surgeRunning = v
+        if v then
+            task.spawn(function()
+                local s = 1 / cfg.AnimSpeed
+                currentMode = "MagicCircle"
+                cfg.MagicCircle.Height = -3
+                cfg.MagicCircle.Size = 5
+                cfg.MagicCircle.Speed = 10
+                startEffect()
+                for i = 5, 30, 2 do
+                    if not surgeRunning then break end
+                    cfg.MagicCircle.Size = i
+                    task.wait(0.09 * s)
+                end
+                if not surgeRunning then return end
+                currentMode = "Sphere"
+                cfg.Sphere.Size = 30
+                task.wait(1 * s)
+                if not surgeRunning then return end
+                for i = 30, 3, 2 do
+                    if not surgeRunning then break end
+                    cfg.Sphere.Size = i
+                    cfg.Sphere.Speed = (cfg.Sphere.Speed or 1) + 0.5
+                    task.wait(0.05 * s)
+                end
+                if not surgeRunning then return end
+                task.wait(0.9 * s)
+                if not surgeRunning then return end
+                cfg.Sphere.Speed = 20
+                for i = 3, 25, 3 do
+                    if not surgeRunning then break end
+                    cfg.Sphere.Size = i
+                    task.wait(0.04 * s)
+                end
+                if not surgeRunning then return end
+                task.wait(1.5 * s)
+                if not surgeRunning then return end
+                currentMode = "BackGuard"
+                cfg.BackGuard.Back = 15
+                cfg.BackGuard.Height = 5
+                cfg.BackGuard.Size = 20
+                cfg.BackGuard.Speed = 1
+            end)
+        end
+	end
+})
+
+-- --- TAB: MODE SETTINGS ---
+local ModeSetTab = Window:MakeTab({
+    Name = "モード設定",
+    Icon = "rbxassetid://8997386997"
+})
+
+local CombineSec = ModeSetTab:AddSection({
+    Name = "合体設定"
+})
+
+-- 合体モードトグル (ここに移動)
+UIElements.CombinedToggle = CombineSec:AddToggle({
+	Name = "合体モード使用",
+	Default = false,
+	Callback = function(v)
+		combinedActive = v
+	end    
+})
+
+local function getModeListWithNone()
+    local list = {"なし"}
+    local order = {"Wing","Heart","Star","Vortex","Sphere","Rotate","Pet","Text","MagicCircle","MagicCircle2","MagicCircle3","FloatStone","Merkaba","Cube","Pyramid","MirrorPlayer","Beam","BackGuard","Tornado","Gyro"}
+    for _, k in ipairs(order) do table.insert(list, modeNames[k]) end
+    return list
+end
+
+UIElements.CombineMode1 = CombineSec:AddDropdown({
+    Name = "合体: モード1",
+    Default = modeNames["Wing"],
+    Options = getModeListWithNone(),
+    Callback = function(v) cfg.Combined.Mode1 = modeKeys[v] end
+})
+
+UIElements.CombineMode1Count = CombineSec:AddSlider({
+    Name = "モード1の使用数",
+    Min = 1,
+    Max = 200,
+    Default = 20,
+    Increment = 1,
+    ValueName = "個",
+    Callback = function(v) cfg.Combined.Mode1Count = v end    
+})
+
+UIElements.CombineMode2 = CombineSec:AddDropdown({
+    Name = "合体: モード2",
+    Default = modeNames["Rotate"],
+    Options = getModeListWithNone(),
+    Callback = function(v) cfg.Combined.Mode2 = modeKeys[v] end
+})
+
+UIElements.CombineMode2Count = CombineSec:AddSlider({
+    Name = "モード2の使用数",
+    Min = 1,
+    Max = 200,
+    Default = 10,
+    Increment = 1,
+    ValueName = "個",
+    Callback = function(v) cfg.Combined.Mode2Count = v end    
+})
+
+UIElements.CombineMode3 = CombineSec:AddDropdown({
+    Name = "合体: モード3",
+    Default = "なし",
+    Options = getModeListWithNone(),
+    Callback = function(v) cfg.Combined.Mode3 = modeKeys[v] end
+})
+
+UIElements.CombineMode3Count = CombineSec:AddSlider({
+    Name = "モード3の使用数",
+    Min = 0,
+    Max = 200,
+    Default = 0,
+    Increment = 1,
+    ValueName = "個",
+    Callback = function(v) cfg.Combined.Mode3Count = v end
+})
+
+-- --- 共通設定エディタ (ドロップダウンで切り替え) ---
+local EditSec = ModeSetTab:AddSection({
+    Name = "共通設定エディタ"
+})
+
+local modes = {"Wing","Heart","Star","Vortex","Sphere","Rotate","Pet","Text","MagicCircle","MagicCircle2","MagicCircle3","FloatStone","Merkaba","Cube","Pyramid","MirrorPlayer","Beam","BackGuard","Tornado","Gyro"}
+
+local currentEditMode = "Wing"
+local sl_Speed, sl_Size, sl_Height, sl_Back
+
+EditSec:AddDropdown({
+    Name = "編集対象モード",
+    Default = modeNames["Wing"],
+    Options = getModeList(),
+    Callback = function(v)
+        currentEditMode = modeKeys[v]
+        -- スライダーの値を更新
+        if sl_Speed then sl_Speed:Set(cfg[currentEditMode].Speed or 10) end
+        if sl_Size then sl_Size:Set(cfg[currentEditMode].Size or 10) end
+        if sl_Height then sl_Height:Set(cfg[currentEditMode].Height or 0) end
+        if sl_Back then sl_Back:Set(cfg[currentEditMode].Back or 0) end
+    end
+})
+
+sl_Speed = EditSec:AddSlider({
+    Name = "速度", Min = 0, Max = 100, Default = cfg.Wing.Speed or 10,
+    Callback = function(v) cfg[currentEditMode].Speed = v end
+})
+sl_Size = EditSec:AddSlider({
+    Name = "サイズ/幅", Min = 1, Max = 150, Default = cfg.Wing.Size or 10,
+    Callback = function(v) cfg[currentEditMode].Size = v end
+})
+sl_Height = EditSec:AddSlider({
+    Name = "高さ", Min = -50, Max = 50, Default = cfg.Wing.Height or 0,
+    Callback = function(v) cfg[currentEditMode].Height = v end
+})
+sl_Back = EditSec:AddSlider({
+    Name = "奥行き", Min = -50, Max = 50, Default = cfg.Wing.Back or 0,
+    Callback = function(v) cfg[currentEditMode].Back = v end
+})
+
+-- --- 詳細設定タブ (固有設定のみ) ---
+local AdvTab = Window:MakeTab({
+    Name = "詳細設定",
+    Icon = "rbxassetid://7733771472"
+})
+
+for _, m in ipairs(modes) do
+    -- 固有設定があるモードのみセクションを作成
+    if m == "Wing" or m == "Pet" or m == "Text" or m == "MagicCircle2" or m == "MagicCircle3" or m == "Beam" or m == "FloatStone" or m == "Tornado" or m == "Rotate" then
+        local s = AdvTab:AddSection({ Name = modeNames[m] or m })
+        
+        if m == "Wing" then
+            s:AddToggle({ Name = "付け根を固定 (Root Fixed)", Default = cfg.Wing.RootFixed, Callback = function(v) cfg.Wing.RootFixed = v end })
+            s:AddSlider({ Name = "体との距離 (Gap)", Min = 0, Max = 50, Default = cfg.Wing.Gap or 10, Callback = function(v) cfg.Wing.Gap = v end })
+            s:AddSlider({ Name = "関節数", Min = 0, Max = 10, Default = 3, Callback = function(v) cfg.Wing.Joints = v end })
+            s:AddSlider({ Name = "V字角度 (前後方向)", Min = -180, Max = 180, Default = 0, Callback = function(v) cfg.Wing.V_Angle = v end })
+            s:AddSlider({ Name = "上下傾斜", Min = -90, Max = 90, Default = 0, Callback = function(v) cfg.Wing.Tilt = v end })
+            s:AddSlider({ Name = "羽ばたき強度", Min = 0, Max = 50, Default = 15, Callback = function(v) cfg.Wing.Strength = v end })
+            s:AddToggle({ Name = "カーブ (反り)", Default = cfg.Wing.Curve or false, Callback = function(v) cfg.Wing.Curve = v end })
+            s:AddSlider({ Name = "カーブ強度 (反り)", Min = -50, Max = 50, Default = cfg.Wing.CurveAmount or 10, Callback = function(v) cfg.Wing.CurveAmount = v end })
+        
+        elseif m == "Pet" then
+            s:AddSlider({ Name = "個体数", Min = 1, Max = 10, Default = 2, Callback = function(v) cfg.Pet.Count = v end })
+            s:AddSlider({ Name = "関節数(うねり)", Min = 0, Max = 10, Default = 3, Callback = function(v) cfg.Pet.Joints = v end })
+            s:AddSlider({ Name = "横の広がり(Gap)", Min = 1, Max = 20, Default = 13, Callback = function(v) cfg.Pet.Gap = v end })
+        
+        elseif m == "Text" then
+            s:AddTextbox({ Name = "表示テキスト", Default = "HELLO", TextDisappear = false, Callback = function(v) cfg.Text.Content = v end })
+        
+        elseif m == "MagicCircle2" then
+            s:AddSlider({ Name = "レイヤー数", Min = 1, Max = 5, Default = 3, Callback = function(v) cfg.MagicCircle2.Layers = v end })
+        
+        elseif m == "MagicCircle3" then
+            s:AddSlider({ Name = "複雑度", Min = 1, Max = 10, Default = 5, Callback = function(v) cfg.MagicCircle3.Complexity = v end })
+        
+        elseif m == "Beam" then
+            s:AddSlider({ Name = "ビーム本数", Min = 1, Max = 20, Default = 8, Callback = function(v) cfg.Beam.Count = v end })
+        
+        elseif m == "FloatStone" then
+            s:AddToggle({ Name = "カオス移動", Default = false, Callback = function(v) cfg.FloatStone.Chaos = v end })
+
+        elseif m == "Tornado" then
+            s:AddSlider({ Name = "下部幅", Min = 0, Max = 50, Default = cfg.Tornado.Radius, Callback = function(v) cfg.Tornado.Radius = v end })
+            s:AddSlider({ Name = "上部幅", Min = 0, Max = 50, Default = cfg.Tornado.TopRadius, Callback = function(v) cfg.Tornado.TopRadius = v end })
+            s:AddToggle({ Name = "ピラミッド形状", Default = false, Callback = function(v) cfg.Tornado.Pyramid = v end })
+
+        elseif m == "Rotate" then
+            s:AddToggle({ Name = "ウェーブ (くねくね)", Default = cfg.Rotate.Wave or false, Callback = function(v) cfg.Rotate.Wave = v end })
+            s:AddSlider({ Name = "ウェーブ速度", Min = 1, Max = 20, Default = cfg.Rotate.WaveSpeed or 2, Callback = function(v) cfg.Rotate.WaveSpeed = v end })
+            s:AddSlider({ Name = "ウェーブ振幅", Min = 1, Max = 20, Default = cfg.Rotate.WaveAmp or 2, Callback = function(v) cfg.Rotate.WaveAmp = v end })
+        end
+    end
+end
+
+-- --- TAB: CONFIG / SETTINGS ---
+local ConfigTab = Window:MakeTab({
+    Name = "全体・保存",
+    Icon = "rbxassetid://10734950309"
+})
+
+local GlobalSec = ConfigTab:AddSection({
+    Name = "システム"
+})
+
+-- 0,0,0リセットボタン
+GlobalSec:AddButton({
+    Name = "エフェクトをワールド0,0,0にリセット",
+    Callback = function()
+        if not isEnabled then return end
+        followMethod = "固定"
+        lastBaseCF = CFrame.new(0, 0, 0) 
+        
+        if UIElements.FollowMethodDropdown then
+            UIElements.FollowMethodDropdown:Set("固定")
+        end
+
+        for i, fw in ipairs(activeToys) do
+            task.spawn(function()
+                fw.AP.Enabled = false 
+                fw.Part.Anchored = true
+                fw.Part.CFrame = CFrame.new(0, 0, 0)
+                fw.AP.Position = Vector3.new(0, 0, 0) 
+                fw.Part.AssemblyLinearVelocity = Vector3.zero
+                
+                task.wait(0.1)
+                
+                fw.AP.Enabled = true 
+                fw.Part.Anchored = false
+            end)
+        end
+    end
+})
+
+UIElements.MaxToysSlider = GlobalSec:AddSlider({
+    Name = "使用するおもちゃの最大数",
+    Min = 1, Max = 200, Default = cfg.Global.MaxToys or 100,
+    Callback = function(v) cfg.Global.MaxToys = v end
+})
+
+UIElements.AutoWidthToggle = GlobalSec:AddToggle({
+    Name = "幅自動調整",
+    Default = true,
+    Callback = function(v) autoWidth = v end
+})
+
+UIElements.LowLatencyToggle = GlobalSec:AddToggle({
+    Name = "低遅延モード（他人用）",
+    Default = false,
+    Callback = function(v)
+        lowLatencyMode = v
+        if isEnabled then startEffect() end
+    end
+})
+
+-- アニメ速度倍率 (小数のため10倍で処理)
+UIElements.AnimSpeedSlider = GlobalSec:AddSlider({
+    Name = "アニメ速度倍率",
+    Min = 1, Max = 50, Default = 10,
+    Callback = function(v) cfg.AnimSpeed = v/10 end
+})
+
+-- --- 家制限時間リセット設定 ---
+local ResetSec = ConfigTab:AddSection({
+    Name = "家制限時間リセット"
+})
+
+HomeStatus = ResetSec:AddParagraph("家の状態", "待機中...")
+
+UIElements.PlotReturnToggle = ResetSec:AddToggle({
+    Name = "自動家検知＆リセット",
+    Default = cfg.PlotReturn.Enabled,
+    Callback = function(v)
+        cfg.PlotReturn.Enabled = v
+        if not v and HomeStatus then HomeStatus:Set("無効化中") end
+    end
+})
+
+-- --- 座標管理システム ---
+local CoordSec = ConfigTab:AddSection({
+    Name = "座標・位置管理"
+})
+
+local CoordHUD = nil
+local HUDLabel = nil
+local coordUpdateConn = nil
+
+CoordSec:AddToggle({
+    Name = "別ウィンドウで座標を常に表示",
+    Default = false,
+    Callback = function(state)
+        if state then
+            if not CoordHUD then
+                CoordHUD = Instance.new("ScreenGui")
+                CoordHUD.Name = "HolonHUD_Coords"
+                CoordHUD.Parent = (game:GetService("CoreGui"):FindFirstChild("RobloxGui") or game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui"))
+                
+                local Frame = Instance.new("Frame")
+                Frame.Size = UDim2.new(0, 180, 0, 35)
+                Frame.Position = UDim2.new(0.5, -90, 0.05, 0)
+                Frame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+                Frame.BackgroundTransparency = 0.4
+                Frame.BorderSizePixel = 0
+                Frame.Active = true
+                Frame.Draggable = true 
+                Frame.Parent = CoordHUD
+                
+                local Corner = Instance.new("UICorner")
+                Corner.CornerRadius = UDim.new(0, 8)
+                Corner.Parent = Frame
+
+                HUDLabel = Instance.new("TextLabel")
+                HUDLabel.Size = UDim2.new(1, 0, 1, 0)
+                HUDLabel.BackgroundTransparency = 1
+                HUDLabel.TextColor3 = Color3.new(1, 1, 1)
+                HUDLabel.Font = Enum.Font.Code
+                HUDLabel.TextSize = 16
+                HUDLabel.Text = "X: 0 | Y: 0 | Z: 0"
+                HUDLabel.Parent = Frame
+            end
+            CoordHUD.Enabled = true
+            if coordUpdateConn then coordUpdateConn:Disconnect() end
+            coordUpdateConn = RunService.Heartbeat:Connect(function()
+                local c = LocalPlayer.Character
+                local r = c and c:FindFirstChild("HumanoidRootPart")
+                if r and HUDLabel then
+                    local p = r.Position
+                    HUDLabel.Text = string.format("X: %d | Y: %d | Z: %d", math.round(p.X), math.round(p.Y), math.round(p.Z))
+                end
+            end)
+        else
+            if CoordHUD then CoordHUD.Enabled = false end
+            if coordUpdateConn then coordUpdateConn:Disconnect() coordUpdateConn = nil end
+        end
+    end
+})
+
+CoordSec:AddButton({
+    Name = "現在の座標をコピー",
+    Callback = function()
+        local char = game.Players.LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if root then
+            local p = root.Position
+            local posString = string.format("%d, %d, %d", math.round(p.X), math.round(p.Y), math.round(p.Z))
+            setclipboard(posString)
+            OrionLib:MakeNotification({
+                Name = "コピー完了",
+                Content = posString,
+                Time = 5
+            })
+        end
+    end
+})
+
+local EffectRotSec = ConfigTab:AddSection({ Name = "エフェクト全体の向き" })
+UIElements.EffectRotationX = EffectRotSec:AddSlider({
+    Name = "X軸 (Pitch)", Min = -180, Max = 180, Default = 0,
+    Callback = function(v) cfg.Global.EffectRotation = Vector3.new(v, cfg.Global.EffectRotation.Y, cfg.Global.EffectRotation.Z) end
+})
+UIElements.EffectRotationY = EffectRotSec:AddSlider({
+    Name = "Y軸 (Yaw)", Min = -180, Max = 180, Default = 0,
+    Callback = function(v) cfg.Global.EffectRotation = Vector3.new(cfg.Global.EffectRotation.X, v, cfg.Global.EffectRotation.Z) end
+})
+UIElements.EffectRotationZ = EffectRotSec:AddSlider({
+    Name = "Z軸 (Roll)", Min = -180, Max = 180, Default = 0,
+    Callback = function(v) cfg.Global.EffectRotation = Vector3.new(cfg.Global.EffectRotation.X, cfg.Global.EffectRotation.Y, v) end
+})
+
+local IndivRotSec = ConfigTab:AddSection({ Name = "おもちゃ自体の向き" })
+UIElements.IndividualRotationX = IndivRotSec:AddSlider({
+    Name = "X軸 (Pitch)", Min = -180, Max = 180, Default = 0,
+    Callback = function(v) cfg.Global.IndividualRotation = Vector3.new(v, cfg.Global.IndividualRotation.Y, cfg.Global.IndividualRotation.Z) end
+})
+UIElements.IndividualRotationY = IndivRotSec:AddSlider({
+    Name = "Y軸 (Yaw)", Min = -180, Max = 180, Default = -90,
+    Callback = function(v) cfg.Global.IndividualRotation = Vector3.new(cfg.Global.IndividualRotation.X, v, cfg.Global.IndividualRotation.Z) end
+})
+UIElements.IndividualRotationZ = IndivRotSec:AddSlider({
+    Name = "Z軸 (Roll)", Min = -180, Max = 180, Default = 0,
+    Callback = function(v) cfg.Global.IndividualRotation = Vector3.new(cfg.Global.IndividualRotation.X, cfg.Global.IndividualRotation.Y, v) end
+})
+
+----- データ管理 ---
+local SaveSec = ConfigTab:AddSection({Name = "データ管理 (リアルタイム更新)"})
+
+-- 1. ドロップダウンを変数として定義（後で中身を書き換えるため）
+local fileDropdown
+
+fileDropdown = SaveSec:AddDropdown({
+    Name = "保存済みファイルを選択",
+    Default = "選択してください",
+    Options = getConfigFileList(),
+    Callback = function(v) 
+        selectedFile = v 
+    end
+})
+
+-- 2. 読み込みボタン（読み込んだ瞬間に見た目を更新）
+SaveSec:AddButton({
+    Name = "選択したファイルを読み込む",
+    Callback = function()
+        if selectedFile and selectedFile ~= "ファイルなし" then
+            local path = "holon_config/" .. selectedFile
+            if isfile(path) then
+                local success, data = pcall(function() 
+                    return HttpService:JSONDecode(readfile(path)) 
+                end)
+                
+                if success then
+                    cfg = data
+                    
+                    -- 保存された設定をローカル変数に反映
+                    if cfg.LocalSettings then
+                        local s = cfg.LocalSettings
+                        walkSpeed = s.WalkSpeed or 16
+                        jumpPower = s.JumpPower or 25
+                        useWalkSpeed = s.UseWalkSpeed or false
+                        useJumpPower = s.UseJumpPower or false
+                        infiniteJump = s.InfiniteJump or false
+                        noclip = s.Noclip or false
+                        antiExplosion = s.AntiExplosion or false
+                        antiFire = s.AntiFire or false
+                        antiGrab = s.AntiGrab or false
+                        currentMode = s.CurrentMode or "Wing"
+                        combinedActive = s.CombinedActive or false
+                        
+                        if s.FollowMethod then
+                            followMethod = s.FollowMethod
+                        elseif s.FollowPlayer ~= nil then
+                            followMethod = s.FollowPlayer and "プレイヤー" or "固定"
+                        else
+                            followMethod = "プレイヤー"
+                        end
+                        
+                        local effectRot = s.EffectRotation
+                        if effectRot and type(effectRot) == "table" then
+                            cfg.Global.EffectRotation = Vector3.new(effectRot.X or 0, effectRot.Y or 0, effectRot.Z or 0)
+                        else
+                            cfg.Global.EffectRotation = Vector3.new(0,0,0)
+                        end
+                        local indivRot = s.IndividualRotation
+                        if indivRot and type(indivRot) == "table" then
+                            cfg.Global.IndividualRotation = Vector3.new(indivRot.X or 0, indivRot.Y or -90, indivRot.Z or 0)
+                        else
+                            cfg.Global.IndividualRotation = Vector3.new(0,-90,0)
+                        end
+                        useOtherToys = s.UseOtherToys or false
+                        autoWidth = s.AutoWidth or true
+                        lowLatencyMode = s.LowLatencyMode or false
+                        if s.Esp then espCfg = s.Esp end
+                        
+                        -- ★UI要素の見た目を更新 (Setメソッドを使用)
+                        if UIElements.WalkSpeedSlider then UIElements.WalkSpeedSlider:Set(walkSpeed) end
+                        if UIElements.WalkSpeedToggle then UIElements.WalkSpeedToggle:Set(useWalkSpeed) end
+                        if UIElements.JumpPowerSlider then UIElements.JumpPowerSlider:Set(jumpPower) end
+                        if UIElements.JumpPowerToggle then UIElements.JumpPowerToggle:Set(useJumpPower) end
+                        if UIElements.NoclipToggle then UIElements.NoclipToggle:Set(noclip) end
+                        if UIElements.InfiniteJumpToggle then UIElements.InfiniteJumpToggle:Set(infiniteJump) end
+                        if UIElements.AntiExplosionToggle then UIElements.AntiExplosionToggle:Set(antiExplosion) end
+                        if UIElements.AntiFireToggle then UIElements.AntiFireToggle:Set(antiFire) end
+                        if UIElements.AntiGrabToggle then UIElements.AntiGrabToggle:Set(antiGrab) end
+                        if UIElements.DefenseAntiExplosionToggle then UIElements.DefenseAntiExplosionToggle:Set(antiExplosion) end
+                        if UIElements.DefenseAntiFireToggle then UIElements.DefenseAntiFireToggle:Set(antiFire) end
+                        if UIElements.DefenseAntiGrabToggle then UIElements.DefenseAntiGrabToggle:Set(antiGrab) end
+                        if UIElements.AntiGucciToggle then UIElements.AntiGucciToggle:Set(false) end -- 安全のためOFF
+                        if UIElements.EffectToggle then UIElements.EffectToggle:Set(isEnabled) end
+                        if UIElements.ModeDropdown then UIElements.ModeDropdown:Set(modeNames[currentMode] or currentMode) end
+                        if UIElements.CombinedToggle then UIElements.CombinedToggle:Set(combinedActive) end
+                        if UIElements.FollowMethodDropdown then UIElements.FollowMethodDropdown:Set(followMethod) end
+                        if UIElements.EffectRotationX then UIElements.EffectRotationX:Set(cfg.Global.EffectRotation.X) end
+                        if UIElements.EffectRotationY then UIElements.EffectRotationY:Set(cfg.Global.EffectRotation.Y) end
+                        if UIElements.EffectRotationZ then UIElements.EffectRotationZ:Set(cfg.Global.EffectRotation.Z) end
+                        if UIElements.IndividualRotationX then UIElements.IndividualRotationX:Set(cfg.Global.IndividualRotation.X) end
+                        if UIElements.IndividualRotationY then UIElements.IndividualRotationY:Set(cfg.Global.IndividualRotation.Y) end
+                        if UIElements.IndividualRotationZ then UIElements.IndividualRotationZ:Set(cfg.Global.IndividualRotation.Z) end
+                        if UIElements.MaxToysSlider then UIElements.MaxToysSlider:Set(cfg.Global.MaxToys) end
+                        if UIElements.AutoWidthToggle then UIElements.AutoWidthToggle:Set(autoWidth) end
+                        if UIElements.LowLatencyToggle then UIElements.LowLatencyToggle:Set(lowLatencyMode) end
+                        if UIElements.AnimSpeedSlider then UIElements.AnimSpeedSlider:Set(cfg.AnimSpeed * 10) end
+                        if UIElements.OtherToysToggle then UIElements.OtherToysToggle:Set(useOtherToys) end
+                        if UIElements.PlotReturnToggle then UIElements.PlotReturnToggle:Set(cfg.PlotReturn.Enabled) end
+                        if UIElements.PlotReturnInterval then UIElements.PlotReturnInterval:Set(cfg.PlotReturn.Interval) end
+                        
+                        -- ESP設定の反映
+                        if UIElements.EspEnabled then UIElements.EspEnabled:Set(espCfg.Enabled) end
+                        if UIElements.EspTargetOnly then UIElements.EspTargetOnly:Set(espCfg.TargetOnly) end
+                        if UIElements.EspNames then UIElements.EspNames:Set(espCfg.Names) end
+                        if UIElements.EspTracers then UIElements.EspTracers:Set(espCfg.Tracers) end
+                        if UIElements.EspHitbox then UIElements.EspHitbox:Set(espCfg.Hitbox) end
+                        if UIElements.EspHitboxSize then UIElements.EspHitboxSize:Set(espCfg.HitboxSize) end
+                        if UIElements.EspColor then UIElements.EspColor:Set(espCfg.ESPColor) end
+                        
+                        -- 合体設定の反映
+                        if UIElements.CombineMode1 then UIElements.CombineMode1:Set(modeNames[cfg.Combined.Mode1] or cfg.Combined.Mode1) end
+                        if UIElements.CombineMode1Count then UIElements.CombineMode1Count:Set(cfg.Combined.Mode1Count) end
+                        if UIElements.CombineMode2 then UIElements.CombineMode2:Set(modeNames[cfg.Combined.Mode2] or cfg.Combined.Mode2) end
+                        if UIElements.CombineMode2Count then UIElements.CombineMode2Count:Set(cfg.Combined.Mode2Count) end
+                        
+                        -- 追加項目の反映
+                        vflyEnabled = s.VFlyEnabled or false
+                        vflySpeed = s.VFlySpeed or 1
+                        local isThirdPerson = s.ThirdPerson or false
+                        local savedFOV = s.FOV or 70
+                        targetMainName = s.TargetMainName or ""
+                        targetSubName = s.TargetSubName or ""
+                        selectedItemName = s.SelectedItemName or "全てのおもちゃ"
+                        pianoEnabled = s.PianoEnabled or false
+                        pianoFollowEnabled = s.PianoFollowEnabled or true
+
+                        if UIElements.VFlyToggle then UIElements.VFlyToggle:Set(vflyEnabled) end
+                        if UIElements.VFlySpeedSlider then UIElements.VFlySpeedSlider:Set(vflySpeed) end
+                        if UIElements.ThirdPersonToggle then UIElements.ThirdPersonToggle:Set(isThirdPerson) end
+                        if UIElements.FOVSlider then UIElements.FOVSlider:Set(savedFOV) end
+                        if UIElements.ItemDropdown then UIElements.ItemDropdown:Set(selectedItemName) end
+                        if UIElements.PianoEnabled then UIElements.PianoEnabled:Set(pianoEnabled) end
+                        if UIElements.PianoFollow then UIElements.PianoFollow:Set(pianoFollowEnabled) end
+
+                        -- ターゲットドロップダウンの復元（リストから検索）
+                        local function restoreDropdown(dd, name)
+                            if dd and name ~= "" then
+                                for _, opt in ipairs(getPList()) do
+                                    if opt:match("@" .. name .. "%)") then dd:Set(opt) break end
+                                end
+                            end
+                        end
+                        restoreDropdown(UIElements.MainTargetDropdown, targetMainName)
+                        restoreDropdown(UIElements.SubTargetDropdown, targetSubName)
+                        
+                        -- ★UI設定の復元
+                        if not cfg.UI then
+                            cfg.UI = {
+                                Transparency = 0.1,
+                                BackgroundColor = Color3.fromRGB(25, 25, 25),
+                                AccentColor = Color3.fromRGB(128, 128, 128),
+                                BackgroundImage = ""
+                            }
+                        end
+                        
+                        if UIElements.UITransparency then UIElements.UITransparency:Set((cfg.UI.Transparency or 0.1) * 100) end
+                        if UIElements.UIBackgroundColor then UIElements.UIBackgroundColor:Set(cfg.UI.BackgroundColor or Color3.fromRGB(25, 25, 25)) end
+                        if UIElements.UIAccentColor then UIElements.UIAccentColor:Set(cfg.UI.AccentColor or Color3.fromRGB(128, 128, 128)) end
+                        if UIElements.UIBackgroundImage then UIElements.UIBackgroundImage:Set(cfg.UI.BackgroundImage or "") end
+                    end
+
+                    -- ★ここでリアルタイムにUIの見た目（カラー・透明度・画像）を更新
+                    applyCustomStyle() 
+                    OrionLib:MakeNotification({Name = "成功", Content = selectedFile .. " を適用しました", Time = 3})
+                else
+                    OrionLib:MakeNotification({Name = "エラー", Content = "ファイルの読み込みに失敗しました", Time = 3})
+                end
+            end
+        end
+    end
+})
+
+SaveSec:AddTextbox({
+    Name = "新規保存ファイル名",
+    Default = "config1",
+    TextDisappear = false,
+    Callback = function(v) saveName = v end
+})
+
+-- 3. 保存ボタン（保存した瞬間にドロップダウンを更新）
+SaveSec:AddButton({
+    Name = "現在の設定を保存",
+    Callback = function()
+        if saveName and saveName ~= "" then
+            if not isfolder("holon_config") then makefolder("holon_config") end
+            local path = "holon_config/" .. saveName .. ".json"
+            
+            -- ローカル変数の状態をcfgに同期させてから保存
+            cfg.LocalSettings = {
+                WalkSpeed = walkSpeed,
+                JumpPower = jumpPower,
+                UseWalkSpeed = useWalkSpeed,
+                UseJumpPower = useJumpPower,
+                InfiniteJump = infiniteJump,
+                Noclip = noclip,
+                AntiExplosion = antiExplosion,
+                AntiFire = antiFire,
+                AntiGrab = antiGrab,
+                CurrentMode = currentMode,
+                CombinedActive = combinedActive,
+                FollowMethod = followMethod,
+                EffectRotation = cfg.Global.EffectRotation,
+                IndividualRotation = cfg.Global.IndividualRotation,
+                UseOtherToys = useOtherToys,
+                AutoWidth = autoWidth,
+                LowLatencyMode = lowLatencyMode,
+                Esp = espCfg, -- ESP設定(テーブル)も保存
+                -- 追加保存項目
+                VFlyEnabled = vflyEnabled,
+                VFlySpeed = vflySpeed,
+                ThirdPerson = (LocalPlayer.CameraMode == Enum.CameraMode.Classic),
+                FOV = Camera.FieldOfView,
+                TargetMainName = targetMainName,
+                TargetSubName = targetSubName,
+                SelectedItemName = selectedItemName,
+                PianoEnabled = pianoEnabled,
+                PianoFollowEnabled = pianoFollowEnabled,
+                GrabMod = cfg.GrabMod
+            }
+
+            writefile(path, HttpService:JSONEncode(cfg))
+            
+            -- ★ここがポイント：保存した直後にドロップダウンのリストを最新にする
+            fileDropdown:Refresh(getConfigFileList(), true)
+            
+            OrionLib:MakeNotification({
+                Name = "保存完了", 
+                Content = saveName .. ".json を保存し、リストを更新しました", 
+                Time = 3
+            })
+        end
+    end
+})
+
+-- --- UI外観設定 ---
+local UISec = ConfigTab:AddSection({Name = "UI外観・カラー設定"})
+
+UIElements.UITransparency = UISec:AddSlider({
+    Name = "UI透明度",
+    Min = 0, Max = 100, Default = 0,
+    Callback = function(v)
+        cfg.UI.Transparency = v / 100
+        applyCustomStyle()
+    end
+})
+
+-- 以降、cfg.UI が存在するので消えずに表示されます
+UIElements.UIBackgroundColor = UISec:AddColorpicker({
+    Name = "背景カラー",
+    Default = cfg.UI.BackgroundColor,
+    Callback = function(v)
+        cfg.UI.BackgroundColor = v
+        applyCustomStyle()
+    end
+})
+
+UIElements.UIAccentColor = UISec:AddColorpicker({
+    Name = "枠カラー (アクセント)",
+    Default = cfg.UI.AccentColor,
+    Callback = function(v)
+        cfg.UI.AccentColor = v
+        applyCustomStyle()
+    end
+})
+
+UIElements.UIBackgroundImage = UISec:AddTextbox({
+    Name = "背景画像ID (数字のみ)",
+    Default = cfg.UI.BackgroundImage,
+    TextDisappear = false,
+    Callback = function(v)
+        -- 数字以外の文字を除去して、数値のみ取り出す
+        local id = v:match("%d+") 
+        if id then
+            -- Decal IDをImage IDとして読み込ませるためのURL形式
+            -- ※Robloxの内部処理で自動変換を促す書き方です
+            cfg.UI.BackgroundImage = "rbxassetid://" .. id
+        else
+            cfg.UI.BackgroundImage = ""
+        end
+        
+        applyCustomStyle()
+    end
+})
+
+-- --- TAB: SUB FEATURES ---
+local SubTab = Window:MakeTab({
+    Name = "サブ機能",
+    Icon = "rbxassetid://10747372167"
+})
+
+-- サブターゲットセクション
+local SubTargetSec = SubTab:AddSection({
+    Name = "サブターゲット"
+})
+
+-- 1. ドロップダウンの作成
+local targetSubName = "" 
+
+UIElements.SubTargetDropdown = SubTargetSec:AddDropdown({
+    Name = "対象選択",
+    Default = LocalPlayer.DisplayName .. " (@" .. LocalPlayer.Name .. ")",
+    Options = getPList(),
+    Callback = function(v)
+        -- @以降のユーザー名を正確に切り出す
+        local name = v:match("@([^)]+)")
+        targetSubName = name or LocalPlayer.Name
+        
+        -- 即座に最新のオブジェクトも一度取得しておく（既存コードとの互換性のため）
+        targetSub = Players:FindFirstChild(targetSubName) or LocalPlayer
+    end    
+})
+pDropSub = UIElements.SubTargetDropdown
+
+Players.PlayerAdded:Connect(function()
+    task.wait(0.5)
+    pDropSub:Refresh(getPList(), true)
+end)
+
+Players.PlayerRemoving:Connect(function()
+    task.wait(0.5)
+    pDropSub:Refresh(getPList(), true)
+end)
+
+SubTargetSec:AddButton({
+    Name = "プレイヤーリスト更新",
+    Callback = function()
+        pDropSub:Refresh(getPList(), true)
+        OrionLib:MakeNotification({ Name = "更新", Content = "プレイヤーリストを更新しました", Time = 3 })
+    end
+})
+
+-- 視点・カメラセクション
+local ViewSec = SubTab:AddSection({
+    Name = "視点・カメラ"
+})
+
+ViewSec:AddToggle({
+    Name = "視点ジャック",
+    Default = false,
+    Callback = function(v) 
+        if v then 
+            RunService:BindToRenderStep("Jack", Enum.RenderPriority.Camera.Value + 1, function() 
+                if targetSub and targetSub.Character and targetSub.Character:FindFirstChild("Humanoid") then 
+                    Camera.CameraSubject = targetSub.Character.Humanoid 
+                end 
+            end)
+        else 
+            RunService:UnbindFromRenderStep("Jack")
+            if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+                Camera.CameraSubject = LocalPlayer.Character.Humanoid 
+            end
+        end
+    end 
+})
+
+-- ESP設定セクション
+local EspSec = SubTab:AddSection({
+    Name = "ESP設定"
+})
+
+UIElements.EspEnabled = EspSec:AddToggle({
+    Name = "ESP有効",
+    Default = false,
+    Callback = function(v) espCfg.Enabled = v end 
+})
+
+UIElements.EspTargetOnly = EspSec:AddToggle({
+    Name = "ターゲットのみ表示",
+    Default = false,
+    Callback = function(v) espCfg.TargetOnly = v end 
+})
+
+UIElements.EspNames = EspSec:AddToggle({
+    Name = "名前表示",
+    Default = true,
+    Callback = function(v) espCfg.Names = v end 
+})
+
+UIElements.EspTracers = EspSec:AddToggle({
+    Name = "トレーサー表示",
+    Default = false,
+    Callback = function(v) espCfg.Tracers = v end 
+})
+
+UIElements.EspHitbox = EspSec:AddToggle({
+    Name = "ヒットボックス",
+    Default = false,
+    Callback = function(v) espCfg.Hitbox = v end 
+})
+
+UIElements.EspHitboxSize = EspSec:AddSlider({
+    Name = "ヒットボックスサイズ",
+    Min = 2,
+    Max = 20,
+    Default = 10,
+    Callback = function(v) espCfg.HitboxSize = v end 
+})
+
+UIElements.EspColor = EspSec:AddColorpicker({
+    Name = "ESPカラー",
+    Default = Color3.new(1,0,0),
+    Callback = function(v)
+        espCfg.ESPColor = v
+    end	  
+})
+
+local BarrierSec = SubTab:AddSection({
+    Name = "バリア破壊"
+})
+
+BarrierSec:AddButton({
+    Name = "バリア破壊 (Barrier Break)",
+    Callback = function()
+        local player = game:GetService("Players").LocalPlayer
+        if not player then
+            OrionLib:MakeNotification({Name="Error", Content="Player not found", Time = 4})
+            return
+        end
+
+        if not (player.Character and player.Character:FindFirstChild("HumanoidRootPart")) then
+            OrionLib:MakeNotification({Name="Error", Content="Character not ready", Time = 4})
+            return
+        end
+
+        local humanoid = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+        local originalWalkSpeed, originalJumpPower
+        if humanoid then
+            originalWalkSpeed = humanoid.WalkSpeed
+            originalJumpPower = humanoid.JumpPower
+            pcall(function() humanoid.WalkSpeed = 0 humanoid.JumpPower = 0 end)
+        end
+
+        local success, err = pcall(function()
+            local MenuToys = ReplicatedStorage:WaitForChild("MenuToys")
+            local hrp = player.Character.HumanoidRootPart
+            local originalCFrame = hrp.CFrame
+
+            hrp.CFrame = CFrame.new(246.052, -7.35, 431.821)
+            task.wait(0.05)
+
+            MenuToys.SpawnToyRemoteFunction:InvokeServer(
+                "InstrumentWoodwindOcarina",
+                CFrame.new(184.148834, -5.54824972, 498.136749,
+                    0.829037189, -0.214714944, 0.516328275,
+                    0, 0.923344612, 0.383972496,
+                    -0.559193552, -0.318327487, 0.765486956),
+                Vector3.new(0, 34, 0)
+            )
+
+            task.wait(0.2)
+
+            local toyFolder = Workspace:FindFirstChild(player.Name .. "SpawnedInToys")
+            if not toyFolder then error("SpawnedInToys folder not found") end
+
+            local ocarina = toyFolder:FindFirstChild("InstrumentWoodwindOcarina")
+            if not ocarina then error("InstrumentWoodwindOcarina not found") end
+
+            if ocarina:FindFirstChild("HoldPart") and ocarina.HoldPart:FindFirstChild("HoldItemRemoteFunction") then
+                pcall(function()
+                    ocarina.HoldPart.HoldItemRemoteFunction:InvokeServer(ocarina, player.Character)
+                end)
+                task.wait(0.2)
+            end
+
+            player.Character.HumanoidRootPart.CFrame = CFrame.new(304.06, 25.77, 488.54)
+            task.wait(0.05)
+
+            if MenuToys:FindFirstChild("DestroyToy") then
+                MenuToys.DestroyToy:FireServer(ocarina)
+            else
+                local destroyEv = ReplicatedStorage:FindFirstChild("MenuToys") and ReplicatedStorage.MenuToys:FindFirstChild("DestroyToy")
+                if destroyEv then
+                    destroyEv:FireServer(ocarina)
+                else
+                    error("DestroyToy event not found")
+                end
+            end
+
+            task.wait(0.05)
+
+            if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                player.Character.HumanoidRootPart.CFrame = originalCFrame
+            end
+
+            OrionLib:MakeNotification({Name="Success", Content="バリア破壊を実行しました", Time = 3})
+        end)
+
+        local function tryRestore()
+            if originalWalkSpeed == nil and originalJumpPower == nil then return end
+            local curHum = player.Character and player.Character:FindFirstChildOfClass("Humanoid")
+            if curHum then
+                pcall(function()
+                    if originalWalkSpeed ~= nil then curHum.WalkSpeed = originalWalkSpeed end
+                    if originalJumpPower ~= nil then curHum.JumpPower = originalJumpPower end
+                end)
+            end
+        end
+
+        tryRestore()
+
+        if not success then
+            OrionLib:MakeNotification({Name="Error", Content=tostring(err), Time = 6})
+        end
+    end
+})
+
+-- --- TAB: GRAB MOD ---
+local GrabTab = Window:MakeTab({
+    Name = "掴む",
+    Icon = "rbxassetid://4483345998"
+})
+
+local GrabControlSec = GrabTab:AddSection({ Name = "掴み制御" })
+
+UIElements.SuperStrengthToggle = GrabControlSec:AddToggle({
+    Name = "スーパースロー",
+    Default = false,
+    Callback = function(v)
+        superStrengthEnabled = v
+    end
+})
+
 UIElements.StrengthSlider = GrabControlSec:AddSlider({
-	Name = "Strength (強さ)",
-	Min = 400,
+    Name = "強さ",
+    Min = 400,
     Max = 10000,
     Default = 400,
     Increment = 100,
     ValueName = "Power",
-	Callback = function(v)
-		strengthValue = v
-	end    
+    Callback = function(v)
+        strengthValue = v
+    end
 })
 
 UIElements.DeathGrabToggle = GrabControlSec:AddToggle({
-	Name = "Death Grab",
-	Default = false,
-	Callback = function(v)
-		deathGrabEnabled = v
-	end    
+    Name = "キル掴む",
+    Default = false,
+    Callback = function(v)
+        deathGrabEnabled = v
+    end
 })
 
 UIElements.NoclipGrabToggle = GrabControlSec:AddToggle({
-    Name = "Noclip Grab",
+    Name = "すり抜け掴む",
     Default = false,
     Callback = function(v)
         noclipGrabEnabled = v
-        -- トグルをOFFにした時に、もし掴んでいる最中なら当たり判定を元に戻す
         if not v then
             for part, state in pairs(noclipOriginalCollisions) do
                 if part and part.Parent then
@@ -406,81 +4498,82 @@ UIElements.NoclipGrabToggle = GrabControlSec:AddToggle({
 })
 
 UIElements.LineToggle = GrabControlSec:AddToggle({
-        Name = "Crazy Line",
-        Default = false,
-        Callback = function(v)
-            _G.CrazyLine = v
-            if v then
-                task.spawn(function()
-                    while _G.CrazyLine do
-                        for _, p in pairs(Players:GetPlayers()) do
-                            if p ~= LocalPlayer and p.Character then
-                                local targetPart = p.Character:FindFirstChild("Torso") or p.Character:FindFirstChild("HumanoidRootPart")
-                                if targetPart then
-                                    -- Blizのソースコードにある固定CFrameを使用
-                                    pcall(function() GrabEvents.CreateGrabLine:FireServer(targetPart, CFrame.new(0.12640380859375, 0.9606337547302246, - 0.5000009536743164, 0.9985212683677673, 0, - 0.05436277016997337, - 6.4805472099749295e-9, 1, - 1.1903301100346653e-7, 0.05436277016997337, 5.960464477539063e-8, 0.9985212683677673)) end)
-                                end
+    Name = "クレイジーライン",
+    Default = false,
+    Callback = function(v)
+        _G.CrazyLine = v
+        if v then
+            task.spawn(function()
+                while _G.CrazyLine do
+                    for _, p in pairs(Players:GetPlayers()) do
+                        if p ~= LocalPlayer and p.Character then
+                            local targetPart = p.Character:FindFirstChild("Torso") or p.Character:FindFirstChild("HumanoidRootPart")
+                            if targetPart then
+                                pcall(function()
+                                    GrabEvents.CreateGrabLine:FireServer(targetPart, CFrame.new(0.12640380859375, 0.9606337547302246, -0.5000009536743164, 0.9985212683677673, 0, -0.05436277016997337, -6.4805472099749295e-9, 1, -1.1903301100346653e-7, 0.05436277016997337, 5.960464477539063e-8, 0.9985212683677673))
+                                end)
                             end
                         end
-                        task.wait()
                     end
-                end)
-            end
+                    task.wait()
+                end
+            end)
         end
-    })
+    end
+})
 
 UIElements.InvisibleLineToggle = GrabControlSec:AddToggle({
-	Name = "Invisible Line",
-	Default = false,
-	Callback = function(v)
-		invisibleLineEnabled = v
-	end    
+    Name = "透明ライン",
+    Default = false,
+    Callback = function(v)
+        invisibleLineEnabled = v
+    end
 })
 
 UIElements.RainbowLineToggle = GrabControlSec:AddToggle({
-	Name = "Rainbow Line",
-	Default = false,
-	Callback = function(v)
-		_G.RainbowLine = v
-		if v then
-			task.spawn(function()
-				local hueOffset = 0
-				local DataEvents = ReplicatedStorage:FindFirstChild("DataEvents")
-				local UpdateLineColorsEvent = DataEvents and DataEvents:FindFirstChild("UpdateLineColorsEvent")
+    Name = "虹色ライン",
+    Default = false,
+    Callback = function(v)
+        _G.RainbowLine = v
+        if v then
+            task.spawn(function()
+                local hueOffset = 0
+                local DataEvents = ReplicatedStorage:FindFirstChild("DataEvents")
+                local UpdateLineColorsEvent = DataEvents and DataEvents:FindFirstChild("UpdateLineColorsEvent")
 
-				while _G.RainbowLine do
-					hueOffset = (hueOffset + 0.005) % 1
-					if UpdateLineColorsEvent then
-						local keypoints = {}
-						for i = 0, 10 do
-							table.insert(keypoints, ColorSequenceKeypoint.new(i / 10, Color3.fromHSV((i / 10 + hueOffset) % 1, 1, 1)))
-						end
-						local cs = ColorSequence.new(keypoints)
-						pcall(function()
-							UpdateLineColorsEvent:FireServer(cs, cs.Keypoints[1].Value, cs.Keypoints[2].Value, cs.Keypoints[3].Value, cs.Keypoints[4].Value, cs.Keypoints[5].Value, cs.Keypoints[6].Value, cs.Keypoints[7].Value, cs.Keypoints[8].Value, cs.Keypoints[9].Value)
-						end)
-					else
-						local color = Color3.fromHSV(hueOffset, 1, 1)
-						local grabParts = Workspace:FindFirstChild("GrabParts")
-						if grabParts then
-							for _, d in ipairs(grabParts:GetDescendants()) do
-								if d:IsA("Beam") then
-									d.Color = ColorSequence.new(color)
-								end
-							end
-						end
-					end
-					RunService.Heartbeat:Wait()
-				end
-				if not _G.RainbowLine and UpdateLineColorsEvent then
-					local white = Color3.new(1, 1, 1)
-					pcall(function()
-						UpdateLineColorsEvent:FireServer(white, white, white, white, white, white, white, white, white, white)
-					end)
-				end
-			end)
-		end
-	end    
+                while _G.RainbowLine do
+                    hueOffset = (hueOffset + 0.005) % 1
+                    if UpdateLineColorsEvent then
+                        local keypoints = {}
+                        for i = 0, 10 do
+                            table.insert(keypoints, ColorSequenceKeypoint.new(i / 10, Color3.fromHSV((i / 10 + hueOffset) % 1, 1, 1)))
+                        end
+                        local cs = ColorSequence.new(keypoints)
+                        pcall(function()
+                            UpdateLineColorsEvent:FireServer(cs, cs.Keypoints[1].Value, cs.Keypoints[2].Value, cs.Keypoints[3].Value, cs.Keypoints[4].Value, cs.Keypoints[5].Value, cs.Keypoints[6].Value, cs.Keypoints[7].Value, cs.Keypoints[8].Value, cs.Keypoints[9].Value)
+                        end)
+                    else
+                        local color = Color3.fromHSV(hueOffset, 1, 1)
+                        local grabParts = Workspace:FindFirstChild("GrabParts")
+                        if grabParts then
+                            for _, d in ipairs(grabParts:GetDescendants()) do
+                                if d:IsA("Beam") then
+                                    d.Color = ColorSequence.new(color)
+                                end
+                            end
+                        end
+                    end
+                    RunService.Heartbeat:Wait()
+                end
+                if not _G.RainbowLine and UpdateLineColorsEvent then
+                    local white = Color3.new(1, 1, 1)
+                    pcall(function()
+                        UpdateLineColorsEvent:FireServer(white, white, white, white, white, white, white, white, white, white)
+                    end)
+                end
+            end)
+        end
+    end
 })
 
 local FurtherExtendSec = GrabTab:AddSection({
@@ -488,7 +4581,7 @@ local FurtherExtendSec = GrabTab:AddSection({
 })
 
 FurtherExtendSec:AddToggle({
-    Name = "Further Extend",
+    Name = "線の延長",
     Default = false,
     Callback = function(Value)
         _G.FutherExtend = Value
@@ -508,317 +4601,61 @@ FurtherExtendSec:AddSlider({
     end
 })
 
--- --- 防御タブ (Invincibility) ---
-local CounterSec = DefenseTab:AddSection({ Name = "Counter-Attack" })
-
-CounterSec:AddToggle({
-    Name = "Auto-Attacker",
-    Default = false,
-    Callback = function(v)
-        _G.AutoAttacker = v
-    end,
-    Save = true,
-    Flag = "rinnegan_toggle"
-})
-
-CounterSec:AddDropdown({
-    Name = "Counter Mode",
-    Default = "Repulsion",
-    Options = {"Repulsion", "Death"},
-    Callback = function(v)
-        counterMode = v
-    end
-})
-
-local AntiKick = DefenseTab:AddToggle({
-    Name = "アンチキック",
-    CurrentValue = false,
-    Flag = "AntiKickToy",
-    Callback = function(Value)
-        _G.AntiKickToy = Value
-        if not _G.AntiKickToy then return end
-
-        task.spawn(function()
-            local lastt = false
-            while _G.AntiKickToy do
-                pcall(function()
-                    local char = LocalPlayer.Character
-                    if not char then return end
-                    
-                    local hrp = char:FindFirstChild("HumanoidRootPart")
-                    local hum = char:FindFirstChild("Humanoid")
-                    local rightLeg = char:FindFirstChild("Right Leg")
-                    
-                    if not (hrp and hum and rightLeg) or hum.Health <= 0 then return end
-                    
-                    local inPlot = false
-                    local inPlotVal = LocalPlayer:FindFirstChild("InPlot")
-                    if inPlotVal and inPlotVal.Value then inPlot = true end
-                    
-                    if not inPlot then
-                        local toysFolder = Workspace:FindFirstChild(LocalPlayer.Name .. "SpawnedInToys")
-                        local shuriken = toysFolder and toysFolder:FindFirstChild("NinjaShuriken")
-                        local destroyToy = ReplicatedStorage.MenuToys:FindFirstChild("DestroyToy")
-                        
-                        if shuriken then
-                            local stickyPart = shuriken:FindFirstChild("StickyPart")
-                            local stickyWeld = stickyPart and stickyPart:FindFirstChild("StickyWeld")
-                            
-                            local valid = false
-                            if stickyWeld and stickyWeld.Part1 == rightLeg then valid = true end
-                            
-                            if not valid and destroyToy then
-                                destroyToy:FireServer(shuriken)
-                                task.wait(0.1)
-                            end
-                        else
-                            local canSpawn = LocalPlayer:FindFirstChild("CanSpawnToy")
-                            if canSpawn and canSpawn.Value then
-                                if lastt then lastt = false; task.wait(0.5) end
-                                
-                                local spawnRemote = ReplicatedStorage.MenuToys:FindFirstChild("SpawnToyRemoteFunction")
-                                if spawnRemote then
-                                    local spawnCF = hrp.CFrame - Vector3.new(hrp.CFrame.LookVector.X * 20, -15, hrp.CFrame.LookVector.Z * 20)
-                                    spawnRemote:InvokeServer("NinjaShuriken", spawnCF, Vector3.zero)
-                                end
-                                
-                                local tStart = tick()
-                                repeat task.wait() 
-                                    toysFolder = Workspace:FindFirstChild(LocalPlayer.Name .. "SpawnedInToys")
-                                    shuriken = toysFolder and toysFolder:FindFirstChild("NinjaShuriken")
-                                until shuriken or tick() - tStart > 2
-                                
-                                if shuriken then
-                                    local stickyPart = shuriken:WaitForChild("StickyPart", 1)
-                                    if stickyPart then
-                                        if GrabEvents and GrabEvents:FindFirstChild("SetNetworkOwner") then
-                                            GrabEvents.SetNetworkOwner:FireServer(stickyPart, stickyPart.CFrame)
-                                        end
-                                        local stickyEvent = ReplicatedStorage.PlayerEvents:FindFirstChild("StickyPartEvent")
-                                        if stickyEvent then
-                                            stickyEvent:FireServer(stickyPart, rightLeg, CFrame.new(0.0490287527, 0.5, 0.00000000, -0.00000000, 0.00739139877, -0.999561906, -0.998452604, -0.0478846952, 0.0282763243, -0.0476547107, 0.99882561, 0.00000000000))
-                                        end
-                                    end
-                                end
-                            end
-                        end
-                    else
-                        lastt = true
-                    end
-                end)
-                task.wait(0.1)
-            end
-        end)
-    end
-})
-
--- Anti-Kick Release (SprayCanWD) Logic from Iyan Hub
-local function AntiKickReleaseLoop()
-    while _G.AntiKickRelease do
-        local success, err = pcall(function()
-            local mt = ReplicatedStorage:FindFirstChild("MenuToys")
-            local spawnRemote = mt and mt:FindFirstChild("SpawnToyRemoteFunction")
-            local destroyRemote = mt and mt:FindFirstChild("DestroyToy")
-            local toysName = LocalPlayer.Name .. "SpawnedInToys"
-            local toysFolder = Workspace:FindFirstChild(toysName)
-
-            -- 既存のSprayCanがあれば削除
-            if toysFolder and toysFolder:FindFirstChild("SprayCanWD") and destroyRemote then
-                destroyRemote:FireServer(toysFolder.SprayCanWD)
-                task.wait(0.5)
-            end
-
-            local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-            if not myRoot or not spawnRemote then return end
-
-            -- SprayCanをスポーン
-            spawnRemote:InvokeServer("SprayCanWD", myRoot.CFrame, Vector3.zero)
-            
-            local sprayCan = nil
-            local tStart = tick()
-            repeat
-                toysFolder = Workspace:FindFirstChild(toysName)
-                if toysFolder then sprayCan = toysFolder:FindFirstChild("SprayCanWD") end
-                task.wait()
-            until sprayCan or tick() - tStart > 2
-
-            if sprayCan then
-                local stickyPart = nil
-                for _, part in ipairs(sprayCan:GetChildren()) do
-                    if part.Name == "StickyRemoverPart" then
-                        part.Size = Vector3.new(10, 10, 10)
-                        stickyPart = part
-                        break
-                    end
-                end
-
-                if stickyPart then
-                    if GrabEvents and GrabEvents:FindFirstChild("SetNetworkOwner") then
-                        GrabEvents.SetNetworkOwner:FireServer(stickyPart, stickyPart.CFrame)
-                    end
-                    
-                    local mainPart = sprayCan:FindFirstChild("Main")
-                    if mainPart then
-                        local bp = Instance.new("BodyPosition", mainPart)
-                        bp.P = 20000
-                        bp.Position = Vector3.new(0, 600, 0) -- 本体を上空へ待機
-                    end
-
-                    while _G.AntiKickRelease and sprayCan.Parent do
-                        for _, player in ipairs(Players:GetPlayers()) do
-                            if not _G.AntiKickRelease then break end
-                            if player ~= LocalPlayer and player.Character then
-                                local target = player.Character:FindFirstChild("HumanoidRootPart") or player.Character:FindFirstChild("Head")
-                                if target then
-                                    stickyPart.Position = target.Position
-                                    task.wait(0.01)
-                                end
-                            end
-                        end
-                        task.wait(0.01)
-                    end
-                end
-            end
-        end)
-        if not success then task.wait(1) end
-        task.wait()
-    end
-    
-    -- 終了時のクリーンアップ
-    local mt = ReplicatedStorage:FindFirstChild("MenuToys")
-    local destroyRemote = mt and mt:FindFirstChild("DestroyToy")
-    local toysFolder = Workspace:FindFirstChild(LocalPlayer.Name .. "SpawnedInToys")
-    if toysFolder and toysFolder:FindFirstChild("SprayCanWD") and destroyRemote then
-        destroyRemote:FireServer(toysFolder.SprayCanWD)
-    end
-end
-
--- Bliz-like Counter Logic
-local function PerformCounterAction(targetPlayer)
-    if not targetPlayer or not targetPlayer.Character then return end
-    
-    local root = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
-    local hum = targetPlayer.Character:FindFirstChild("Humanoid")
-    
-    if not root or not hum then return end
-    
-    if counterMode == "Repulsion" then
-        -- Repulsion Logic
-        local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if myRoot then
-            local lookAtCFrame = CFrame.lookAt(myRoot.Position, root.Position)
-            local bv = Instance.new("BodyVelocity")
-            bv.Name = "RepulsionVelocity"
-            bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-            bv.Velocity = Vector3.new(lookAtCFrame.LookVector.X, 0.5, lookAtCFrame.LookVector.Z) * 100
-            bv.Parent = root
-            DebrisService:AddItem(bv, 0.5)
-            
-            if GrabEvents and GrabEvents:FindFirstChild("DestroyGrabLine") then
-                GrabEvents.DestroyGrabLine:FireServer(root)
-            end
-        end
-        
-    elseif counterMode == "Death" then
-        -- Death Logic
-        if GrabEvents and GrabEvents:FindFirstChild("DestroyGrabLine") then
-            -- Create SkyVelocity
-            if not root:FindFirstChild("SkyVelocity") then
-                local bv = Instance.new("BodyVelocity", root)
-                bv.Name = "SkyVelocity"
-                bv.Velocity = Vector3.new(0, 100000000000000, 0)
-                bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-            end
-            
-            for _ = 0, 20 do
-                hum.BreakJointsOnDeath = false
-                hum:ChangeState(Enum.HumanoidStateType.Dead)
-                hum.Jump = true
-                hum.Sit = true
-            end
-            task.wait()
-            GrabEvents.DestroyGrabLine:FireServer(root)
-        end
-    end
-end
-
-local function AttemptCounter(targetPlayer)
-    if not targetPlayer then return end
-    
-    task.spawn(function()
-        local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        if not myRoot then return end
-        
-        -- Bliz Loop Logic
-        for i = 1, 50 do
-            if not targetPlayer.Character or not targetPlayer.Character.Parent then break end
-            
-            local root = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
-            local head = targetPlayer.Character:FindFirstChild("Head")
-            if not root or not head then task.wait(0.1) continue end
-
-            -- Check Ownership (Head.PartOwner)
-            local po = head:FindFirstChild("PartOwner")
-            if po and po.Value == LocalPlayer.Name then
-                -- We have ownership, perform action
-                PerformCounterAction(targetPlayer)
-                break -- Exit loop after action
-            else
-                -- Request Ownership
-                local Sno = GrabEvents and GrabEvents:FindFirstChild("SetNetworkOwner")
-                if Sno and (root.Position - myRoot.Position).Magnitude <= 50 then
-                    -- Bliz uses lookAt from Local to Target
-                    local lookCF = CFrame.lookAt(myRoot.Position, root.Position)
-                    pcall(function() 
-                        Sno:FireServer(root, lookCF) 
-                    end)
-                end
-            end
-            task.wait(0.1)
-        end
-    end)
-end
-
 local PerspectiveGrabSec = GrabTab:AddSection({ Name = "三人称視点での掴み (Perspective Grab)" })
 
 UIElements.PerspectiveGrabToggle = PerspectiveGrabSec:AddToggle({
-	Name = "Perspective Grab",
-	Default = false,
-	Callback = function(v)
-		perspectiveGrabEnabled = v
-	end    
+    Name = "透明化掴む",
+    Default = false,
+    Callback = function(v)
+        perspectiveGrabEnabled = v
+    end
 })
 
 UIElements.PerspectiveSpeedSlider = PerspectiveGrabSec:AddSlider({
-	Name = "Perspective Speed",
-	Min = 20,
+    Name = "Perspective Speed",
+    Min = 20,
     Max = 200,
     Default = 50,
     Increment = 5,
-	Callback = function(v) perspectiveSpeed = v end    
+    Callback = function(v)
+        perspectiveSpeed = v
+    end
 })
 
--- --- アクションタブ (UI構築をここに移動) ---
-local BlobmanKickSec = ActionTab:AddSection({ Name = "Actions" })
+local ActionSec = SubTab:AddSection({ Name = "アクション" })
 
-BlobmanKickSec:AddDropdown({
-    Name = "アクション対象",
+local tpTargetName = ""
+tpDropdown = ActionSec:AddDropdown({
+    Name = "テレポート対象",
     Default = "選択してください",
     Options = getPList(),
     Callback = function(v)
-        if v == "選択してください" then
-            tpTargetName = ""
-        else
-            tpTargetName = v:match("@([^)]+)")
+        tpTargetName = v:match("@([^)]+)")
+    end
+})
+
+ActionSec:AddButton({
+    Name = "選択したプレイヤーへテレポート",
+    Callback = function()
+        local targetName = (tpTargetName ~= "" and tpTargetName) or (targetSub and targetSub.Name)
+        local target = Players:FindFirstChild(targetName)
+        if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            LocalPlayer.Character.HumanoidRootPart.CFrame = target.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 3)
         end
     end
 })
 
-BlobmanKickSec:AddButton({
-    Name = "Blobman Bring",
-    Callback = function()
-        local target = Players:FindFirstChild(tpTargetName)
+local levitateRunning = false
+UIElements.BlobmanKick = ActionSec:AddToggle({
+    Name = "Blobman Kick",
+    Default = false,
+    Callback = function(v)
+        levitateRunning = v
+        if not v then return end
 
+        local targetName = (tpTargetName ~= "" and tpTargetName) or (targetSub and targetSub.Name)
+        local target = Players:FindFirstChild(targetName)
+        
         if target and target ~= LocalPlayer and target.Character and target.Character:FindFirstChild("HumanoidRootPart") and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
             -- Blobmanを探す
             local blobman = nil
@@ -873,23 +4710,27 @@ BlobmanKickSec:AddButton({
                 end
                 
                 if grabRemote and dropRemote and ((lDet and lWeld) or (rDet and rWeld)) then
-                    OrionLib:MakeNotification({ Name = "実行", Content = "Blobman Bring (Once)", Time = 3 })
+                    OrionLib:MakeNotification({ Name = "実行", Content = "Blobman Kick Loop", Time = 3 })
 
                     task.spawn(function()
+                        -- raw.txt Logic Implementation
                         local GE = ReplicatedStorage:WaitForChild("GrabEvents")
                         local blobRoot = blobman:FindFirstChild("HumanoidRootPart") or blobman.PrimaryPart
                         local SavedPos = blobRoot.CFrame
+                        
+                        -- Prefer Right, fallback to Left
                         local Det = rDet or lDet
                         local Weld = rWeld or lWeld
                         
-                        -- Phase 1: Capture (ターゲットを捕まえに行く)
+                        -- Phase 1: Capture
                         local bringStart = tick()
-                        while tick() - bringStart < 0.5 do
-                            if not blobman or not blobman.Parent then break end
+                        while tick() - bringStart < 0.35 do
+                            if not levitateRunning or not blobman or not blobman.Parent then break end
                             if target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
                                 local tRoot = target.Character.HumanoidRootPart
                                 blobRoot.CFrame = tRoot.CFrame
                                 blobRoot.AssemblyLinearVelocity = Vector3.zero
+                                
                                 pcall(function()
                                     if Det then grabRemote:FireServer(Det, tRoot, Weld) end
                                     GE.CreateGrabLine:FireServer(tRoot, Vector3.zero, tRoot.Position, false)
@@ -899,21 +4740,61 @@ BlobmanKickSec:AddButton({
                             RunService.Heartbeat:Wait()
                         end
                         
-                        -- 元の位置に戻る
                         if blobRoot then
                             blobRoot.CFrame = SavedPos
                             blobRoot.AssemblyLinearVelocity = Vector3.zero
                             task.wait(0.05)
                         end
-
-                        if target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
-                            local tRoot = target.Character.HumanoidRootPart
-                            -- 1. 位置を1回だけ設定
-                            tRoot.CFrame = blobRoot.CFrame * CFrame.new(0, 0, 0) 
-                            tRoot.AssemblyLinearVelocity = Vector3.zero
+                        
+                        -- Phase 2: Lock
+                        while levitateRunning and blobman and blobman.Parent do
+                            if not target or not target.Parent or not target.Character then break end
+                            
+                            local tChar = target.Character
+                            local tRoot = tChar:FindFirstChild("HumanoidRootPart")
+                            local tHum = tChar:FindFirstChild("Humanoid")
+                            
+                            if tRoot and tHum and tHum.Health > 0 and blobRoot then
+                                blobRoot.CFrame = SavedPos
+                                blobRoot.AssemblyLinearVelocity = Vector3.zero
+                                
+                                local lockPos = SavedPos * CFrame.new(0, 23, 0)
+                                tRoot.CFrame = lockPos
+                                tRoot.AssemblyLinearVelocity = Vector3.zero
+                                tRoot.AssemblyAngularVelocity = Vector3.zero
+                                
+                                pcall(function()
+                                    tHum.PlatformStand = true
+                                    tHum.Sit = true
+                                    GE.SetNetworkOwner:FireServer(tRoot, lockPos)
+                                    
+                                    -- Check for existing weld to drop
+                                    local currentWeld = Det:FindFirstChild("RightWeld") or Det:FindFirstChild("LeftWeld") or Det:FindFirstChildWhichIsA("Weld") or Det:FindFirstChild("RigidConstraint")
+                                    if currentWeld then
+                                        dropRemote:FireServer(currentWeld)
+                                    end
+                                    
+                                    GE.DestroyGrabLine:FireServer(tRoot)
+                                    if Det then grabRemote:FireServer(Det, tRoot, Weld) end
+                                    GE.CreateGrabLine:FireServer(tRoot, Vector3.zero, tRoot.Position, false)
+                                end)
+                            else
+                                if blobRoot then
+                                    blobRoot.CFrame = SavedPos
+                                    blobRoot.AssemblyLinearVelocity = Vector3.zero
+                                end
+                            end
+                            RunService.Heartbeat:Wait()
+                        end
+                        
+                        -- 終了時に固定解除
+                        if blobRoot then
+                            blobRoot.CFrame = SavedPos
+                            blobRoot.AssemblyLinearVelocity = Vector3.zero
                         end
                     end)
                 else
+                    -- 詳細なエラー内容を表示
                     local missing = {}
                     if not grabRemote then table.insert(missing, "CreatureGrab") end
                     if not dropRemote then table.insert(missing, "CreatureDrop") end
@@ -922,366 +4803,367 @@ BlobmanKickSec:AddButton({
                     OrionLib:MakeNotification({ Name = "エラー", Content = "不足: " .. table.concat(missing, ", "), Time = 5 })
                 end
             else
-                OrionLib:MakeNotification({ Name = "エラー", Content = "Blobmanが見つかりません", Time = 3 })
+                OrionLib:MakeNotification({ Name = "エラー", Content = "Blobmanが見つかりません (おもちゃを出してください)", Time = 3 })
             end
         end
     end
 })
 
-local Tab = Window:MakeTab({
-    Name = "メインタブ",
-    Icon = "rbxassetid://4483345998",
-    PremiumOnly = false
+-- --- TAB: ACTION (ported from test.lua) ---
+local ActionTabSec = ActionTab:AddSection({ Name = "Actions" })
+local actionTabTargetName = ""
+
+local function parseSelectedPlayerName(v)
+    if v == "選択してください" then
+        return ""
+    end
+    return (v and v:match("@([^)]+)")) or ""
+end
+
+ActionTabSec:AddDropdown({
+    Name = "アクション対象",
+    Default = "選択してください",
+    Options = getPList(),
+    Callback = function(v)
+        actionTabTargetName = parseSelectedPlayerName(v)
+    end
 })
 
-local FriendTab = Window:MakeTab({
-    Name = "ホワイトフレンド",
-    Icon = "rbxassetid://4483345998",
-    PremiumOnly = false
+ActionTabSec:AddButton({
+    Name = "Blobman bring",
+    Callback = function()
+        local target = Players:FindFirstChild(actionTabTargetName)
+        if not (target and target ~= LocalPlayer and target.Character and target.Character:FindFirstChild("HumanoidRootPart")) then
+            OrionLib:MakeNotification({ Name = "エラー", Content = "対象プレイヤーを選択してください", Time = 3 })
+            return
+        end
+        if not (LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")) then
+            return
+        end
+
+        local blobman = nil
+        local spawned = Workspace:FindFirstChild(LocalPlayer.Name .. "SpawnedInToys")
+        if spawned then blobman = spawned:FindFirstChild("CreatureBlobman") end
+
+        if not blobman then
+            local mt = ReplicatedStorage:FindFirstChild("MenuToys")
+            local st = mt and mt:FindFirstChild("SpawnToyRemoteFunction")
+            if st then
+                local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                local spawnCF = myRoot and (myRoot.CFrame + Vector3.new(0, 5, 0)) or CFrame.new(0, 50, 0)
+                st:InvokeServer("CreatureBlobman", spawnCF, Vector3.zero)
+                task.wait(0.5)
+                spawned = Workspace:FindFirstChild(LocalPlayer.Name .. "SpawnedInToys")
+                if spawned then blobman = spawned:FindFirstChild("CreatureBlobman") end
+            end
+        end
+
+        if not blobman then
+            for _, obj in ipairs(Workspace:GetChildren()) do
+                if obj.Name == "CreatureBlobman" and obj:FindFirstChild("VehicleSeat") then
+                    blobman = obj
+                    break
+                end
+            end
+        end
+
+        if not blobman then
+            OrionLib:MakeNotification({ Name = "エラー", Content = "Blobmanが見つかりません", Time = 3 })
+            return
+        end
+
+        local scriptObj = blobman:FindFirstChild("BlobmanSeatAndOwnerScript")
+        local grabRemote = scriptObj and scriptObj:FindFirstChild("CreatureGrab")
+        local dropRemote = scriptObj and scriptObj:FindFirstChild("CreatureDrop")
+        local lDet = blobman:FindFirstChild("LeftDetector")
+        local rDet = blobman:FindFirstChild("RightDetector")
+        local lWeld = lDet and (lDet:FindFirstChild("LeftWeld") or lDet:FindFirstChild("RigidConstraint"))
+        local rWeld = rDet and (rDet:FindFirstChild("RightWeld") or rDet:FindFirstChild("RigidConstraint"))
+
+        local seat = blobman:FindFirstChild("VehicleSeat")
+        local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid")
+        if seat and hum and seat.Occupant ~= hum then
+            LocalPlayer.Character.HumanoidRootPart.CFrame = seat.CFrame + Vector3.new(0, 2, 0)
+            seat:Sit(hum)
+            task.wait(0.3)
+        end
+
+        if not (grabRemote and dropRemote and ((lDet and lWeld) or (rDet and rWeld))) then
+            local missing = {}
+            if not grabRemote then table.insert(missing, "CreatureGrab") end
+            if not dropRemote then table.insert(missing, "CreatureDrop") end
+            if not (lDet or rDet) then table.insert(missing, "Detector") end
+            if not (lWeld or rWeld) then table.insert(missing, "Weld/Constraint") end
+            OrionLib:MakeNotification({ Name = "エラー", Content = "不足: " .. table.concat(missing, ", "), Time = 5 })
+            return
+        end
+
+        OrionLib:MakeNotification({ Name = "実行", Content = "Blobman Bring (Once)", Time = 3 })
+        task.spawn(function()
+            local ge = ReplicatedStorage:WaitForChild("GrabEvents")
+            local blobRoot = blobman:FindFirstChild("HumanoidRootPart") or blobman.PrimaryPart
+            if not blobRoot then return end
+            local savedPos = blobRoot.CFrame
+            local det = rDet or lDet
+            local weld = rWeld or lWeld
+
+            local bringStart = tick()
+            while tick() - bringStart < 0.5 do
+                if not (blobman and blobman.Parent) then break end
+                if target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+                    local tRoot = target.Character.HumanoidRootPart
+                    blobRoot.CFrame = tRoot.CFrame
+                    blobRoot.AssemblyLinearVelocity = Vector3.zero
+                    pcall(function()
+                        if det then grabRemote:FireServer(det, tRoot, weld) end
+                        ge.CreateGrabLine:FireServer(tRoot, Vector3.zero, tRoot.Position, false)
+                        ge.SetNetworkOwner:FireServer(tRoot, blobRoot.CFrame)
+                    end)
+                end
+                RunService.Heartbeat:Wait()
+            end
+
+            blobRoot.CFrame = savedPos
+            blobRoot.AssemblyLinearVelocity = Vector3.zero
+            task.wait(0.05)
+
+            if target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+                local tRoot = target.Character.HumanoidRootPart
+                tRoot.CFrame = blobRoot.CFrame
+                tRoot.AssemblyLinearVelocity = Vector3.zero
+            end
+        end)
+    end
 })
 
-local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local LocalPlayer = Players.LocalPlayer
+-- All Kick with white-friend protection
+local allKickSec = ActionTab:AddSection({ Name = "All Kick" })
+local allKickGrabbedPlayers = {}
+local allKickCurrentBlob = nil
+local allKickWhiteFriends = {}
+_G.ProtectRealFriends = _G.ProtectRealFriends or false
 
-local grabbedPlayers = {}
-local currentBlob = nil
-local whiteFriends = {}
-
-local function IsWhiteFriend(player)
+local function isAllKickWhiteFriend(player)
     if _G.ProtectRealFriends then
         return player:IsFriendsWith(LocalPlayer.UserId)
     end
-    return whiteFriends[player] == true or whiteFriends[player.Name] == true
+    return allKickWhiteFriends[player] == true or allKickWhiteFriends[player.Name] == true
 end
 
-local function GetPlayersInPlots()
-    local plotPlayers = {}
-    local plotItems = workspace:FindFirstChild("PlotItems")
-    
-    if plotItems then
-        local playersInPlots = plotItems:FindFirstChild("PlayersInPlots")
-        if playersInPlots then
-            for _, v in ipairs(playersInPlots:GetChildren()) do
-                local player = Players:FindFirstChild(v.Name)
-                if player then
-                    plotPlayers[player] = true
-                end
-            end
-        end
-    end
-    
-    return plotPlayers
-end
-
-local function IsPlayerProtected(player)
-    if IsWhiteFriend(player) then
+local function isAllKickProtected(player)
+    if isAllKickWhiteFriend(player) then
         return true
     end
-    
-    local plotItems = workspace:FindFirstChild("PlotItems")
-    if plotItems then
-        local playersInPlots = plotItems:FindFirstChild("PlayersInPlots")
-        if playersInPlots then
-            for _, v in ipairs(playersInPlots:GetChildren()) do
-                if v.Name == player.Name then
-                    return true
-                end
-            end
-        end
+    local plotItems = Workspace:FindFirstChild("PlotItems")
+    local playersInPlots = plotItems and plotItems:FindFirstChild("PlayersInPlots")
+    if playersInPlots and playersInPlots:FindFirstChild(player.Name) then
+        return true
     end
-    
     return false
 end
 
-local function SetNetworkOwner(part)
+local function setAllKickNetworkOwner(part)
     if not part then return end
     pcall(function()
         ReplicatedStorage.GrabEvents.SetNetworkOwner:FireServer(part, LocalPlayer.Character.HumanoidRootPart.CFrame)
     end)
 end
 
-local function GetMyToyFolder()
-    return workspace[LocalPlayer.Name .. "SpawnedInToys"]
+local function getAllKickToyFolder()
+    return Workspace:FindFirstChild(LocalPlayer.Name .. "SpawnedInToys")
 end
 
-local function GetMyRoot()
+local function getAllKickRoot()
     return LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
 end
 
-local function AnchorBlobman(blob, state)
+local function anchorAllKickBlob(blob, state)
     if not blob then return end
     for _, v in ipairs(blob:GetDescendants()) do
-        if v:IsA("BasePart") then
-            v.Anchored = state
+        if v:IsA("BasePart") then v.Anchored = state end
+    end
+    local mainPart = blob:FindFirstChild("HumanoidRootPart") or blob.PrimaryPart
+    if mainPart then
+        if state then
+            local sb = mainPart:FindFirstChild("AllKickAnchorBox") or Instance.new("SelectionBox")
+            sb.Name = "AllKickAnchorBox"
+            sb.Adornee = blob
+            sb.Parent = mainPart
+            sb.Color3 = Color3.fromRGB(0, 255, 255)
+            sb.LineThickness = 0.05
+        else
+            local old = mainPart:FindFirstChild("AllKickAnchorBox")
+            if old then old:Destroy() end
+            local sb = Instance.new("SelectionBox")
+            sb.Name = "AllKickUnanchorBox"
+            sb.Adornee = blob
+            sb.Parent = mainPart
+            sb.Color3 = Color3.fromRGB(255, 0, 0)
+            sb.LineThickness = 0.05
+            DebrisService:AddItem(sb, 0.5)
         end
     end
 end
 
-local function GrabPlayer(blob, targetPlayer)
-    if not blob or not targetPlayer or not targetPlayer.Character then return end
-    
-    if IsPlayerProtected(targetPlayer) then
-        return
-    end
-    
-    local targetRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
-    if not targetRoot then return end
-    
-    local leftDetector = blob:FindFirstChild("LeftDetector")
-    if not leftDetector then return end
-    
-    local leftWeld = leftDetector:FindFirstChild("LeftWeld")
-    if not leftWeld then return end
-    
-    local script = blob:FindFirstChild("BlobmanSeatAndOwnerScript")
-    if not script then return end
-    
-    local grabEvent = script:FindFirstChild("CreatureGrab")
-    if not grabEvent then return end
-    
-    pcall(function()
-        grabEvent:FireServer(leftDetector, targetRoot, leftWeld)
-    end)
-end
+local function allKickGrab3Times(blob, targetPlayer)
+    if not (blob and targetPlayer and targetPlayer.Character) then return false end
+    if isAllKickProtected(targetPlayer) then return false end
 
-local function Grab3Times(blob, targetPlayer)
-    if not blob or not targetPlayer or not targetPlayer.Character then return false end
-    
-    if IsPlayerProtected(targetPlayer) then
-        return false
-    end
-    
     local targetRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
     if not targetRoot then return false end
-    
-    for i = 1, 50 do
-        SetNetworkOwner(targetRoot)
-    end
-    
+    for _ = 1, 50 do setAllKickNetworkOwner(targetRoot) end
+
     local leftDetector = blob:FindFirstChild("LeftDetector")
-    if not leftDetector then return end
-    
-    local leftWeld = leftDetector:FindFirstChild("LeftWeld")
-    if not leftWeld then return end
-    
+    local leftWeld = leftDetector and leftDetector:FindFirstChild("LeftWeld")
     local rightDetector = blob:FindFirstChild("RightDetector")
-    if not rightDetector then return end
-    
-    local rightWeld = rightDetector:FindFirstChild("RightWeld")
-    if not rightWeld then return end
-    
-    local script = blob:FindFirstChild("BlobmanSeatAndOwnerScript")
-    if not script then return end
-    
-    local grabEvent = script:FindFirstChild("CreatureGrab")
-    if not grabEvent then return end
-    
-    local dropEvent = script:FindFirstChild("CreatureDrop")
-    if not dropEvent then return end
-    
-    local releaseEvent = script:FindFirstChild("CreatureRelease")
-    if not releaseEvent then return end
-    
-    local myRoot = GetMyRoot()
-    if not myRoot then return end
-    
-    local rootAttachment = myRoot:FindFirstChild("RootAttachment")
-    if not rootAttachment then return end
-    
-    for i = 1, 3 do
+    local rightWeld = rightDetector and rightDetector:FindFirstChild("RightWeld")
+    local scriptObj = blob:FindFirstChild("BlobmanSeatAndOwnerScript")
+    local grabEvent = scriptObj and scriptObj:FindFirstChild("CreatureGrab")
+    local dropEvent = scriptObj and scriptObj:FindFirstChild("CreatureDrop")
+    local releaseEvent = scriptObj and scriptObj:FindFirstChild("CreatureRelease")
+    local myRoot = getAllKickRoot()
+    local rootAttachment = myRoot and myRoot:FindFirstChild("RootAttachment")
+
+    if not (leftDetector and leftWeld and rightDetector and rightWeld and grabEvent and dropEvent and releaseEvent and rootAttachment) then
+        return false
+    end
+
+    for _ = 1, 3 do
         pcall(function()
             grabEvent:FireServer(leftDetector, targetRoot, leftWeld)
             dropEvent:FireServer(leftWeld, rootAttachment)
             releaseEvent:FireServer(rightWeld)
         end)
     end
-    
-    grabbedPlayers[targetPlayer] = true
+    allKickGrabbedPlayers[targetPlayer] = true
     return true
 end
 
-local function TeleportAllToCircleInstant(center, radius)
-    local players = {}
-    local count = 0
-    
+local function allKickTeleportCircle(center, radius)
+    local playersToMove = {}
     for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and not IsPlayerProtected(player) and player.Character then
+        if player ~= LocalPlayer and not isAllKickProtected(player) and player.Character then
             local targetRoot = player.Character:FindFirstChild("HumanoidRootPart")
             if targetRoot then
-                table.insert(players, {
-                    player = player,
-                    root = targetRoot
-                })
+                table.insert(playersToMove, { player = player, root = targetRoot })
             end
         end
     end
-    
-    local angleStep = (2 * math.pi) / #players
-    for i, data in ipairs(players) do
+    if #playersToMove == 0 then return 0 end
+
+    local angleStep = (2 * math.pi) / #playersToMove
+    local count = 0
+    for i, data in ipairs(playersToMove) do
         local angle = (i - 1) * angleStep
         local x = center.X + radius * math.cos(angle)
         local z = center.Z + radius * math.sin(angle)
-        
-        for j = 1, 50 do
-            SetNetworkOwner(data.root)
-        end
-        
+        for _ = 1, 50 do setAllKickNetworkOwner(data.root) end
         data.root.CFrame = CFrame.new(x, center.Y, z)
         count = count + 1
     end
-    
     return count
 end
 
-local function MassGrab20(blob)
-    for grabCount = 1, 10 do
-        for player, _ in pairs(grabbedPlayers) do
-            if player and player.Character and not IsPlayerProtected(player) then
-                GrabPlayer(blob, player)
+local function allKickMassGrab(blob)
+    if not blob then return 0 end
+    for _ = 1, 20 do
+        for player, _v in pairs(allKickGrabbedPlayers) do
+            if player and player.Character and not isAllKickProtected(player) then
+                local leftDetector = blob:FindFirstChild("LeftDetector")
+                local leftWeld = leftDetector and leftDetector:FindFirstChild("LeftWeld")
+                local scriptObj = blob:FindFirstChild("BlobmanSeatAndOwnerScript")
+                local grabEvent = scriptObj and scriptObj:FindFirstChild("CreatureGrab")
+                local targetRoot = player.Character:FindFirstChild("HumanoidRootPart")
+                if grabEvent and leftDetector and leftWeld and targetRoot then
+                    pcall(function() grabEvent:FireServer(leftDetector, targetRoot, leftWeld) end)
+                end
             end
         end
         task.wait(0.01)
     end
-    
-    task.wait(0.02)
-    
-    for grabCount = 1, 10 do
-        for player, _ in pairs(grabbedPlayers) do
-            if player and player.Character and not IsPlayerProtected(player) then
-                GrabPlayer(blob, player)
-            end
-        end
-        task.wait(0.01)
-    end
-    
-    return #grabbedPlayers
+    return 0
 end
 
-FriendTab:AddToggle({
-    Name = "Robloxフレンド保護 (Real Friends)",
-    Default = false,
-    Callback = function(v)
-        _G.ProtectRealFriends = v
-    end
-})
-
-Tab:AddButton({
+allKickSec:AddButton({
     Name = "キックオール",
     Callback = function()
-        grabbedPlayers = {}
-        currentBlob = nil
-        local totalPlayers = 0
-        
+        allKickGrabbedPlayers = {}
+        allKickCurrentBlob = nil
+
         local protectedCount = 0
         for _, player in ipairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer and IsPlayerProtected(player) then
+            if player ~= LocalPlayer and isAllKickProtected(player) then
                 protectedCount = protectedCount + 1
             end
         end
 
-        
-        local character = LocalPlayer.Character
-        if character then
-            local rootPart = character:FindFirstChild("HumanoidRootPart")
-            if rootPart then
-                local spawnPos = rootPart.CFrame * CFrame.new(0, 0, -5)
-                ReplicatedStorage.MenuToys.SpawnToyRemoteFunction:InvokeServer(table.unpack({
-                    [1] = "CreatureBlobman",
-                    [2] = spawnPos,
-                    [3] = Vector3.new(0, 127, 0),
-                }))
-            end
+        local myRoot = getAllKickRoot()
+        if myRoot then
+            local spawnPos = myRoot.CFrame * CFrame.new(0, 0, -5)
+            pcall(function()
+                ReplicatedStorage.MenuToys.SpawnToyRemoteFunction:InvokeServer("CreatureBlobman", spawnPos, Vector3.new(0, 127, 0))
+            end)
         end
         task.wait(0.5)
-        
-        local folder = GetMyToyFolder()
-        currentBlob = folder and folder:FindFirstChild("CreatureBlobman")
-        
-        if currentBlob then
-            local vehicleSeat = currentBlob:FindFirstChild("VehicleSeat")
-            if vehicleSeat then
-                local humanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-                if humanoid then
-                    vehicleSeat:Sit(humanoid)
-                end
-            end
+
+        local folder = getAllKickToyFolder()
+        allKickCurrentBlob = folder and folder:FindFirstChild("CreatureBlobman")
+        if allKickCurrentBlob then
+            local vehicleSeat = allKickCurrentBlob:FindFirstChild("VehicleSeat")
+            local humanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+            if vehicleSeat and humanoid then vehicleSeat:Sit(humanoid) end
         end
         task.wait(0.3)
-        
-        local myRoot = GetMyRoot()
-        if myRoot and currentBlob then
+
+        myRoot = getAllKickRoot()
+        if myRoot and allKickCurrentBlob then
             for _, player in ipairs(Players:GetPlayers()) do
-                if player ~= LocalPlayer and not IsPlayerProtected(player) and player.Character then
-                    totalPlayers = totalPlayers + 1
+                if player ~= LocalPlayer and not isAllKickProtected(player) and player.Character then
                     local targetRoot = player.Character:FindFirstChild("HumanoidRootPart")
                     if targetRoot then
                         myRoot.CFrame = targetRoot.CFrame
                         task.wait(0.15)
-                        Grab3Times(currentBlob, player)
+                        allKickGrab3Times(allKickCurrentBlob, player)
                     end
                 end
             end
         end
-        
+
         for _, player in ipairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer and not IsPlayerProtected(player) and player.Character then
+            if player ~= LocalPlayer and not isAllKickProtected(player) and player.Character then
                 local targetRoot = player.Character:FindFirstChild("HumanoidRootPart")
                 if targetRoot then
-                    for i = 1, 50 do
-                        SetNetworkOwner(targetRoot)
-                    end
+                    for _ = 1, 50 do setAllKickNetworkOwner(targetRoot) end
                 end
             end
         end
-        
+
         if myRoot then
             myRoot.CFrame = CFrame.new(0, 70, 0)
             task.wait(0.2)
         end
-        
-        if currentBlob then
-            AnchorBlobman(currentBlob, true)
-        end
-        
-        local center = Vector3.new(0, 70, 0)
-        local teleportedCount = TeleportAllToCircleInstant(center, 15)
-        
-        local grabbedCount = MassGrab20(currentBlob)
-        
+
+        if allKickCurrentBlob then anchorAllKickBlob(allKickCurrentBlob, true) end
+        local teleportedCount = allKickTeleportCircle(Vector3.new(0, 70, 0), 15)
+        allKickMassGrab(allKickCurrentBlob)
         task.wait(0.5)
-        if currentBlob then
-            AnchorBlobman(currentBlob, false)
-        end
-        
+        if allKickCurrentBlob then anchorAllKickBlob(allKickCurrentBlob, false) end
+
         OrionLib:MakeNotification({
             Name = "完了",
-            Content = string.format("対象: %d人\n保護対象: %d人\nGrab20回完了", teleportedCount, protectedCount),
+            Content = string.format("対象: %d人\n保護対象: %d人\nKick実行", teleportedCount, protectedCount),
             Image = "rbxassetid://4483345998",
             Time = 4
         })
     end
 })
 
--- ループキルセクション
-local LoopKillSec = ActionTab:AddSection({ Name = "Loop Kill" })
+-- Loop Kill (ported from test.lua)
+local loopKillSecActionTab = ActionTab:AddSection({ Name = "Loop Kill" })
+local loopKillTargetNameActionTab = ""
+local loopKillEnabledActionTab = false
 
-LoopKillSec:AddDropdown({
-    Name = "ターゲット選択",
-    Default = "選択してください",
-    Options = getPList(),
-    Callback = function(v)
-        if v == "選択してください" then
-            loopKillTargetName = ""
-        else
-            -- @以降のユーザー名を正確に切り出す
-            loopKillTargetName = v:match("@([^)]+)")
-        end
-    end
-})
-
--- Loop Kill Helpers (Comic Logic)
-local function nocoll(model)
+local function noCollideModelActionTab(model)
     for _, v in ipairs(model:GetDescendants()) do
         if v:IsA("BasePart") then
             v.CanCollide = false
@@ -1289,1008 +5171,105 @@ local function nocoll(model)
     end
 end
 
-local function fling(root, hum)
-    nocoll(hum.Parent)
+local function flingActionTab(root, hum)
+    noCollideModelActionTab(hum.Parent)
     local bv = Instance.new("BodyVelocity")
     bv.Velocity = Vector3.new(0, 1000000000, 0)
     bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
     bv.Parent = root
-    
     hum.Sit = false
     hum.Jump = true
-    
     DebrisService:AddItem(bv, 3)
 end
 
-LoopKillSec:AddToggle({
-    Name = "Loop Kill",
+loopKillSecActionTab:AddDropdown({
+    Name = "ターゲット選択",
+    Default = "選択してください",
+    Options = getPList(),
+    Callback = function(v)
+        loopKillTargetNameActionTab = parseSelectedPlayerName(v)
+    end
+})
+
+loopKillSecActionTab:AddToggle({
+    Name = "ループキル",
     Default = false,
     Callback = function(v)
-        loopKillEnabled = v
-        if v then
-            task.spawn(function()
-                local myChar = LocalPlayer.Character
-                local savedPivot = myChar and myChar:GetPivot()
+        loopKillEnabledActionTab = v
+        if not v then return end
 
-                while loopKillEnabled do
-                  RunService.Heartbeat:Wait()
-                  if not myChar or not myChar.Parent then
-                      myChar = LocalPlayer.Character
-                      if myChar then savedPivot = myChar:GetPivot() end
-                  end
+        task.spawn(function()
+            local myChar = LocalPlayer.Character
+            local savedPivot = myChar and myChar:GetPivot()
 
-                  if loopKillTargetName ~= "" and myChar and myChar:FindFirstChild("HumanoidRootPart") then
-                      local target = Players:FindFirstChild(loopKillTargetName)
-                      if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
-                          local dist = (myChar.HumanoidRootPart.Position - target.Character.HumanoidRootPart.Position).Magnitude
-                          -- ターゲットから十分離れている場合のみ位置を更新（移動可能にする）
-                          if dist > 20 then
-                              savedPivot = myChar:GetPivot()
-                          end
-                      end
-                  end
+            while loopKillEnabledActionTab do
+                RunService.Heartbeat:Wait()
+                if not myChar or not myChar.Parent then
+                    myChar = LocalPlayer.Character
+                    if myChar then savedPivot = myChar:GetPivot() end
+                end
 
-                  task.spawn(function()
-                    if loopKillTargetName ~= "" then
-                        local target = Players:FindFirstChild(loopKillTargetName)
-                        
-                        -- Check if in plot (Comic logic)
-                        local inPlot = false
-                        if Workspace:FindFirstChild("PlotItems") and Workspace.PlotItems:FindFirstChild("PlayersInPlots") then
-                            if Workspace.PlotItems.PlayersInPlots:FindFirstChild(target.Name) then
-                                inPlot = true
-                            end
-                        end
-
-                        if target and target ~= LocalPlayer and target.Character and not inPlot then
-                            local targetRoot = target.Character:FindFirstChild("HumanoidRootPart")
-                            local targetHum = target.Character:FindFirstChild("Humanoid")
-                            local targetHead = target.Character:FindFirstChild("Head")
-                            local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
-
-                            if targetRoot and targetHum and targetHead and targetHum.Health > 0 and myRoot then
-                                pcall(function()
-                                    
-                                    -- tp to target + offset (Comic Hub: 5, -18.5, 0)
-                                    local offset = Vector3.new(5, -18.5, 0)
-                                    myChar:PivotTo(CFrame.new(targetRoot.Position + offset))
-                                    
-                                    -- nocoll target
-                                    nocoll(target.Character)
-                                    
-                                    -- SetNetworkOwner
-                                    if GrabEvents and GrabEvents:FindFirstChild("SetNetworkOwner") then
-                                        GrabEvents.SetNetworkOwner:FireServer(targetRoot, targetRoot.CFrame)
-                                    end
-                                    
-                                    task.wait()
-                                    
-                                    -- ret (return to saved pos if far enough)
-                                    if myRoot and savedPivot and (myRoot.Position - savedPivot.Position).Magnitude > 2 then
-                                        myChar:PivotTo(savedPivot)
-                                    end
-
-                                    task.wait(0.1)
-                                    
-                                    -- DestroyGrabLine
-                                    if GrabEvents and GrabEvents:FindFirstChild("DestroyGrabLine") then
-                                        GrabEvents.DestroyGrabLine:FireServer(targetRoot)
-                                    end
-
-                                    task.wait(0.1)
-                                    
-                                    -- Kill if owned
-                                    if targetHead:FindFirstChild("PartOwner") and targetHead.PartOwner.Value == LocalPlayer.Name then
-                                        fling(targetRoot, targetHum)
-                                        task.wait(0.1)
-                                        targetHum.Health = 0
-                                    end
-                                end)
-                            end
+                if loopKillTargetNameActionTab ~= "" and myChar and myChar:FindFirstChild("HumanoidRootPart") then
+                    local target = Players:FindFirstChild(loopKillTargetNameActionTab)
+                    if target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") then
+                        local dist = (myChar.HumanoidRootPart.Position - target.Character.HumanoidRootPart.Position).Magnitude
+                        if dist > 20 then
+                            savedPivot = myChar:GetPivot()
                         end
                     end
-                  end)
                 end
-            end)
-        end
+
+                task.spawn(function()
+                    if loopKillTargetNameActionTab == "" then return end
+                    local target = Players:FindFirstChild(loopKillTargetNameActionTab)
+                    if not (target and target ~= LocalPlayer and target.Character) then return end
+
+                    local inPlot = false
+                    if Workspace:FindFirstChild("PlotItems") and Workspace.PlotItems:FindFirstChild("PlayersInPlots") then
+                        if Workspace.PlotItems.PlayersInPlots:FindFirstChild(target.Name) then
+                            inPlot = true
+                        end
+                    end
+                    if inPlot then return end
+
+                    local targetRoot = target.Character:FindFirstChild("HumanoidRootPart")
+                    local targetHum = target.Character:FindFirstChild("Humanoid")
+                    local targetHead = target.Character:FindFirstChild("Head")
+                    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+                    if not (targetRoot and targetHum and targetHead and targetHum.Health > 0 and myRoot) then return end
+
+                    pcall(function()
+                        myChar:PivotTo(CFrame.new(targetRoot.Position + Vector3.new(5, -18.5, 0)))
+                        noCollideModelActionTab(target.Character)
+                        if GrabEvents and GrabEvents:FindFirstChild("SetNetworkOwner") then
+                            GrabEvents.SetNetworkOwner:FireServer(targetRoot, targetRoot.CFrame)
+                        end
+                        task.wait()
+                        if myRoot and savedPivot and (myRoot.Position - savedPivot.Position).Magnitude > 2 then
+                            myChar:PivotTo(savedPivot)
+                        end
+                        task.wait(0.1)
+                        if GrabEvents and GrabEvents:FindFirstChild("DestroyGrabLine") then
+                            GrabEvents.DestroyGrabLine:FireServer(targetRoot)
+                        end
+                        task.wait(0.1)
+                        if targetHead:FindFirstChild("PartOwner") and targetHead.PartOwner.Value == LocalPlayer.Name then
+                            flingActionTab(targetRoot, targetHum)
+                            task.wait(0.1)
+                            targetHum.Health = 0
+                        end
+                    end)
+                end)
+            end
+        end)
     end,
     Save = true,
-    Flag = "lk_toggle"
-})
-                            
--- --- キーボードタブ (Bliz Keybinds) ---
-local keyboardTargetName = ""
-
--- 1. Teleport Section
-local TeleportSec = KeyboardTab:AddSection({ Name = "Teleport" })
-
-local function PerformTeleport()
-    local char = LocalPlayer.Character
-    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
-
-    local targetPos
-    if IsMobile() then
-        local cam = Workspace.CurrentCamera
-        local params = RaycastParams.new()
-        params.FilterDescendantsInstances = {char}
-        params.FilterType = Enum.RaycastFilterType.Exclude
-        local ray = Workspace:Raycast(cam.CFrame.Position, cam.CFrame.LookVector * 1000, params)
-        targetPos = ray and ray.Position or (cam.CFrame.Position + cam.CFrame.LookVector * 50)
-    else
-        local mouse = LocalPlayer:GetMouse()
-        if mouse and mouse.Hit then
-            targetPos = mouse.Hit.Position
-        end
-    end
-
-    if targetPos then
-        char.HumanoidRootPart.CFrame = CFrame.new(targetPos + Vector3.new(0, 5, 0))
-    end
-end
-
-local function onTeleportAction(actionName, inputState, inputObject)
-    if inputState == Enum.UserInputState.Begin then
-        PerformTeleport()
-    end
-end
-
--- Mobile Teleport Button (Bliz Style)
-local TeleportBtn = Instance.new("ImageButton")
-TeleportBtn.Name = "TeleportButton"
-TeleportBtn.Size = UDim2.new(0, 70, 0, 70)
-TeleportBtn.Position = UDim2.new(1, - 267, 1, - 90)
-TeleportBtn.Image = "rbxassetid://97166444"
-TeleportBtn.ImageColor3 = Color3.fromRGB(142, 142, 142)
-TeleportBtn.BackgroundTransparency = 1
-TeleportBtn.ImageTransparency = 0.2
-TeleportBtn.Visible = false
-TeleportBtn.Parent = gui
-
-TeleportBtn.MouseButton1Down:Connect(function()
-    TeleportBtn.ImageTransparency = 0
-end)
-
-TeleportBtn.MouseButton1Up:Connect(function()
-    TeleportBtn.ImageTransparency = 0.2
-end)
-
-local TeleportIcon = Instance.new("ImageLabel")
-TeleportIcon.Size = UDim2.new(0.7, 0, 0.7, 0)
-TeleportIcon.Position = UDim2.new(0.15, 0, 0.15, 0)
-TeleportIcon.BackgroundTransparency = 1
-TeleportIcon.Image = "rbxassetid://10650996837" -- Teleport Icon
-TeleportIcon.Parent = TeleportBtn
-
-TeleportBtn.MouseButton1Click:Connect(PerformTeleport)
-
-
-TeleportSec:AddToggle({
-    Name = "Teleport (Z)",
-    Default = false,
-    Callback = function(v)
-        if v then
-            ContextActionService:BindAction("TeleportZ", onTeleportAction, false, Enum.KeyCode.Z)
-            if IsMobile() then TeleportBtn.Visible = true end
-        else
-            ContextActionService:UnbindAction("TeleportZ")
-            TeleportBtn.Visible = false
-        end
-    end
+    Flag = "lk_toggle_action_tab"
 })
 
-
-
-
-
--- 2. Anchor Objects Section
-local AnchorSec = KeyboardTab:AddSection({ Name = "Anchor Objects" })
-
-local AnchoredObjects = {}
-
-local function PerformAnchor()
-        local targetToProcess = nil
-        local partToDrop = nil
-        local grabPartsFolder = Workspace:FindFirstChild("GrabParts")
-
-        -- 1. 掴んでいるオブジェクトがある場合 (Bliz仕様: 新規固定は掴んでいる時のみ)
-        if grabPartsFolder and grabPartsFolder:FindFirstChild("GrabPart") and grabPartsFolder.GrabPart:FindFirstChild("WeldConstraint") then
-            local grabbedPart = grabPartsFolder.GrabPart.WeldConstraint.Part1
-            if grabbedPart then
-                -- マップの一部やロックされたパーツは除外
-                local map = Workspace:FindFirstChild("Map")
-                if not (grabbedPart.Locked or (map and grabbedPart:IsDescendantOf(map))) then
-                     local model = grabbedPart:FindFirstAncestorOfClass("Model")
-                     targetToProcess = model or grabbedPart
-                     partToDrop = grabbedPart
-                end
-            end
-        elseif LocalPlayer.Character then
-            -- 2. 掴んでいない場合: 既にこのスクリプトでアンカーされた("IsAnchored"属性がある)オブジェクトのみ操作可能
-            local target
-            if IsMobile() then
-                local cam = Workspace.CurrentCamera
-                local params = RaycastParams.new()
-                params.FilterDescendantsInstances = {LocalPlayer.Character}
-                params.FilterType = Enum.RaycastFilterType.Exclude
-                local ray = Workspace:Raycast(cam.CFrame.Position, cam.CFrame.LookVector * 1000, params)
-                if ray then target = ray.Instance end
-            else
-                local mouse = LocalPlayer:GetMouse()
-                target = mouse.Target
-            end
-
-            if target then
-                local model = target:FindFirstAncestorOfClass("Model")
-                local checkObj = model or target
-                -- Bliz仕様: IsAnchored属性を持っている場合のみ反応 (解除など)
-                if checkObj:GetAttribute("IsAnchored") then
-                    targetToProcess = checkObj
-                end
-            end
-        end
-
-        if targetToProcess then
-            -- トグル処理 (属性IsAnchoredを基準にする)
-            local currentAnchorState = targetToProcess:GetAttribute("IsAnchored")
-            local newAnchorState = not currentAnchorState
-            
-            -- 属性を更新
-            targetToProcess:SetAttribute("IsAnchored", newAnchorState)
-
-            -- メインパーツ特定 (BodyMover用)
-            local mainPart = targetToProcess
-            if targetToProcess:IsA("Model") then
-                mainPart = targetToProcess.PrimaryPart or targetToProcess:FindFirstChildWhichIsA("BasePart", true)
-            end
-
-            -- Network Ownership Request (Bliz Logic: Ensure control before anchoring)
-            if mainPart and GrabEvents and GrabEvents:FindFirstChild("SetNetworkOwner") and not partToDrop then
-                task.spawn(function()
-                    pcall(function() GrabEvents.SetNetworkOwner:FireServer(mainPart, mainPart.CFrame) end)
-                end)
-            end
-
-            OrionLib:MakeNotification({
-                Name = "Anchor",
-                Content = (newAnchorState and "[Anchored] " or "[Unanchored] ") .. targetToProcess.Name,
-                Time = 1
-            })
-            -- エフェクト用 (Bliz参考)
-            local highlightName = "BlizAnchor"
-
-            local existing = targetToProcess:FindFirstChild(highlightName)
-            if existing then existing:Destroy() end
-
-            if newAnchorState and mainPart then
-                -- 固定時: BodyMoversで固定 (Fake Anchor - Bliz仕様)
-                local connections = {}
-                
-                -- PartOwnerの監視関数
-                local function setupOwnerListener(po)
-                    if not po then return end
-                    if po.Value ~= LocalPlayer.Name then
-                        targetToProcess:SetAttribute("AnchorOwnership", nil)
-                    end
-                    local conn = po:GetPropertyChangedSignal("Value"):Connect(function()
-                        if po.Value ~= LocalPlayer.Name then
-                            targetToProcess:SetAttribute("AnchorOwnership", nil)
-                        end
-                    end)
-                    table.insert(connections, conn)
-                end
-                
-                connections[#connections+1] = targetToProcess.DescendantAdded:Connect(function(desc)
-                    if desc.Name == "PartOwner" then setupOwnerListener(desc) end
-                end)
-                connections[#connections+1] = targetToProcess.DescendantRemoving:Connect(function(descendant)
-                    if descendant.Name == "PartOwner" then
-                        targetToProcess:SetAttribute("AnchorOwnership", nil)
-                    end
-                end)
-                
-                -- 既存のPartOwnerに対しても監視を設定（ここが重要）
-                for _, desc in ipairs(targetToProcess:GetDescendants()) do
-                    if desc.Name == "PartOwner" then
-                        setupOwnerListener(desc)
-                    end
-                end
-                
-                AnchoredObjects[targetToProcess] = {Part = mainPart, Connections = connections}
-                
-                -- Bliz仕様: BodyPosition (重力落下防止)
-                local bp = mainPart:FindFirstChild("BlizAnchorBP") or Instance.new("BodyPosition")
-                bp.Name = "BlizAnchorBP"
-                bp.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-                bp.P = 40000
-                bp.D = 950 -- Blizの値に合わせる
-                bp.Position = mainPart.Position
-                bp.Parent = mainPart
-
-                local bg = mainPart:FindFirstChild("BlizAnchorBG") or Instance.new("BodyGyro")
-                bg.Name = "BlizAnchorBG"
-                bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
-                bg.P = 40000
-                bg.D = 950
-                bg.CFrame = mainPart.CFrame
-                bg.Parent = mainPart
-
-                local sb = mainPart:FindFirstChild(highlightName) or Instance.new("SelectionBox")
-                sb.Name = highlightName
-                sb.Adornee = targetToProcess
-                sb.Parent = targetToProcess
-                sb.Color3 = Color3.fromRGB(0, 255, 255) -- Cyan
-                sb.LineThickness = 0.05
-
-                -- Bliz仕様: 位置を微調整し続けて物理演算を維持する (Jitter Loop)
-                task.spawn(function()
-                    local initialPos = mainPart.Position
-                    while targetToProcess:GetAttribute("IsAnchored") and bp.Parent do
-                        bp.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-                        bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
-                        
-                        bp.Position = initialPos + Vector3.new(0, 0.001, 0)
-                        task.wait()
-                        bp.Position = initialPos
-                    end
-                end)
-
-            elseif mainPart then
-                -- 解除時: BodyMoversを削除
-                local data = AnchoredObjects[targetToProcess]
-                if data and data.Connections then
-                    for _, conn in ipairs(data.Connections) do
-                        conn:Disconnect()
-                    end
-                end
-                AnchoredObjects[targetToProcess] = nil
-                local bp = mainPart:FindFirstChild("BlizAnchorBP")
-                if bp then bp:Destroy() end
-                local bg = mainPart:FindFirstChild("BlizAnchorBG")
-                if bg then bg:Destroy() end
-
-                local sb = Instance.new("SelectionBox")
-                sb.Adornee = targetToProcess
-                sb.Parent = targetToProcess
-                sb.Color3 = Color3.fromRGB(255, 0, 0) -- Red
-                sb.LineThickness = 0.05
-                DebrisService:AddItem(sb, 0.5)
-            end
-        end
-end
-
-local function onAnchorAction(actionName, inputState, inputObject)
-    if inputState == Enum.UserInputState.Begin then
-        PerformAnchor()
-    end
-end
-
--- Mobile Anchor Button (Bliz Style)
-local AnchorBtn = Instance.new("ImageButton")
-AnchorBtn.Name = "AnchorButton"
-AnchorBtn.Size = UDim2.new(0, 60, 0, 60)
-AnchorBtn.Position = UDim2.new(1, - 330, 1, - 80)
-AnchorBtn.Image = "rbxassetid://97166444"
-AnchorBtn.ImageColor3 = Color3.fromRGB(142, 142, 142)
-AnchorBtn.BackgroundTransparency = 1
-AnchorBtn.ImageTransparency = 0.2
-AnchorBtn.Visible = false
-AnchorBtn.Parent = gui
-
-AnchorBtn.MouseButton1Down:Connect(function()
-    AnchorBtn.ImageTransparency = 0
-end)
-
-AnchorBtn.MouseButton1Up:Connect(function()
-    AnchorBtn.ImageTransparency = 0.2
-end)
-
-
-
-local AnchorIcon = Instance.new("ImageLabel")
-AnchorIcon.Size = UDim2.new(0.55, 0, 0.55, 0)
-AnchorIcon.Position = UDim2.new(0.225, 0, 0.225, 0)
-AnchorIcon.BackgroundTransparency = 1
-AnchorIcon.Image = "rbxassetid://357069505" -- Anchor Icon
-AnchorIcon.Parent = AnchorBtn
-AnchorBtn.MouseButton1Click:Connect(PerformAnchor)
-
-
-AnchorSec:AddToggle({
-    Name = "Anchor (K)",
-    Default = false,
-    Callback = function(v)
-        if v then
-            ContextActionService:BindAction("AnchorK", onAnchorAction, false, Enum.KeyCode.K)
-            if IsMobile() then AnchorBtn.Visible = true end
-        else
-            ContextActionService:UnbindAction("AnchorK")
-            AnchorBtn.Visible = false
-        end
-    end
-})
-
--- --- Silent Aim Tab (Ported from Comic Hub) ---
-local SilentAimTab = Window:MakeTab({
-	Name = "Silent Aim",
-	Icon = "rbxassetid://6031091005"
-})
-
-local ConfigContainer = {
-    SA = {
-        En = false, 
-        Key = "RightAlt", 
-        TP = "HumanoidRootPart", 
-        Show = false, 
-        MHP = false, 
-        AP = true, 
-        MHP_A = 0.165, 
-        HC = 100, 
-        Col = Color3.fromRGB(54, 57, 241)
-    }, 
-    Cam = Workspace.CurrentCamera, 
-    P = game:GetService("Players"), 
-    RS = game:GetService("RunService"), 
-    GS = game:GetService("GuiService"), 
-    UIS = game:GetService("UserInputService"), 
-    ST = game:GetService("Stats"), 
-    LP = game:GetService("Players").LocalPlayer, 
-    MC = nil, 
-    MB = nil, 
-    M = nil, 
-    MBX = nil, 
-    VTP = {
-        "Head", 
-        "HumanoidRootPart"
-    }, 
-    CPA = 0.165, 
-    EA = {
-        Raycast = {
-            AC = 3, 
-            Args = {
-                "Instance", 
-                "Vector3", 
-                "Vector3", 
-                "RaycastParams"
-            }
-        }
-    }, 
-    CoR = coroutine.resume, 
-    CoC = coroutine.create
-}
-
-if getgenv then
-    getgenv().SilentAimSettings = ConfigContainer.SA
-end
-
-ConfigContainer.M = ConfigContainer.LP:GetMouse()
-local DrawingObject = pcall(function() return Drawing.new("Square") end)
-
-if DrawingObject then
-    ConfigContainer.MBX = Drawing.new("Square")
-    ConfigContainer.MBX.Visible = false
-    ConfigContainer.MBX.ZIndex = 999
-    ConfigContainer.MBX.Color = ConfigContainer.SA.Col
-    ConfigContainer.MBX.Thickness = 2
-    ConfigContainer.MBX.Size = Vector2.new(30, 30)
-    ConfigContainer.MBX.Filled = true
-else
-    ConfigContainer.MBX = {
-        Visible = false, 
-        Position = Vector2.new(), 
-        Color = ConfigContainer.SA.Col
-    }
-    ConfigContainer.SA.Show = false
-end
-
-ConfigContainer.MC = ConfigContainer.UIS.TouchEnabled and not ConfigContainer.UIS.KeyboardEnabled
-
-local function Ch(Param5)
-    Param5 = math.floor(Param5)
-    return math.floor(math.random() * 100) / 100 <= Param5 / 100
-end
-
-local function GPx(Object1)
-    local ScreenPoint1, ScreenPoint2 = ConfigContainer.Cam:WorldToScreenPoint(Object1)
-    return Vector2.new(ScreenPoint1.X, ScreenPoint1.Y), ScreenPoint2
-end
-
-local function VA(Param6, Param7)
-    local DefaultValue = 0
-    if #Param6 < Param7.AC then
-        return false
-    else
-        for LoopVariable1, LoopVariable2 in next, Param6 do
-            if typeof(LoopVariable2) == Param7.Args[LoopVariable1] then
-                DefaultValue = DefaultValue + 1
-            end
-        end
-        return Param7.AC <= DefaultValue
-    end
-end
-
-local function GD(Param8, Param9)
-    return (Param9 - Param8).Unit * 1000
-end
-
-local function GMP()
-    return ConfigContainer.UIS:GetMouseLocation()
-end
-
-local function GPP(VelocityObject)
-    local DefaultVelocity = VelocityObject.Velocity or Vector3.new()
-    return VelocityObject.Position + (ConfigContainer.SA.MHP and DefaultVelocity * ConfigContainer.CPA or Vector3.new())
-end
-
-local function GCP()
-    if not ConfigContainer.SA.TP then return end
-    
-    local BestTarget = nil
-    local ClosestDist = math.huge
-    local MyRoot = ConfigContainer.LP.Character and ConfigContainer.LP.Character:FindFirstChild("HumanoidRootPart")
-    if not MyRoot then return nil end
-    local MyPos = MyRoot.Position
-
-    for _, LoopCharacter in next, ConfigContainer.P:GetPlayers() do
-        if LoopCharacter ~= ConfigContainer.LP then
-            local TargetCharacter = LoopCharacter.Character
-            if TargetCharacter then
-                local HumanoidRootPart = TargetCharacter:FindFirstChild("HumanoidRootPart")
-                local Humanoid = TargetCharacter:FindFirstChild("Humanoid")
-                if HumanoidRootPart and Humanoid and Humanoid.Health > 0 then
-                    local Dist = (MyPos - HumanoidRootPart.Position).Magnitude
-                    if Dist < ClosestDist then
-                        ClosestDist = Dist
-                        BestTarget = ConfigContainer.SA.TP == "Random" and TargetCharacter[ConfigContainer.VTP[math.random(1, #ConfigContainer.VTP)]] or TargetCharacter[ConfigContainer.SA.TP]
-                    end
-                end
-            end
-        end
-    end
-    return BestTarget
-end
-
-SilentAimTab:AddToggle({Name = "Enabled (有効化)", Default = ConfigContainer.SA.En, Callback = function(v) ConfigContainer.SA.En = v end})
-
-ConfigContainer.RS.Heartbeat:Connect(function()
-    if ConfigContainer.SA.AP then
-        local StatusResult, ActionResult = pcall(function()
-            return ConfigContainer.ST.Network.ServerStatsItem["Data Ping"]:GetValueString()
-        end)
-        if StatusResult then
-            local ActionResultValue = tonumber(ActionResult:match("(%d+)")) or 50
-            if ActionResultValue < 20 then ConfigContainer.CPA = 0.11
-            elseif ActionResultValue < 30 then ConfigContainer.CPA = 0.115
-            elseif ActionResultValue < 40 then ConfigContainer.CPA = 0.12
-            elseif ActionResultValue < 50 then ConfigContainer.CPA = 0.125
-            elseif ActionResultValue < 60 then ConfigContainer.CPA = 0.13
-            elseif ActionResultValue < 70 then ConfigContainer.CPA = 0.135
-            elseif ActionResultValue < 80 then ConfigContainer.CPA = 0.14
-            elseif ActionResultValue < 90 then ConfigContainer.CPA = 0.145
-            elseif ActionResultValue < 100 then ConfigContainer.CPA = 0.15
-            elseif ActionResultValue < 110 then ConfigContainer.CPA = 0.155
-            else ConfigContainer.CPA = 0.16 end
-        end
-    else
-        ConfigContainer.CPA = ConfigContainer.SA.MHP_A
-    end
-end)
-
-ConfigContainer.RS.RenderStepped:Connect(function()
-    if ConfigContainer.SA.Show and ConfigContainer.SA.En and DrawingObject then
-        local target = GCP()
-        if target then
-            local PrimaryPart = target.Parent.PrimaryPart or target
-            local ViewportPoint1, ViewportPoint2 = ConfigContainer.Cam:WorldToViewportPoint(PrimaryPart.Position)
-            ConfigContainer.MBX.Visible = ViewportPoint2
-            ConfigContainer.MBX.Position = Vector2.new(ViewportPoint1.X, ViewportPoint1.Y)
-        else
-            ConfigContainer.MBX.Visible = false
-            ConfigContainer.MBX.Position = Vector2.new()
-        end
-    end
-end)
-
-local CheckCallerFunc = checkcaller or function() return false end
-local NewCcClosureFunc = newcclosure or function(Param18) return Param18 end
-local oldNC
-
-if hookmetamethod then
-    pcall(function()
-        oldNC = hookmetamethod(game, "__namecall", NewCcClosureFunc(function(...)
-            local args = {...}
-            local self = args[1]
-            if ConfigContainer.SA.En and self == Workspace and not CheckCallerFunc() and Ch(ConfigContainer.SA.HC) and getnamecallmethod() == "Raycast" and VA(args, ConfigContainer.EA.Raycast) then
-                local targetPart = GCP()
-                if targetPart then
-                    args[3] = GD(args[2], GPP(targetPart))
-                    return oldNC(unpack(args))
-                end
-            end
-            return oldNC(...)
-        end))
-    end)
-end
-
--- --- Aura Tab Implementation (Matching Bliz Logic) ---
-
-local NormalAurasSec = AuraTab:AddSection({ Name = "Normal Auras" })
-local FlingAuraSec = AuraTab:AddSection({ Name = "Fling Aura" })
-
-NormalAurasSec:AddToggle({
-    Name = "Death Aura",
-    Default = false,
-    Callback = function(v)
-        _G.DeathAura = v
-        if v then
-            task.spawn(function()
-                while _G.DeathAura do
-                    for _, p in ipairs(Players:GetPlayers()) do
-                        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character:FindFirstChild("Humanoid") then
-                             if p.Character.Humanoid.Health > 0 then
-                                 if SNOWshipPlayer(p) then
-                                     local root = p.Character.HumanoidRootPart
-                                     local hum = p.Character.Humanoid
-                                     pcall(function() GrabEvents.DestroyGrabLine:FireServer(root) end)
-                                     
-                                     -- SkyVelocity
-                                     if not root:FindFirstChild("SkyVelocity") then
-                                         local bv = Instance.new("BodyVelocity")
-                                         bv.Name = "SkyVelocity"
-                                         bv.Velocity = Vector3.new(0, 100000000000000, 0)
-                                         bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-                                         bv.Parent = root
-                                         DebrisService:AddItem(bv, 1)
-                                     end
-                                     
-                                     hum.BreakJointsOnDeath = false
-                                     hum:ChangeState(Enum.HumanoidStateType.Dead)
-                                     hum.Jump = true
-                                     hum.Sit = false
-                                 end
-                             end
-                        end
-                    end
-                    task.wait()
-                end
-            end)
-        end
-    end
-})
-
-NormalAurasSec:AddToggle({
-    Name = "Attraction Aura",
-    Default = false,
-    Callback = function(v)
-        _G.AttractionAura = v
-        if v then
-            task.spawn(function()
-                while _G.AttractionAura do
-                    for _, p in ipairs(Players:GetPlayers()) do
-                        if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character:FindFirstChild("Humanoid") then
-                            local root = p.Character.HumanoidRootPart
-                            local hum = p.Character.Humanoid
-                            if SNOWshipPlayer(p) then
-                                hum.Sit = false
-                                hum.WalkSpeed = 25
-                                if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                                    -- Bliz uses MoveTo with offset
-                                    hum:MoveTo(LocalPlayer.Character.HumanoidRootPart.Position)
-                                end
-                            end
-                        end
-                    end
-                    task.wait()
-                end
-            end)
-        end
-    end
-})
-
-FlingAuraSec:AddToggle({
-    Name = "Fling Aura",
-    Default = false,
-    Callback = function(v)
-        _G.FlingAura = v
-        if v then
-            task.spawn(function()
-                while _G.FlingAura do
-                    -- Target Players
-                    if _G.FlingTarget == "Players" or _G.FlingTarget == "Players and Objects" then
-                        for _, p in ipairs(Players:GetPlayers()) do
-                             if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-                                 local root = p.Character.HumanoidRootPart
-                                 if SNOWshipPlayer(p) and not root:FindFirstChild("FlingAuraVelocity") and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                                     local myRoot = LocalPlayer.Character.HumanoidRootPart
-                                     local lookCF = CFrame.lookAt(myRoot.Position, root.Position)
-                                     local bv = Instance.new("BodyVelocity")
-                                     bv.Name = "FlingAuraVelocity"
-                                     bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-                                     bv.Velocity = Vector3.new(lookCF.LookVector.X, 0.5, lookCF.LookVector.Z) * _G.FlingStrength
-                                     bv.Parent = root
-                                     DebrisService:AddItem(bv, 0.1)
-                                 end
-                             end
-                        end
-                    end
-
-                    -- Target Objects
-                    if _G.FlingTarget == "Objects" or _G.FlingTarget == "Players and Objects" then
-                        local objects = CheckObjectsAroundPlayer()
-                        for _, part in ipairs(objects) do
-                             if part and part:IsA("BasePart") and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                                 if SNOWship(part) and not part:FindFirstChild("FlingAuraVelocity") then
-                                     local myRoot = LocalPlayer.Character.HumanoidRootPart
-                                     local lookCF = CFrame.lookAt(myRoot.Position, part.Position)
-                                     local bv = Instance.new("BodyVelocity")
-                                     bv.Name = "FlingAuraVelocity"
-                                     bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-                                     bv.Velocity = Vector3.new(lookCF.LookVector.X, 0.5, lookCF.LookVector.Z) * _G.FlingStrength
-                                     bv.Parent = part
-                                     DebrisService:AddItem(bv, 0.1)
-                                 end
-                             end
-                        end
-                    end
-
-                    task.wait(0.1)
-                end
-            end)
-        end
-    end
-})
-
-FlingAuraSec:AddSlider({
-    Name = "Strength",
-    Min = 400,
-    Max = 10000,
-    Default = 400,
-    Increment = 100,
-    Callback = function(v) _G.FlingStrength = v end
-})
-
-FlingAuraSec:AddDropdown({
-    Name = "Target",
-    Default = "Players",
-    Options = {"Players", "Objects", "Players and Objects"},
-    Callback = function(v) _G.FlingTarget = v end
-})
-
--- キャラクターイベントの監視 (カウンター用)
-local function OnCharacterAdded(char)
-    char.DescendantAdded:Connect(function(descendant)
-        if _G.AutoAttacker and descendant.Name == "PartOwner" then
-            local attackerName = tostring(descendant.Value)
-            local attacker = Players:FindFirstChild(attackerName)
-            if attacker and attacker ~= LocalPlayer then
-                OrionLib:MakeNotification({ Name = "Counter", Content = "Countering: " .. attackerName, Time = 3 })
-                AttemptCounter(attacker)
-            end
-        end
-    end)
-end
-LocalPlayer.CharacterAdded:Connect(OnCharacterAdded)
-if LocalPlayer.Character then OnCharacterAdded(LocalPlayer.Character) end
-
--- 掴んだオブジェクトを追跡
-Workspace.ChildAdded:Connect(function(child)
-    if child.Name == "GrabParts" and child:IsA("Model") then
-        local grabPart = child:FindFirstChild("GrabPart", true)
-        if not grabPart then return end
-        local weld = grabPart:FindFirstChildOfClass("WeldConstraint")
-
-        if weld and weld.Part1 then
-            lastGrabbedPart = weld.Part1
-            local grabbedModel = lastGrabbedPart.Parent
-            
-            -- SuperStrength (投げ飛ばし)
-            if superStrengthEnabled then
-                local bv = Instance.new("BodyVelocity")
-                bv.Name = "BlizSuperStrength"
-                bv.MaxForce = Vector3.new(0, 0, 0)
-                bv.Velocity = Vector3.new(0, 0, 0)
-                bv.Parent = lastGrabbedPart
-            end
-
-            -- Death Grab
-            if deathGrabEnabled and grabbedModel and grabbedModel:FindFirstChildOfClass("Humanoid") then
-                local player = Players:GetPlayerFromCharacter(grabbedModel)
-                local hum = grabbedModel:FindFirstChildOfClass("Humanoid")
-                local head = grabbedModel:FindFirstChild("Head")
-                
-                if player and player ~= LocalPlayer and hum and head then
-                    task.spawn(function()
-                        while child and child.Parent and hum.Health > 0 do
-                            -- Blizのキルロジック (所有権がある場合、ステータスをDeadに変更)
-                            if head:FindFirstChild("PartOwner") and head.PartOwner.Value == LocalPlayer.Name then
-                                hum.BreakJointsOnDeath = false
-                                hum:ChangeState(Enum.HumanoidStateType.Dead)
-                                hum.Jump = true
-                                hum.Sit = false
-                            end
-                            task.wait(0.1)
-                        end
-                    end)
-                end
-            end
-
-            -- Noclip Grab
-            if noclipGrabEnabled and grabbedModel and not lastGrabbedPart.Anchored then
-                noclipOriginalCollisions = {}
-                task.spawn(function()
-                    for _, p in ipairs(grabbedModel:GetDescendants()) do
-                        if p:IsA("BasePart") then noclipOriginalCollisions[p] = p.CanCollide end
-                    end
-                    while child and child.Parent do
-                        for p in pairs(noclipOriginalCollisions) do
-                            if p and p.Parent then p.CanCollide = false end
-                        end
-                        task.wait(0.2)
-                    end
-                end)
-            end
-
-            -- Perspective Grab
-            if perspectiveGrabEnabled then
-                -- Blizと同様に、デフォルトのグラブラインを非表示にする
-                if GrabEvents then
-                    GrabEvents.CreateGrabLine:FireServer()
-                end
-
-                task.spawn(function()
-                    local char = LocalPlayer.Character
-                    if not char then return end
-                    local hum = char:FindFirstChildOfClass("Humanoid")
-                    local root = char:FindFirstChild("HumanoidRootPart")
-                    if not hum or not root then return end
-
-                    local originalCF = root.CFrame
-                    local camPart = Instance.new("Part")
-                    camPart.Name = "PerspectiveFocus"
-                    camPart.Transparency = 1
-                    camPart.CanCollide = false
-                    camPart.Anchored = true
-                    camPart.Parent = Workspace
-                    camPart.CFrame = Camera.CFrame
-                    
-                    Camera.CameraSubject = camPart
-                    Camera.CameraType = Enum.CameraType.Follow
-                    
-                    local conn = RunService.Heartbeat:Connect(function(dt)
-                        if not camPart or not camPart.Parent then return end
-
-                        -- [修正] より直感的で安定した飛行操作（フライ）になるように移動計算ロジックを刷新
-                        local moveDir = hum.MoveDirection
-                        local finalMove = Vector3.zero
-
-                        if moveDir.Magnitude > 0.01 then
-                            local camCF = Camera.CFrame
-
-                            -- カメラの水平方向の「前」と「右」のベクトルを基準にする
-                            local camLookHorizontal = (camCF.LookVector * Vector3.new(1, 0, 1)).Unit
-                            local camRightHorizontal = (camCF.RightVector * Vector3.new(1, 0, 1)).Unit
-
-                            -- プレイヤーの入力（MoveDirection）が、カメラから見てどれだけ「前」と「右」の成分を持っているか計算
-                            local forwardAmount = moveDir:Dot(camLookHorizontal)
-                            local rightAmount = moveDir:Dot(camRightHorizontal)
-
-                            -- 「前」成分はカメラの実際の向き（上下含む）に、「右」成分は水平方向に適用する
-                            finalMove = (camCF.LookVector * forwardAmount) + (camRightHorizontal * rightAmount)
-                        end
-
-                        if finalMove.Magnitude > 0.01 then
-                            camPart.CFrame = camPart.CFrame + finalMove.Unit * perspectiveSpeed * dt
-                        end
-
-                        -- Bliz同様、キャラクター本体は遠くに隠す
-                        root.CFrame = CFrame.new(527, 123, -376) 
-                        root.AssemblyLinearVelocity = Vector3.zero
-                    end)
-                    
-                    while child.Parent do task.wait() end
-                    
-                    conn:Disconnect()
-                    local finalCamCF = Camera.CFrame
-                    Camera.CameraSubject = hum
-                    Camera.CameraType = Enum.CameraType.Custom
-                    camPart:Destroy()
-                    root.CFrame = finalCamCF
-
-                    -- Blizと同様に、グラブラインの挙動をリセットする
-                    if GrabEvents then
-                        GrabEvents.CreateGrabLine:FireServer()
-                    end
-                end)
-            end
-        end
-    end
-end)
-
--- オブジェクトを離した時の処理 (blizのロジックを再現)
-Workspace.ChildRemoved:Connect(function(child)
-    if child.Name == "GrabParts" and child:IsA("Model") then
-        toggleButtonState(false)
-        toggleDefaultExtendButtons(true)
-        -- SuperStrength 処理
-        if superStrengthEnabled and lastGrabbedPart and lastGrabbedPart.Parent then
-            local bv = lastGrabbedPart:FindFirstChild("BlizSuperStrength")
-            if bv then
-                if UserInputService:GetLastInputType() == Enum.UserInputType.MouseButton2 then
-                    bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-                    bv.Velocity = Camera.CFrame.LookVector * strengthValue
-                    DebrisService:AddItem(bv, 1) -- 1秒後に自動で削除
-                else
-                    bv:Destroy()
-                end
-            end
-        end
-        
-        -- Noclip Grab の当たり判定を元に戻す
-        for part, state in pairs(noclipOriginalCollisions) do
-            if part and part.Parent then
-                pcall(function() part.CanCollide = state end)
-            end
-        end
-        noclipOriginalCollisions = {}
-
-        -- 最後にリセット
-        lastGrabbedPart = nil
-    end
-end)
-
--- クレイジーラインとインビジブルラインの常時ループ処理 (Bliz参考: 掴み中の動的変更に対応)
-RunService.Heartbeat:Connect(function()
-    if not GrabEvents then return end
-    
-    -- Blizと同様に毎回GrabPartsを強制検索する (ChildAddedの不発を防ぎ、確実に動作させる)
-    local grabbedModel = Workspace:FindFirstChild("GrabParts")
-    local currentTarget = lastGrabbedPart
-
-    if grabbedModel then
-        local gp = grabbedModel:FindFirstChild("GrabPart")
-        if gp then
-            local wc = gp:FindFirstChildOfClass("WeldConstraint")
-            if wc and wc.Part1 then
-                currentTarget = wc.Part1
-            end
-        end
-    end
-
-    if currentTarget and currentTarget.Parent then
-        if invisibleLineEnabled then
-             pcall(function()
-                 GrabEvents.CreateGrabLine:FireServer()
-             end)
-        end
-    end
-end)
-
--- 当たり判定を保存・復元するためのグローバルなテーブルと関数
-local originalCollisions = {}
-
-local function saveCollisions(character, key)
-    originalCollisions[key] = {}
-    for _, part in ipairs(character:GetDescendants()) do
-        if part:IsA("BasePart") then
-            originalCollisions[key][part] = part.CanCollide
-        end
-    end
-end
-
-local function restoreCollisions(key)
-    if not originalCollisions[key] then return end
-    for part, canCollide in pairs(originalCollisions[key]) do
-        if part and part.Parent then
-            pcall(function() part.CanCollide = canCollide end)
-        end
-    end
-    originalCollisions[key] = nil
-end
-
--- Bring All Logic (Ported from Comic Hub)
-local BringAllSec = ActionTab:AddSection({ Name = "Bring All" })
-
--- Bring All Logic (Ported from Comic Hub & Inspired by Bliz)
-local BringAllConfig = {
+-- Bring All (ported from test.lua)
+local bringAllSecActionTab = ActionTab:AddSection({ Name = "Bring All" })
+local bringAllConfigActionTab = {
     Enabled = false,
     Position = nil,
     Radius = 15,
@@ -2299,57 +5278,70 @@ local BringAllConfig = {
     CameraPart = nil,
     ActiveMovers = {},
     MainLoop = nil,
-    HiddenCFrame = CFrame.new(527, 123, -376) -- Bliz's hiding spot
+    HiddenCFrame = CFrame.new(527, 123, -376)
 }
 
--- フレンド判定のキャッシュ（IsFriendsWithの遅延・エラー対策）
-local FriendCache = {}
+local originalCollisionsActionTab = {}
+local friendCacheActionTab = {}
+
+local function saveCollisionsActionTab(character, key)
+    originalCollisionsActionTab[key] = {}
+    for _, part in ipairs(character:GetDescendants()) do
+        if part:IsA("BasePart") then
+            originalCollisionsActionTab[key][part] = part.CanCollide
+        end
+    end
+end
+
+local function restoreCollisionsActionTab(key)
+    if not originalCollisionsActionTab[key] then return end
+    for part, canCollide in pairs(originalCollisionsActionTab[key]) do
+        if part and part.Parent then
+            pcall(function() part.CanCollide = canCollide end)
+        end
+    end
+    originalCollisionsActionTab[key] = nil
+end
+
 task.spawn(function()
     while true do
         for _, player in ipairs(Players:GetPlayers()) do
             if player ~= LocalPlayer then
-                FriendCache[player.UserId] = LocalPlayer:IsFriendsWith(player.UserId)
+                friendCacheActionTab[player.UserId] = LocalPlayer:IsFriendsWith(player.UserId)
             end
         end
         task.wait(10)
     end
 end)
 
-local function InPlot(player)
+local function inPlotActionTab(player)
     local plotItems = Workspace:FindFirstChild("PlotItems")
     local playersInPlots = plotItems and plotItems:FindFirstChild("PlayersInPlots")
     local inPlotValue = player:FindFirstChild("InPlot")
     return (playersInPlots and playersInPlots:FindFirstChild(player.Name)) or (inPlotValue and inPlotValue.Value)
 end
 
-local function InRad(part)
-    if not BringAllConfig.Position then return false end
-    return (part.Position - BringAllConfig.Position).Magnitude <= BringAllConfig.Radius
+local function inRadiusActionTab(part)
+    if not bringAllConfigActionTab.Position then return false end
+    return (part.Position - bringAllConfigActionTab.Position).Magnitude <= bringAllConfigActionTab.Radius
 end
 
-local function Ignore(player)
+local function ignorePlayerActionTab(player)
     if player == LocalPlayer then return true end
-    local isFriend = FriendCache[player.UserId]
-    if isFriend == nil then isFriend = LocalPlayer:IsFriendsWith(player.UserId) end
-    if BringAllConfig.Whitelist and isFriend then return true end
+    local isFriend = friendCacheActionTab[player.UserId]
+    if isFriend == nil then
+        isFriend = LocalPlayer:IsFriendsWith(player.UserId)
+    end
+    if bringAllConfigActionTab.Whitelist and isFriend then return true end
     return false
 end
 
--- Bliz-inspired helper functions
-local function GetPlayerVelocity(player)
-    if player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-        return player.Character.AssemblyLinearVelocity.Magnitude
-    end
-    return 0
-end
-
-local function CreateBringMover(targetRoot, destinationPosition)
+local function createBringMoverActionTab(targetRoot, destinationPosition)
     local existingMover = targetRoot:FindFirstChild("BringAllMover")
     if existingMover and existingMover:IsA("BodyPosition") then
         existingMover.Position = destinationPosition
         return
     end
-
     if existingMover then existingMover:Destroy() end
 
     local bringMover = Instance.new("BodyPosition")
@@ -2359,156 +5351,727 @@ local function CreateBringMover(targetRoot, destinationPosition)
     bringMover.D = 5000
     bringMover.P = 1500000
     bringMover.Parent = targetRoot
-
-    table.insert(BringAllConfig.ActiveMovers, bringMover)
+    table.insert(bringAllConfigActionTab.ActiveMovers, bringMover)
 end
 
--- The main loop function
-local function BringAllLoop()
+local function bringAllLoopActionTab()
     local myChar = LocalPlayer.Character
     local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
-    if not myRoot then return end
+    if not (myChar and myRoot) then return end
 
-    while BringAllConfig.Enabled do
+    while bringAllConfigActionTab.Enabled do
         local playersToBring = {}
         for _, player in ipairs(Players:GetPlayers()) do
-            if not Ignore(player) and player.Character and (BringAllConfig.BringPlot or not InPlot(player)) then
+            if not ignorePlayerActionTab(player) and player.Character and (bringAllConfigActionTab.BringPlot or not inPlotActionTab(player)) then
                 local root = player.Character:FindFirstChild("HumanoidRootPart")
                 local hum = player.Character:FindFirstChildOfClass("Humanoid")
-                local isRagdolled = hum and hum:FindFirstChild("Ragdolled")
-                if root and not InRad(root) and not (isRagdolled and isRagdolled.Value) then
+                local ragdolled = hum and hum:FindFirstChild("Ragdolled")
+                if root and not inRadiusActionTab(root) and not (ragdolled and ragdolled.Value) then
                     table.insert(playersToBring, player)
                 end
             end
         end
 
         if #playersToBring == 0 then
-            task.wait(1) -- No one to bring, wait and re-scan
+            task.wait(1)
             continue
         end
 
         for _, targetPlayer in ipairs(playersToBring) do
-            if not BringAllConfig.Enabled or not targetPlayer.Parent then continue end
-
-            local targetRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
-            local targetHead = targetPlayer.Character:FindFirstChild("Head")
-
-            if targetRoot and targetHead then                
+            if not bringAllConfigActionTab.Enabled or not targetPlayer.Parent then continue end
+            local targetRoot = targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+            local targetHead = targetPlayer.Character and targetPlayer.Character:FindFirstChild("Head")
+            if targetRoot and targetHead then
                 local success = false
-                for i = 1, 30 do -- Try more aggressively (approx 1.5s)
-                    if not BringAllConfig.Enabled or not targetPlayer.Parent or not targetRoot.Parent then break end
-
-                    -- Loop内で常に相手の位置に追従する (重要)
+                for _ = 1, 30 do
+                    if not bringAllConfigActionTab.Enabled or not targetRoot.Parent then break end
                     myChar:PivotTo(targetRoot.CFrame * CFrame.new(0, 0, 2))
-
                     if targetHead:FindFirstChild("PartOwner") and targetHead.PartOwner.Value == LocalPlayer.Name then
                         success = true
                         break
                     end
-                    
                     if GrabEvents and GrabEvents:FindFirstChild("SetNetworkOwner") then
                         pcall(function()
                             GrabEvents.SetNetworkOwner:FireServer(targetRoot, CFrame.lookAt(myRoot.Position, targetRoot.Position))
                         end)
                     end
-                    task.wait(0.05) -- チェック間隔を短縮
+                    task.wait(0.05)
                 end
 
                 if success then
-                    CreateBringMover(targetRoot, BringAllConfig.Position)
-                    -- 初期位置を強制的にセットして勢いをつける
-                    targetRoot.CFrame = CFrame.new(BringAllConfig.Position)
+                    createBringMoverActionTab(targetRoot, bringAllConfigActionTab.Position)
+                    targetRoot.CFrame = CFrame.new(bringAllConfigActionTab.Position)
                     targetRoot.AssemblyLinearVelocity = Vector3.zero
                 end
 
-                if myRoot and BringAllConfig.Enabled then
-                    myChar:PivotTo(BringAllConfig.HiddenCFrame)
+                if bringAllConfigActionTab.Enabled then
+                    myChar:PivotTo(bringAllConfigActionTab.HiddenCFrame)
                 end
             end
         end
-        
-        task.wait(1) -- Wait after a full pass
+        task.wait(1)
     end
 end
 
-local function StartBringAll()
+local function startBringAllActionTab()
     local myChar = LocalPlayer.Character
     local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
     local myHum = myChar and myChar:FindFirstChildOfClass("Humanoid")
-    if not myRoot or not myHum then return end
-    
-    BringAllConfig.Position = myRoot.Position
-    saveCollisions(myChar, "BringAll")
-    nocoll(myChar)
+    if not (myRoot and myHum) then return end
+
+    bringAllConfigActionTab.Position = myRoot.Position
+    saveCollisionsActionTab(myChar, "BringAllAction")
+    noCollideModelActionTab(myChar)
 
     local camPart = Instance.new("Part")
-    camPart.Name = "BringAllCameraPart"
+    camPart.Name = "BringAllCameraPartAction"
     camPart.Size = Vector3.new(1, 1, 1)
     camPart.Transparency = 1
     camPart.Anchored = true
     camPart.CanCollide = false
     camPart.CFrame = myRoot.CFrame
     camPart.Parent = Workspace
-    BringAllConfig.CameraPart = camPart
+    bringAllConfigActionTab.CameraPart = camPart
     Camera.CameraSubject = camPart
 
-    myChar:PivotTo(BringAllConfig.HiddenCFrame)
-
-    BringAllConfig.MainLoop = task.spawn(BringAllLoop)
+    myChar:PivotTo(bringAllConfigActionTab.HiddenCFrame)
+    bringAllConfigActionTab.MainLoop = task.spawn(bringAllLoopActionTab)
 end
 
-local function StopBringAll()
-    BringAllConfig.MainLoop = nil
-
-    for _, mover in ipairs(BringAllConfig.ActiveMovers) do
-        if mover and mover.Parent then
-            mover:Destroy()
-        end
+local function stopBringAllActionTab()
+    bringAllConfigActionTab.MainLoop = nil
+    for _, mover in ipairs(bringAllConfigActionTab.ActiveMovers) do
+        if mover and mover.Parent then mover:Destroy() end
     end
-    BringAllConfig.ActiveMovers = {}
+    bringAllConfigActionTab.ActiveMovers = {}
 
     if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
         Camera.CameraSubject = LocalPlayer.Character.Humanoid
     end
-    if BringAllConfig.CameraPart then
-        BringAllConfig.CameraPart:Destroy()
-        BringAllConfig.CameraPart = nil
+    if bringAllConfigActionTab.CameraPart then
+        bringAllConfigActionTab.CameraPart:Destroy()
+        bringAllConfigActionTab.CameraPart = nil
     end
-    
-    restoreCollisions("BringAll")
+
+    restoreCollisionsActionTab("BringAllAction")
     local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-    if myRoot and BringAllConfig.Position then
+    if myRoot and bringAllConfigActionTab.Position then
         myRoot.AssemblyLinearVelocity = Vector3.zero
-        myRoot.CFrame = CFrame.new(BringAllConfig.Position)
+        myRoot.CFrame = CFrame.new(bringAllConfigActionTab.Position)
     end
 end
 
-BringAllSec:AddToggle({
-    Name = "Bring All", 
-    Default = false, 
+bringAllSecActionTab:AddToggle({
+    Name = "全員連れてくる",
+    Default = false,
     Callback = function(v)
-        BringAllConfig.Enabled = v
+        bringAllConfigActionTab.Enabled = v
         if v then
-            StartBringAll()
+            startBringAllActionTab()
         else
-            StopBringAll()
+            stopBringAllActionTab()
         end
     end
 })
 
-BringAllSec:AddToggle({
-    Name = "Whitelist Friends", 
-    Default = false, 
+bringAllSecActionTab:AddToggle({
+    Name = "Whitelist Friends",
+    Default = false,
     Callback = function(v)
-        BringAllConfig.Whitelist = v
+        bringAllConfigActionTab.Whitelist = v
     end
 })
 
--- 起動完了通知
-OrionLib:MakeNotification({
-	Name = "test Hub",
-	Content = "スクリプトが正常に読み込まれました",
-	Time = 5
+FriendTab:AddToggle({
+    Name = "Robloxフレンド保護 (Real Friends)",
+    Default = false,
+    Callback = function(v)
+        _G.ProtectRealFriends = v
+    end
 })
 
-OrionLib:Init()
+-- --- TAB: KEYBOARD (ported from test.lua) ---
+local keyboardTabSecTeleport = KeyboardTab:AddSection({ Name = "Teleport" })
+local keyboardTabSecAnchor = KeyboardTab:AddSection({ Name = "Anchor Objects" })
+
+local keyboardGui = Instance.new("ScreenGui")
+keyboardGui.Name = "HolonKeyboardTabGUI"
+keyboardGui.ResetOnSpawn = false
+keyboardGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local function isMobileClient()
+    return UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+end
+
+local function performKeyboardTeleport()
+    local char = LocalPlayer.Character
+    if not (char and char:FindFirstChild("HumanoidRootPart")) then return end
+
+    local targetPos = nil
+    if isMobileClient() then
+        local cam = Workspace.CurrentCamera
+        local params = RaycastParams.new()
+        params.FilterDescendantsInstances = {char}
+        params.FilterType = Enum.RaycastFilterType.Exclude
+        local ray = Workspace:Raycast(cam.CFrame.Position, cam.CFrame.LookVector * 1000, params)
+        targetPos = ray and ray.Position or (cam.CFrame.Position + cam.CFrame.LookVector * 50)
+    else
+        local mouse = LocalPlayer:GetMouse()
+        if mouse and mouse.Hit then targetPos = mouse.Hit.Position end
+    end
+
+    if targetPos then
+        char.HumanoidRootPart.CFrame = CFrame.new(targetPos + Vector3.new(0, 5, 0))
+    end
+end
+
+local function onKeyboardTeleportAction(_actionName, inputState, _inputObject)
+    if inputState == Enum.UserInputState.Begin then
+        performKeyboardTeleport()
+    end
+end
+
+local teleportBtn = Instance.new("ImageButton")
+teleportBtn.Name = "HolonTeleportButton"
+teleportBtn.Size = UDim2.new(0, 70, 0, 70)
+teleportBtn.Position = UDim2.new(1, -267, 1, -90)
+teleportBtn.Image = "rbxassetid://97166444"
+teleportBtn.ImageColor3 = Color3.fromRGB(142, 142, 142)
+teleportBtn.BackgroundTransparency = 1
+teleportBtn.ImageTransparency = 0.2
+teleportBtn.Visible = false
+teleportBtn.Parent = keyboardGui
+
+local teleportIcon = Instance.new("ImageLabel")
+teleportIcon.Size = UDim2.new(0.7, 0, 0.7, 0)
+teleportIcon.Position = UDim2.new(0.15, 0, 0.15, 0)
+teleportIcon.BackgroundTransparency = 1
+teleportIcon.Image = "rbxassetid://10650996837"
+teleportIcon.Parent = teleportBtn
+
+teleportBtn.MouseButton1Down:Connect(function() teleportBtn.ImageTransparency = 0 end)
+teleportBtn.MouseButton1Up:Connect(function() teleportBtn.ImageTransparency = 0.2 end)
+teleportBtn.MouseButton1Click:Connect(performKeyboardTeleport)
+
+keyboardTabSecTeleport:AddToggle({
+    Name = "テレポート (Z)",
+    Default = false,
+    Callback = function(v)
+        if v then
+            ContextActionService:BindAction("HolonTeleportZ", onKeyboardTeleportAction, false, Enum.KeyCode.Z)
+            if isMobileClient() then teleportBtn.Visible = true end
+        else
+            ContextActionService:UnbindAction("HolonTeleportZ")
+            teleportBtn.Visible = false
+        end
+    end
+})
+
+local keyboardAnchoredObjects = {}
+
+local function performKeyboardAnchor()
+    local char = LocalPlayer.Character
+    if not char then return end
+
+    local targetToProcess = nil
+    local grabPartsFolder = Workspace:FindFirstChild("GrabParts")
+    if grabPartsFolder and grabPartsFolder:FindFirstChild("GrabPart") and grabPartsFolder.GrabPart:FindFirstChild("WeldConstraint") then
+        local grabbedPart = grabPartsFolder.GrabPart.WeldConstraint.Part1
+        if grabbedPart then
+            local map = Workspace:FindFirstChild("Map")
+            if not (grabbedPart.Locked or (map and grabbedPart:IsDescendantOf(map))) then
+                targetToProcess = grabbedPart:FindFirstAncestorOfClass("Model") or grabbedPart
+            end
+        end
+    else
+        local target = nil
+        if isMobileClient() then
+            local cam = Workspace.CurrentCamera
+            local params = RaycastParams.new()
+            params.FilterDescendantsInstances = {char}
+            params.FilterType = Enum.RaycastFilterType.Exclude
+            local ray = Workspace:Raycast(cam.CFrame.Position, cam.CFrame.LookVector * 1000, params)
+            target = ray and ray.Instance or nil
+        else
+            local mouse = LocalPlayer:GetMouse()
+            target = mouse and mouse.Target or nil
+        end
+        if target then
+            local model = target:FindFirstAncestorOfClass("Model")
+            local checkObj = model or target
+            if checkObj:GetAttribute("IsAnchored") then
+                targetToProcess = checkObj
+            end
+        end
+    end
+
+    if not targetToProcess then return end
+
+    local currentAnchorState = targetToProcess:GetAttribute("IsAnchored")
+    local newAnchorState = not currentAnchorState
+    targetToProcess:SetAttribute("IsAnchored", newAnchorState)
+
+    local mainPart = targetToProcess
+    if targetToProcess:IsA("Model") then
+        mainPart = targetToProcess.PrimaryPart or targetToProcess:FindFirstChildWhichIsA("BasePart", true)
+    end
+    if not mainPart then return end
+
+    OrionLib:MakeNotification({
+        Name = "Anchor",
+        Content = (newAnchorState and "[Anchored] " or "[Unanchored] ") .. targetToProcess.Name,
+        Time = 1
+    })
+
+    if newAnchorState then
+        local bp = mainPart:FindFirstChild("HolonAnchorBP") or Instance.new("BodyPosition")
+        bp.Name = "HolonAnchorBP"
+        bp.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+        bp.P = 40000
+        bp.D = 950
+        bp.Position = mainPart.Position
+        bp.Parent = mainPart
+
+        local bg = mainPart:FindFirstChild("HolonAnchorBG") or Instance.new("BodyGyro")
+        bg.Name = "HolonAnchorBG"
+        bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+        bg.P = 40000
+        bg.D = 950
+        bg.CFrame = mainPart.CFrame
+        bg.Parent = mainPart
+
+        local oldBox = targetToProcess:FindFirstChild("BlizAnchor")
+        if oldBox then oldBox:Destroy() end
+        local sb = Instance.new("SelectionBox")
+        sb.Name = "BlizAnchor"
+        sb.Adornee = targetToProcess
+        sb.Parent = targetToProcess
+        sb.Color3 = Color3.fromRGB(0, 255, 255)
+        sb.LineThickness = 0.05
+
+        keyboardAnchoredObjects[targetToProcess] = { Part = mainPart }
+    else
+        keyboardAnchoredObjects[targetToProcess] = nil
+        local bp = mainPart:FindFirstChild("HolonAnchorBP")
+        local bg = mainPart:FindFirstChild("HolonAnchorBG")
+        if bp then bp:Destroy() end
+        if bg then bg:Destroy() end
+
+        local oldBox = targetToProcess:FindFirstChild("BlizAnchor")
+        if oldBox then oldBox:Destroy() end
+        local sb = Instance.new("SelectionBox")
+        sb.Adornee = targetToProcess
+        sb.Parent = targetToProcess
+        sb.Color3 = Color3.fromRGB(255, 0, 0)
+        sb.LineThickness = 0.05
+        DebrisService:AddItem(sb, 0.5)
+    end
+end
+
+local function onKeyboardAnchorAction(_actionName, inputState, _inputObject)
+    if inputState == Enum.UserInputState.Begin then
+        performKeyboardAnchor()
+    end
+end
+
+local anchorBtn = Instance.new("ImageButton")
+anchorBtn.Name = "HolonAnchorButton"
+anchorBtn.Size = UDim2.new(0, 60, 0, 60)
+anchorBtn.Position = UDim2.new(1, -330, 1, -80)
+anchorBtn.Image = "rbxassetid://97166444"
+anchorBtn.ImageColor3 = Color3.fromRGB(142, 142, 142)
+anchorBtn.BackgroundTransparency = 1
+anchorBtn.ImageTransparency = 0.2
+anchorBtn.Visible = false
+anchorBtn.Parent = keyboardGui
+
+local anchorIcon = Instance.new("ImageLabel")
+anchorIcon.Size = UDim2.new(0.55, 0, 0.55, 0)
+anchorIcon.Position = UDim2.new(0.225, 0, 0.225, 0)
+anchorIcon.BackgroundTransparency = 1
+anchorIcon.Image = "rbxassetid://357069505"
+anchorIcon.Parent = anchorBtn
+
+anchorBtn.MouseButton1Down:Connect(function() anchorBtn.ImageTransparency = 0 end)
+anchorBtn.MouseButton1Up:Connect(function() anchorBtn.ImageTransparency = 0.2 end)
+anchorBtn.MouseButton1Click:Connect(performKeyboardAnchor)
+
+keyboardTabSecAnchor:AddToggle({
+    Name = "固定 (K)",
+    Default = false,
+    Callback = function(v)
+        if v then
+            ContextActionService:BindAction("HolonAnchorK", onKeyboardAnchorAction, false, Enum.KeyCode.K)
+            if isMobileClient() then anchorBtn.Visible = true end
+        else
+            ContextActionService:UnbindAction("HolonAnchorK")
+            anchorBtn.Visible = false
+        end
+    end
+})
+
+-- --- TAB: PIANO ---
+local PianoTab = Window:MakeTab({
+	Name = "ピアノ",
+	Icon = "rbxassetid://7734020554"
+})
+
+local PianoControlSec = PianoTab:AddSection({
+	Name = "ピアノ制御"
+})
+
+UIElements.PianoEnabled = PianoControlSec:AddToggle({
+	Name = "ピアノ機能を有効化",
+	Default = false,
+	Callback = function(v)
+		pianoEnabled = v
+		if v then
+			-- 機能を有効にするだけ。追従の開始は追従トグルに任せる
+			pianoKeyboard = getMusicKeyboard()
+			
+			if pianoKeyboard then
+				-- 追従がオンの場合のみ開始
+				if pianoFollowEnabled then setupPianoFollow() end
+
+				OrionLib:MakeNotification({
+					Name = "ピアノ機能",
+					Content = "MusicKeyboardを検出しました",
+					Time = 5
+				})
+			else
+				pianoEnabled = false
+				UIElements.PianoEnabled:Set(false) -- 失敗したらトグルを元に戻す
+				OrionLib:MakeNotification({
+					Name = "エラー",
+					Content = "MusicKeyboardが見つかりません",
+					Time = 5
+				})
+			end
+		else
+			stopSong()
+			stopPiano() -- 追従を停止
+		end
+	end    
+})
+
+UIElements.PianoFollow = PianoControlSec:AddToggle({
+    Name = "プレイヤー追従",
+    Default = true,
+    Callback = function(v)
+        pianoFollowEnabled = v
+        -- ★修正: pianoKeyboardが有効か(Parentを持つか)もチェックする
+        if pianoEnabled and pianoKeyboard and pianoKeyboard.Parent then
+            if v then
+                setupPianoFollow()
+            else
+                stopPiano()
+            end
+        -- ★追加: ピアノが無効な状態で追従をオンにしたら、再検索して追従を開始
+        elseif pianoEnabled and v then
+            pianoKeyboard = getMusicKeyboard()
+            if pianoKeyboard then
+                setupPianoFollow()
+            end
+        end
+    end
+})
+
+local PianoSongSec = PianoTab:AddSection({
+	Name = "曲の再生"
+})
+
+-- ピアノ曲の自動ダウンロード
+task.spawn(function()
+    local targetFolder = "FTAP_Notes"
+    if not isfolder(targetFolder) then makefolder(targetFolder) end
+
+    local apiUrl = "https://api.github.com/repos/hololove1021/HolonHUB/contents/piano"
+    local success, response = pcall(function() return game:HttpGet(apiUrl, true) end)
+
+    if not success then return warn("HolonHUB: GitHub APIからピアノファイルリストの取得に失敗しました: " .. tostring(response)) end
+
+    local fileList
+    success, fileList = pcall(function() return HttpService:JSONDecode(response) end)
+
+    if not success or type(fileList) ~= "table" then return warn("HolonHUB: ピアノファイルリストのJSONデコードに失敗しました。") end
+
+    for _, fileData in ipairs(fileList) do
+        if fileData.type == "file" and fileData.name:match("%.json$") then
+            local fileName = fileData.name
+            local filePath = targetFolder .. "/" .. fileName
+            
+            if not isfile(filePath) then
+                local downloadUrl = fileData.download_url
+                local fileSuccess, fileContent = pcall(function() return game:HttpGet(downloadUrl, true) end)
+                
+                if fileSuccess and fileContent then
+                    writefile(filePath, fileContent)
+                    OrionLib:MakeNotification({ Name = "System", Content = "Downloaded " .. fileName, Time = 3 })
+                    task.wait(0.2)
+                else
+                    warn("HolonHUB: " .. fileName .. " のダウンロードに失敗しました。")
+                end
+            end
+        end
+    end
+end)
+
+-- JSONファイル一覧を取得
+local function getSongFiles()
+	local files = {}
+	local targetFolder = "FTAP_Notes"
+
+	-- フォルダがなければ作成する
+	if not isfolder(targetFolder) then makefolder(targetFolder) end
+	
+	local success, allFiles = pcall(function()
+		return listfiles(targetFolder)
+	end)
+	
+	if not success or not allFiles then
+		return {"アクセスエラー"}
+	end
+	
+	for _, filePath in ipairs(allFiles) do
+		if filePath:lower():match("%.json$") then
+			local fileName = filePath:match("([^/%\\]+)$") or filePath
+			table.insert(files, fileName) -- OrionのDropdown用に名前のみ追加
+		end
+	end
+	
+	if #files == 0 then
+		return {"JSONファイルなし"}
+	end
+	
+	return files
+end
+
+local songDropdown = PianoSongSec:AddDropdown({
+	Name = "曲を選択",
+	Default = "なし",
+	Options = getSongFiles(),
+	Callback = function(v)
+		if v == "なし" or v == "フォルダが見つかりません" or v == "JSONファイルなし" then
+			selectedSongFile = nil
+			selectedSongData = nil
+			return
+		end
+		
+		-- ファイル名からフルパスを作成（環境に合わせて調整してください）
+		local filePath = "FTAP_Notes/" .. v
+		selectedSongFile = filePath
+		
+		local success, fileContent = pcall(function()
+			return readfile(filePath)
+		end)
+		
+		if success then
+			local decodeSuccess, jsonData = pcall(function()
+				return HttpService:JSONDecode(fileContent)
+			end)
+			
+			if decodeSuccess then
+				selectedSongData = jsonData
+				OrionLib:MakeNotification({
+					Name = "読み込み完了",
+					Content = "音符数: " .. #jsonData,
+					Time = 5
+				})
+			else
+				selectedSongData = nil
+			end
+		end
+	end    
+})
+
+PianoSongSec:AddButton({
+	Name = "曲リストを更新",
+	Callback = function()
+		songDropdown:Refresh(getSongFiles(), true)
+		OrionLib:MakeNotification({
+			Name = "更新完了",
+			Content = "JSONファイルリストを更新しました",
+			Time = 5
+		})
+	end
+})
+
+PianoSongSec:AddButton({
+    Name = "選択した曲を再生",
+    Callback = function()
+        -- ピアノ有効化のチェックを「テストボタン」と同じくらい緩くします
+        if not pianoKeyboard then
+            pianoKeyboard = getMusicKeyboard()
+        end
+        
+        if not pianoKeyboard then
+            OrionLib:MakeNotification({Name = "エラー", Content = "MusicKeyboardが見つかりません", Time = 5})
+            return
+        end
+        
+        if not selectedSongData then
+            OrionLib:MakeNotification({Name = "エラー", Content = "曲を選択してください", Time = 5})
+            return
+        end
+        
+        -- ★修正ポイント：JSONEncodeせずに、そのままデータを渡す
+        -- これで playSongFromJSON が正しくループを開始できます
+        playSongFromJSON(selectedSongData)
+        
+        -- ボタンが反応したことを知らせる通知
+        OrionLib:MakeNotification({
+            Name = "自動演奏",
+            Content = "再生を開始しました",
+            Time = 3
+        })
+    end
+})
+
+PianoSongSec:AddButton({
+	Name = "再生を停止",
+	Callback = function()
+		stopSong()
+		OrionLib:MakeNotification({
+			Name = "停止",
+			Content = "曲の再生を停止しました",
+			Time = 5
+		})
+	end
+})
+
+local PianoManualSec = PianoTab:AddSection({
+    Name = "マニュアル操作・テスト"
+})
+
+UIElements.PianoManualUIToggle = PianoManualSec:AddToggle({
+    Name = "手動演奏UIを表示",
+    Default = false,
+    Callback = function(v)
+        manualPlayEnabled = v
+        if v then
+            pianoKeyboard = getMusicKeyboard()
+            if pianoKeyboard then
+                pianoEnabled = true
+                if UIElements.PianoEnabled then UIElements.PianoEnabled:Set(true) end
+                if not pianoUIGui then createPianoUI() end
+                if pianoUIGui then pianoUIGui.Enabled = true end
+            else
+                pianoEnabled = false
+                manualPlayEnabled = false
+                if UIElements.PianoEnabled then UIElements.PianoEnabled:Set(false) end
+                if UIElements.PianoManualUIToggle then UIElements.PianoManualUIToggle:Set(false) end
+                OrionLib:MakeNotification({Name = "エラー", Content = "MusicKeyboardが見つかりません", Time = 5})
+            end
+        else
+            if pianoUIGui then pianoUIGui.Enabled = false end
+        end
+    end
+})
+
+
+-- PCキーボード入力対応
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if not pianoEnabled then return end
+    
+    if input.UserInputType == Enum.UserInputType.Keyboard then
+        local char = UserInputService:GetStringForKeyCode(input.KeyCode):lower()
+        if pianoKeyMap[char] then
+           if canPressPianoKey() then pressPianoKey(pianoKeyMap[char]) end
+        end
+    end
+end)
+
+-- PianoManualSecの下に追加
+PianoManualSec:AddButton({
+    Name = "テスト: Cキーを押す",
+    Callback = function()
+        if pianoKeyboard then
+            local testKey = pianoKeyboard:FindFirstChild("Key1C", true)
+           if testKey and canPressPianoKey() then
+                -- 音を鳴らす命令
+                SetNetworkOwner:FireServer(testKey, testKey.CFrame)
+                
+                --   waitの後にすぐ通知が来るようにします。
+                task.wait(0.1)
+                
+                OrionLib:MakeNotification({
+                    Name = "テスト", 
+                    Content = "Key1Cを鳴らしました！", 
+                    Time = 2
+                })
+            else
+                warn("Key1Cが見つかりません")
+            end
+        end
+    end
+})
+
+local DetailTab = Window:MakeTab({Name = "詳細", Icon = DetailIcon})
+AddDetailContent(DetailTab)
+
+-- 通知（起動時）
+OrionLib:MakeNotification({
+	Name = "Holon HUB",
+	Content = "v1.4.3 が読み込まれました！",
+	Time = 5
+})
+    -- 起動時にUIスタイルを適用
+    applyCustomStyle()
+
+    -- メイン画面側の初期化
+    OrionLib:Init()
+end
+
+if isfile(KeyFileName) and readfile(KeyFileName) == CorrectKey then
+    -- 認証済みなら即メインへ
+    StartHolonHUB()
+else
+    -- 未認証なら認証UIを作る
+    local OrionLib = loadstring(game:HttpGet(OrionUrl))()
+    
+    local AuthWindow = OrionLib:MakeWindow({
+        Name = "Holon HUB | Key System",
+        HidePremium = true,
+        IntroEnabled = false
+    })
+
+    local AuthTab = AuthWindow:MakeTab({Name = "認証", Icon = "rbxassetid://7733919526"})
+    local KeyInput = ""
+
+    AuthTab:AddTextbox({
+        Name = "キーを入力",
+        Default = "",
+        TextDisappear = false, -- ここを false に変更
+        Callback = function(Value) 
+            KeyInput = Value 
+        end     
+    })
+
+    AuthTab:AddButton({
+        Name = "認証する",
+        Callback = function()
+            if KeyInput == CorrectKey then
+                writefile(KeyFileName, CorrectKey) -- ここで保存
+                OrionLib:MakeNotification({Name = "成功", Content = "起動します!", Time = 2})
+                task.wait(1)
+                pcall(function() game.CoreGui.Orion:Destroy() end)
+                task.wait(0.5)
+                StartHolonHUB()
+            else
+                OrionLib:MakeNotification({Name = "失敗", Content = "キーが違います", Time = 5})
+            end
+        end
+    })
+
+    AuthTab:AddButton({
+        Name = "キーを入手 (Discord)",
+        Callback = function() setclipboard("https://discord.gg/EHBXqgZZYN") end
+    })
+
+    -- 詳細タブ
+    local AuthDetailTab = AuthWindow:MakeTab({Name = "詳細", Icon = DetailIcon})
+    AddDetailContent(AuthDetailTab)
+    
+    OrionLib:Init()
+end
