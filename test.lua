@@ -1,4 +1,4 @@
--- 各種
+-- 各種サービスを取得
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -1405,14 +1405,26 @@ local keyboardTargetName = ""
 local TeleportSec = KeyboardTab:AddSection({ Name = "Teleport" })
 
 local function PerformTeleport()
-   local mouse = LocalPlayer:GetMouse()
-   local char = LocalPlayer.Character
-   
-    if mouse and mouse.Hit and char and char:FindFirstChild("HumanoidRootPart") then
-        if char and char:FindFirstChild("HumanoidRootPart") then
-            -- マウスの位置の少し上にテレポート
-            char.HumanoidRootPart.CFrame = CFrame.new(mouse.Hit.Position + Vector3.new(0, 5, 0))
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+
+    local targetPos
+    if IsMobile() then
+        local cam = Workspace.CurrentCamera
+        local params = RaycastParams.new()
+        params.FilterDescendantsInstances = {char}
+        params.FilterType = Enum.RaycastFilterType.Exclude
+        local ray = Workspace:Raycast(cam.CFrame.Position, cam.CFrame.LookVector * 1000, params)
+        targetPos = ray and ray.Position or (cam.CFrame.Position + cam.CFrame.LookVector * 50)
+    else
+        local mouse = LocalPlayer:GetMouse()
+        if mouse and mouse.Hit then
+            targetPos = mouse.Hit.Position
         end
+    end
+
+    if targetPos then
+        char.HumanoidRootPart.CFrame = CFrame.new(targetPos + Vector3.new(0, 5, 0))
     end
 end
 
@@ -1494,8 +1506,19 @@ local function PerformAnchor()
             end
         elseif LocalPlayer.Character then
             -- 2. 掴んでいない場合: 既にこのスクリプトでアンカーされた("IsAnchored"属性がある)オブジェクトのみ操作可能
-            local mouse = LocalPlayer:GetMouse()
-            local target = mouse.Target
+            local target
+            if IsMobile() then
+                local cam = Workspace.CurrentCamera
+                local params = RaycastParams.new()
+                params.FilterDescendantsInstances = {LocalPlayer.Character}
+                params.FilterType = Enum.RaycastFilterType.Exclude
+                local ray = Workspace:Raycast(cam.CFrame.Position, cam.CFrame.LookVector * 1000, params)
+                if ray then target = ray.Instance end
+            else
+                local mouse = LocalPlayer:GetMouse()
+                target = mouse.Target
+            end
+
             if target then
                 local model = target:FindFirstAncestorOfClass("Model")
                 local checkObj = model or target
