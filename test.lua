@@ -4,7 +4,7 @@ local player = Players.LocalPlayer
 
 -- === 設定 ===
 local targets = {"najayou777", "najryou777"}
-local triggerMessage = "/cholon"
+local triggerMessage = "/cほろん"
 local responseMessage = "ほろん"
 local isActive = false 
 
