@@ -760,7 +760,7 @@ local decoyNoclip = false
 local decoyFly = false
 
 -- スマホ判定の共通化
-local isMobileDevice = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+local isMobileDevice = UserInputService.TouchEnabled
 
 --------------------------------------------------------------------------------
 -- [GPS Minimap 機能] (mapTP.lua と完全一致のロジック)
@@ -3368,8 +3368,8 @@ local function StartHolonHUB()
                         while targetPart and targetPart.Parent and cfg.GrabMod.Spin do
                             if targetPart and targetPart.Parent then
                                 pcall(function()
-                                    -- 回転速度の維持
-                                    targetPart.CFrame = targetPart.CFrame * CFrame.Angles(0, math.rad(15), 0)
+                                    -- ワールド座標系の垂直軸(Y)で回転させることで「横回転」を保証
+                                    targetPart.CFrame = CFrame.Angles(0, math.rad(15), 0) * (targetPart.CFrame - targetPart.Position) + targetPart.Position
                                 end)
                             end
                             task.wait()
@@ -3856,12 +3856,12 @@ local ActionTab = Window:MakeTab({
 
 local SubTab = Window:MakeTab({
 	Name = "サブ機能",
-	Icon = "rbxassetid://10734950309"
+	Icon = "rbxassetid://138635884129147"
 })
 
 local DecoyTab = Window:MakeTab({
     Name = "デコイ",
-    Icon = "rbxassetid://10734950309"
+    Icon = "rbxassetid://103005444008339"
 })
 
 local DecoySec = DecoyTab:AddSection({
