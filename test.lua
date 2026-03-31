@@ -3482,10 +3482,12 @@ local function StartHolonHUB()
                 local bv = lastGrabbedPart:FindFirstChild("BlizSuperStrength")
                 if bv then
                     local lastInput = UserInputService:GetLastInputType()
-                    if lastInput == Enum.UserInputType.MouseButton2 or lastInput == Enum.UserInputType.Touch then
+                    if lastInput == Enum.UserInputType.MouseButton2 then
                         bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
                         bv.Velocity = Camera.CFrame.LookVector * strengthValue
                         DebrisService:AddItem(bv, 1)
+                    elseif bv.MaxForce.Magnitude > 0 then
+                        -- すでにモバイルの「投げボタン」で処理済みの場合は何もしない（そのまま飛んでいく）
                     else
                         bv:Destroy()
                     end
