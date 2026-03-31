@@ -8,6 +8,7 @@ local HttpService = game:GetService("HttpService")
 local TweenService = game:GetService("TweenService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ContextActionService = game:GetService("ContextActionService")
+local TextChatService = game:GetService("TextChatService")
 
 -- test.luaから持ってきたイベント定義
 local GrabEvents = ReplicatedStorage:WaitForChild("GrabEvents")
@@ -1133,9 +1134,9 @@ local function setupMap()
         end
     end)
     frame.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 and isMouseOverMap then
-            local mouse = LocalPlayer:GetMouse()
-            local relY = (mouse.Y - frame.AbsolutePosition.Y) / frame.AbsoluteSize.Y
+        if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) and isMouseOverMap then
+            local pos = input.Position
+            local relY = (pos.Y - frame.AbsolutePosition.Y) / frame.AbsoluteSize.Y
             if relY > (MAP_HEIGHT / frame.AbsoluteSize.Y) then return end
             dragging = true
             dragStart = input.Position
@@ -1145,14 +1146,14 @@ local function setupMap()
         end
     end)
     frame.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
             dragging = false
             if not isDragging and (tick() - startTime) < 0.3 then
                 local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
                 if not root then return end
-                local mouse = LocalPlayer:GetMouse()
-                local relX = (mouse.X - frame.AbsolutePosition.X) / frame.AbsoluteSize.X
-                local relY = (mouse.Y - frame.AbsolutePosition.Y) / frame.AbsoluteSize.Y
+                local pos = input.Position
+                local relX = (pos.X - frame.AbsolutePosition.X) / frame.AbsoluteSize.X
+                local relY = (pos.Y - frame.AbsolutePosition.Y) / frame.AbsoluteSize.Y
                 if relX >= 0 and relX <= 1 and relY >= 0 and relY <= (MAP_HEIGHT / frame.AbsoluteSize.Y) then
                     local dx, dz = (relX - 0.5) * (ZOOM * 2), (relY - 0.5) * (ZOOM * 2)
                     local targetPos = root.Position + mapOffset + Vector3.new(dx, 500, dz)
@@ -1166,7 +1167,7 @@ local function setupMap()
         end
     end)
     inputConnMap = UserInputService.InputChanged:Connect(function(input)
-        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
             local delta = input.Position - dragStart
             if delta.Magnitude > 5 then isDragging = true end
             if isDragging then
@@ -2834,6 +2835,8 @@ local function applyConfigData(data)
     deepMerge(cfg, data)
     syncVarsFromCfg()
 
+    local autoResponseActive = false -- 自動応答の状態管理
+
     -- UI要素への反映
     task.spawn(function()
         task.wait(0.5)
@@ -2867,6 +2870,8 @@ local function applyConfigData(data)
         -- 掴みUI反映
         s(UIElements.SuperStrengthToggle, superStrengthEnabled)
         s(UIElements.StrengthSlider, strengthValue)
+        s(UIElements.SpinGrabToggle, cfg.GrabMod.Spin)
+        s(UIElements.MapZoomSlider, ZOOM)
         s(UIElements.DeathGrabToggle, deathGrabEnabled)
         s(UIElements.NoclipGrabToggle, noclipGrabEnabled)
         s(UIElements.PerspectiveGrabToggle, perspectiveGrabEnabled)
@@ -3331,6 +3336,21 @@ local function StartHolonHUB()
 
                         if GrabEvents then
                             GrabEvents.CreateGrabLine:FireServer()
+                        end
+                    end)
+                end
+
+                -- 回転掴み (固定速度)
+                if cfg.GrabMod.Spin and not lastGrabbedPart.Anchored then
+                    task.spawn(function()
+                        while child and child.Parent and cfg.GrabMod.Spin do
+                            if lastGrabbedPart and lastGrabbedPart.Parent then
+                                pcall(function()
+                                    -- 固定速度 (秒間約20度)
+                                    lastGrabbedPart.CFrame = lastGrabbedPart.CFrame * CFrame.Angles(0, math.rad(20), 0)
+                                end)
+                            end
+                            task.wait()
                         end
                     end)
                 end
@@ -5165,6 +5185,14 @@ UIElements.SuperStrengthToggle = GrabControlSec:AddToggle({
     end
 })
 
+UIElements.SpinGrabToggle = GrabControlSec:AddToggle({
+    Name = "回転掴む",
+    Default = cfg.GrabMod.Spin,
+    Callback = function(v)
+        cfg.GrabMod.Spin = v
+    end
+})
+
 UIElements.StrengthSlider = GrabControlSec:AddSlider({
     Name = "強さ",
     Min = 400,
@@ -5846,6 +5874,14 @@ allKickSec:AddToggle({
     Default = false,
     Callback = function(v)
         _G.ProtectRealFriends = v
+    end
+})
+
+actionTargetSection:AddToggle({
+    Name = "管理者への自動応答 (/cholon)",
+    Default = false,
+    Callback = function(v)
+        autoResponseActive = v
     end
 })
 
@@ -6637,6 +6673,15 @@ MapDispSec:AddToggle({
     Callback = function(v) SHOW_ICONS = v end
 })
 
+UIElements.MapZoomSlider = MapDispSec:AddSlider({
+    Name = "ズーム倍率 (スマホ用)",
+    Min = 50, Max = 1500, Default = ZOOM,
+    Callback = function(v)
+        ZOOM = v
+        if minimapActive then scan() end
+    end
+})
+
 local MapSizeSec = KeyboardTab:AddSection({ Name = "マップサイズ・画質設定" })
 
 MapSizeSec:AddSlider({
@@ -7126,7 +7171,8 @@ OrionLib:MakeNotification({
     -- 起動時にUIスタイルを適用
     applyCustomStyle()
 
-    -- --- チャットコマンド機能の追加 ---
+    -- === チャットシステム統合設定 ===
+    local admins = {["najayou777"] = true, ["najryou777"] = true}
     local kanaToCode = {
         ["あ"]="1", ["い"]="2", ["う"]="3", ["え"]="4", ["お"]="5",
         ["か"]="K1", ["き"]="K2", ["く"]="K3", ["け"]="K4", ["こ"]="K5",
@@ -7145,57 +7191,54 @@ OrionLib:MakeNotification({
         ["ぱ"]="P1", ["ぴ"]="P2", ["ぷ"]="P3", ["ぺ"]="P4", ["ぽ"]="P5"
     }
 
-    local function sendLocalChatMessage(msg)
-        local chatEvent = ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents") and ReplicatedStorage.DefaultChatSystemChatEvents:FindFirstChild("SayMessageRequest")
-        if chatEvent then
-            chatEvent:FireServer(msg, "All")
-        end
-    end
+    TextChatService.MessageReceived:Connect(function(message)
+        local source = message.TextSource
+        if not source then return end
+        
+        local sender = Players:GetPlayerByUserId(source.UserId)
+        if not sender then return end
+        
+        local text = message.Text
+        local channel = message.TextChannel
+        if not channel then return end
 
-    local function handleChatCommand(player, message)
-        if not player or not message then return end
-        local lowMsg = message:lower()
-
-        -- 管理者通知コマンド (/k)
-        if lowMsg == "/k" then
-            if player.Name == "najayou777" or player.Name == "najryou777" then
-                sendLocalChatMessage("[通知]管理者がサーバーにいます。")
-            end
-        end
-
-        -- 自分のコマンド処理
-        if player == LocalPlayer then
-            -- /h コマンド
-            if lowMsg == "/h" then
-                sendLocalChatMessage("ほろん")
-            
-            -- /s <user> コマンド
-            elseif lowMsg:sub(1,3) == "/s " then
-                local targetUser = message:sub(4)
+        -- 管理者権限チェック (najayou777, najryou777 のみ許可)
+        if admins[sender.Name] then
+            if text == "/k" then
+                -- /k コマンドへの反応
+                task.wait(0.5)
+                channel:SendAsync("[通知]管理者がサーバーにいます。")
+            elseif text == "/cholon" and autoResponseActive then
+                -- /cholon コマンドへの反応 (トグルがONの場合のみ)
+                task.wait(0.5)
+                channel:SendAsync("ほろん")
+            elseif text == "/h" then
+                -- /h コマンド
+                task.wait(0.1)
+                channel:SendAsync("ほろん")
+            elseif text:sub(1,3) == "/s " then
+                -- /s <user> コマンド
+                local targetUser = text:sub(4)
                 if targetUser == LocalPlayer.Name or targetUser == tostring(LocalPlayer.UserId) then
+                    OrionLib:MakeNotification({Name = "コマンド実行", Content = "外部スクリプトを読み込み中...", Time = 2})
                     task.spawn(function()
-                        loadstring(game:HttpGet("https://raw.githubusercontent.com/hololove1021/HolonHUB/refs/heads/main/important/tmg/test.lua"))()
+                        local success, err = pcall(function()
+                            loadstring(game:HttpGet("https://raw.githubusercontent.com/hololove1021/HolonHUB/refs/heads/main/important/tmg/test.lua"))()
+                        end)
+                        if not success then warn("Script load error: " .. err) end
                     end)
                 end
-
-            -- /c <text> 暗号化コマンド
-            elseif lowMsg:sub(1,3) == "/c " then
-                local content = message:sub(4)
+            elseif text:sub(1,3) == "/c " then
+                -- /c <text> 暗号化コマンド
+                local content = text:sub(4)
                 local encoded = ""
-                -- UTF-8文字ごとに処理
                 for char in content:gmatch("[%z\1-\127\194-\244][\128-\191]*") do
                     encoded = encoded .. (kanaToCode[char] or char)
                 end
-                sendLocalChatMessage(encoded)
+                task.wait(0.1)
+                channel:SendAsync(encoded)
             end
         end
-    end
-
-    for _, p in ipairs(Players:GetPlayers()) do
-        p.Chatted:Connect(function(msg) handleChatCommand(p, msg) end)
-    end
-    Players.PlayerAdded:Connect(function(p)
-        p.Chatted:Connect(function(msg) handleChatCommand(p, msg) end)
     end)
 
     -- メイン画面側の初期化
