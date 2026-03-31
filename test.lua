@@ -3324,17 +3324,20 @@ local function StartHolonHUB()
                     bv.Parent = lastGrabbedPart
 
                     -- モバイル用の投げボタン検知 (Bliz HUB 参考)
-                    if isMobileDevice then
+                    if UserInputService.TouchEnabled then
                         task.spawn(function()
                             local throwButton = nil
                             local contextGui = LocalPlayer.PlayerGui:FindFirstChild("ContextActionGui")
                             if contextGui then
-                                -- 投げボタンの画像IDからボタン本体を特定
-                                for _, desc in ipairs(contextGui:GetDescendants()) do
-                                    if desc:IsA("ImageLabel") and (desc.Image == "rbxassetid://9603678090" or desc.Image == "http://www.roblox.com/asset/?id=9603678090") then
-                                        throwButton = desc.Parent
-                                        break
+                                -- 投げボタンが出現するまで待機して特定
+                                while throwButton == nil and child.Parent do
+                                    for _, desc in ipairs(contextGui:GetDescendants()) do
+                                        if desc:IsA("ImageLabel") and (desc.Image == "rbxassetid://9603678090" or desc.Image == "http://www.roblox.com/asset/?id=9603678090") then
+                                            throwButton = desc.Parent
+                                            break
+                                        end
                                     end
+                                    task.wait(0.1)
                                 end
 
                                 if throwButton and throwButton:IsA("GuiButton") then
