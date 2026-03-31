@@ -947,7 +947,7 @@ local function setupMap()
 
     local windowDragging, windowDragStart, windowStartPos
     dragHandle.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             windowDragging = true
             windowDragStart = input.Position
             windowStartPos = frame.Position
@@ -959,7 +959,7 @@ local function setupMap()
         end
     end)
     UserInputService.InputChanged:Connect(function(input)
-        if windowDragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+        if windowDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
             local delta = input.Position - windowDragStart
             frame.Position = UDim2.new(windowStartPos.X.Scale, windowStartPos.X.Offset + delta.X, windowStartPos.Y.Scale, windowStartPos.Y.Offset + delta.Y)
         end
@@ -1174,16 +1174,27 @@ local function setupMap()
     local function onInputEnded(input)
         if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
             if input.UserInputType == Enum.UserInputType.Touch then touches[input] = nil end
+            local wasDragging = isDragging
             dragging = false
-            if not isDragging and (tick() - startTime) < 0.3 and isMouseOverMap then
-                local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                if not root then return end
+            
+            if not wasDragging and (tick() - startTime) < 0.3 then
                 local pos = input.Position
-                local relX = (pos.X - frame.AbsolutePosition.X) / frame.AbsoluteSize.X
-                local relY = (pos.Y - frame.AbsolutePosition.Y) / frame.AbsoluteSize.Y
-                if relX >= 0 and relX <= 1 and relY >= 0 and relY <= (MAP_HEIGHT / frame.AbsoluteSize.Y) then
+                local relX = (pos.X - frame.AbsolutePosition.X) / MAP_WIDTH
+                local relY = (pos.Y - frame.AbsolutePosition.Y) / MAP_HEIGHT
+                
+                if relX >= 0 and relX <= 1 and relY >= 0 and relY <= 1 then
+                    local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                    if not root then return end
+
+                    local focusRoot = root
+                    if FOLLOW_TARGET and mapTargetPlayer and mapTargetPlayer.Character then
+                        local tRoot = mapTargetPlayer.Character:FindFirstChild("HumanoidRootPart")
+                        if tRoot then focusRoot = tRoot end
+                    end
+
+                    local currentCenter = focusRoot.Position + mapOffset
                     local dx, dz = (relX - 0.5) * (ZOOM * 2), (relY - 0.5) * (ZOOM * 2)
-                    local targetPos = root.Position + mapOffset + Vector3.new(dx, 500, dz)
+                    local targetPos = currentCenter + Vector3.new(dx, 500, dz)
                     local hit = Workspace:Raycast(targetPos, Vector3.new(0, -1000, 0))
                     root.CFrame = CFrame.new(targetPos.X, hit and hit.Position.Y + 5 or root.Position.Y, targetPos.Z)
                     mapOffset = Vector3.new(0,0,0)
