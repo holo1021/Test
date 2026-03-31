@@ -760,7 +760,7 @@ local decoyNoclip = false
 local decoyFly = false
 
 -- スマホ判定の共通化
-local isMobileDevice = UserInputService.TouchEnabled
+local isMobileDevice = UserInputService.TouchEnabled and (Camera.ViewportSize.X < 800 or Camera.ViewportSize.Y < 800)
 
 --------------------------------------------------------------------------------
 -- [GPS Minimap 機能] (mapTP.lua と完全一致のロジック)
@@ -1178,7 +1178,9 @@ local function setupMap()
             touches[input] = input.Position
             local t = {}
             for _, pos in pairs(touches) do table.insert(t, pos) end
+            
             if #t == 2 then
+                -- 2本指：ピンチズーム
                 local dist = (t[1] - t[2]).Magnitude
                 if lastPinchDist then
                     local change = dist - lastPinchDist
@@ -1187,8 +1189,18 @@ local function setupMap()
                     scan()
                 end
                 lastPinchDist = dist
+            elseif #t == 1 and dragging then
+                -- 1本指：移動（ドラッグ）
+                local delta = input.Position - dragStart
+                if delta.Magnitude > 5 then isDragging = true end
+                if isDragging then
+                    FOLLOW_PLAYER = false
+                    modeBtn.Text = "モード: 自由"
+                    mapOffset = startOffset + Vector3.new(-delta.X * (ZOOM * 2 / math.max(MAP_WIDTH, MAP_HEIGHT)), 0, -delta.Y * (ZOOM * 2 / math.max(MAP_WIDTH, MAP_HEIGHT)))
+                end
             end
-        elseif dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        elseif dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            -- マウス：移動（ドラッグ）
             local delta = input.Position - dragStart
             if delta.Magnitude > 5 then isDragging = true end
             if isDragging then
