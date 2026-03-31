@@ -914,7 +914,7 @@ local function setupMap()
     sg.Name = "GoogleMinimap"
     local frame = Instance.new("Frame", sg)
     frame.Size = UDim2.new(0, MAP_WIDTH, 0, MAP_HEIGHT + 30)
-    frame.Position = UDim2.new(0, 50, 0, 50)
+    frame.Position = UDim2.new(0, 50, 0, 0)
     frame.BackgroundColor3 = Color3.fromRGB(160, 220, 255)
     frame.BorderSizePixel = 2
     frame.BorderColor3 = Color3.new(0.5, 0.5, 0.5)
@@ -6757,7 +6757,7 @@ local MapSizeSec = KeyboardTab:AddSection({ Name = "マップサイズ・画質�
 
 MapSizeSec:AddSlider({
     Name = "ウィンドウの横幅",
-    Min = 100, Max = 1000, Default = 300,
+    Min = 100, Max = 1000, Default = 200,
     Callback = function(v)
         manualSizeSet = true
         local ratio = ZOOM / math.max(MAP_WIDTH, MAP_HEIGHT)
@@ -6769,7 +6769,7 @@ MapSizeSec:AddSlider({
 
 MapSizeSec:AddSlider({
     Name = "ウィンドウの縦幅",
-    Min = 100, Max = 1000, Default = 300,
+    Min = 100, Max = 1000, Default = 200,
     Callback = function(v)
         manualSizeSet = true
         local ratio = ZOOM / math.max(MAP_WIDTH, MAP_HEIGHT)
