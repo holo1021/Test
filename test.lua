@@ -2916,8 +2916,6 @@ local function applyConfigData(data)
     deepMerge(cfg, data)
     syncVarsFromCfg()
 
-    local autoResponseActive = false -- 自動応答の状態管理
-
     -- UI要素への反映
     task.spawn(function()
         task.wait(0.5)
@@ -3324,6 +3322,39 @@ local function StartHolonHUB()
                     bv.MaxForce = Vector3.new(0, 0, 0)
                     bv.Velocity = Vector3.new(0, 0, 0)
                     bv.Parent = lastGrabbedPart
+
+                    -- モバイル用の投げボタン検知 (Bliz HUB 参考)
+                    if isMobileDevice then
+                        task.spawn(function()
+                            local throwButton = nil
+                            local contextGui = LocalPlayer.PlayerGui:FindFirstChild("ContextActionGui")
+                            if contextGui then
+                                -- 投げボタンの画像IDからボタン本体を特定
+                                for _, desc in ipairs(contextGui:GetDescendants()) do
+                                    if desc:IsA("ImageLabel") and (desc.Image == "rbxassetid://9603678090" or desc.Image == "http://www.roblox.com/asset/?id=9603678090") then
+                                        throwButton = desc.Parent
+                                        break
+                                    end
+                                end
+
+                                if throwButton and throwButton:IsA("GuiButton") then
+                                    local throwConn
+                                    throwConn = throwButton.MouseButton1Down:Connect(function()
+                                        if bv and bv.Parent then
+                                            bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+                                            bv.Velocity = Camera.CFrame.LookVector * strengthValue
+                                            DebrisService:AddItem(bv, 1)
+                                        end
+                                        if throwConn then throwConn:Disconnect() end
+                                    end)
+                                    -- おもちゃを離した際に接続を解除
+                                    child.AncestryChanged:Connect(function()
+                                        if not child.Parent and throwConn then throwConn:Disconnect() end
+                                    end)
+                                end
+                            end
+                        end)
+                    end
                 end
 
                 if deathGrabEnabled and grabbedModel and grabbedModel:FindFirstChildOfClass("Humanoid") then
@@ -5959,14 +5990,6 @@ allKickSec:AddToggle({
     end
 })
 
-actionTargetSection:AddToggle({
-    Name = "管理者への自動応答 (/cholon)",
-    Default = false,
-    Callback = function(v)
-        autoResponseActive = v
-    end
-})
-
 -- Loop Kill (ported from test.lua)
 local loopKillSecActionTab = ActionTab:AddSection({ Name = "Loop Kill" })
 local loopKillTargetNameActionTab = ""
@@ -7291,11 +7314,7 @@ OrionLib:MakeNotification({
             if text == "/k" then
                 -- /k コマンドへの反応
                 task.wait(0.5)
-                channel:SendAsync("[通知]管理者がサーバーにいます。")
-            elseif text == "/cholon" and autoResponseActive then
-                -- /cholon コマンドへの反応 (トグルがONの場合のみ)
-                task.wait(0.5)
-                channel:SendAsync("ほろん")
+                channel:SendAsync("開発者だよ。")
             elseif text == "/h" then
                 -- /h コマンド
                 task.wait(0.1)
