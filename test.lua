@@ -765,8 +765,8 @@ local isMobileDevice = UserInputService.TouchEnabled and not UserInputService.Ke
 --------------------------------------------------------------------------------
 -- [GPS Minimap 機能] (mapTP.lua と完全一致のロジック)
 --------------------------------------------------------------------------------
-local MAP_WIDTH = isMobileDevice and 180 or 300
-local MAP_HEIGHT = isMobileDevice and 180 or 300
+local MAP_WIDTH = isMobileDevice and 140 or 300
+local MAP_HEIGHT = isMobileDevice and 140 or 300
 local ZOOM = 250
 local curQualIdx = 2
 local qualities = { {n="低", s=15}, {n="中", s=25}, {n="高", s=40}, {n="最高", s=60}, {n="極限", s=80}, {n="詳細", s=100} }
@@ -3361,14 +3361,15 @@ local function StartHolonHUB()
                     end)
                 end
 
-                -- 回転掴み (常に回転)
+                -- 回転掴み (離しても回転)
                 if cfg.GrabMod.Spin and not lastGrabbedPart.Anchored then
+                    local targetPart = lastGrabbedPart
                     task.spawn(function()
-                        while child and child.Parent and cfg.GrabMod.Spin do
-                            if lastGrabbedPart and lastGrabbedPart.Parent then
+                        while targetPart and targetPart.Parent and cfg.GrabMod.Spin do
+                            if targetPart and targetPart.Parent then
                                 pcall(function()
-                                    -- 固定速度 (秒間約20度)
-                                    lastGrabbedPart.CFrame = lastGrabbedPart.CFrame * CFrame.Angles(0, math.rad(20), 0)
+                                    -- 回転速度の維持
+                                    targetPart.CFrame = targetPart.CFrame * CFrame.Angles(0, math.rad(15), 0)
                                 end)
                             end
                             task.wait()
