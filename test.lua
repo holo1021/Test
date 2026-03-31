@@ -3327,34 +3327,33 @@ local function StartHolonHUB()
                     if UserInputService.TouchEnabled then
                         task.spawn(function()
                             local throwButton = nil
-                            local contextGui = LocalPlayer.PlayerGui:FindFirstChild("ContextActionGui")
-                            if contextGui then
-                                -- 投げボタンが出現するまで待機して特定
-                                while throwButton == nil and child.Parent do
+                            while throwButton == nil and child.Parent do
+                                local contextGui = LocalPlayer.PlayerGui:FindFirstChild("ContextActionGui")
+                                if contextGui then
                                     for _, desc in ipairs(contextGui:GetDescendants()) do
                                         if desc:IsA("ImageLabel") and (desc.Image == "rbxassetid://9603678090" or desc.Image == "http://www.roblox.com/asset/?id=9603678090") then
                                             throwButton = desc.Parent
                                             break
                                         end
                                     end
-                                    task.wait(0.1)
                                 end
+                                task.wait(0.1)
+                            end
 
-                                if throwButton and throwButton:IsA("GuiButton") then
-                                    local throwConn
-                                    throwConn = throwButton.MouseButton1Down:Connect(function()
-                                        if bv and bv.Parent then
-                                            bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-                                            bv.Velocity = Camera.CFrame.LookVector * strengthValue
-                                            DebrisService:AddItem(bv, 1)
-                                        end
-                                        if throwConn then throwConn:Disconnect() end
-                                    end)
-                                    -- おもちゃを離した際に接続を解除
-                                    child.AncestryChanged:Connect(function()
-                                        if not child.Parent and throwConn then throwConn:Disconnect() end
-                                    end)
-                                end
+                            if throwButton and throwButton:IsA("GuiButton") then
+                                local throwConn
+                                throwConn = throwButton.MouseButton1Down:Connect(function()
+                                    if bv and bv.Parent then
+                                        bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+                                        bv.Velocity = Camera.CFrame.LookVector * strengthValue
+                                        DebrisService:AddItem(bv, 1)
+                                    end
+                                    if throwConn then throwConn:Disconnect() end
+                                end)
+                                -- おもちゃを離した際に接続を解除
+                                child.AncestryChanged:Connect(function()
+                                    if not child.Parent and throwConn then throwConn:Disconnect() end
+                                end)
                             end
                         end)
                     end
@@ -3482,7 +3481,8 @@ local function StartHolonHUB()
             if superStrengthEnabled and lastGrabbedPart and lastGrabbedPart.Parent then
                 local bv = lastGrabbedPart:FindFirstChild("BlizSuperStrength")
                 if bv then
-                    if UserInputService:GetLastInputType() == Enum.UserInputType.MouseButton2 then
+                    local lastInput = UserInputService:GetLastInputType()
+                    if lastInput == Enum.UserInputType.MouseButton2 or lastInput == Enum.UserInputType.Touch then
                         bv.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
                         bv.Velocity = Camera.CFrame.LookVector * strengthValue
                         DebrisService:AddItem(bv, 1)
