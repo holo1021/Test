@@ -769,6 +769,7 @@ local MAP_WIDTH = 300
 local MAP_HEIGHT = 300
 local ZOOM = 250
 local curQualIdx = 2
+local manualSizeSet = false
 local qualities = { {n="低", s=15}, {n="中", s=25}, {n="高", s=40}, {n="最高", s=60}, {n="極限", s=80}, {n="詳細", s=100} }
 
 local renderConnMap, inputConnMap, playerRemovingConnMap
@@ -798,15 +799,16 @@ local MaterialColors = {
 }
 
 local function setupMap()
-    -- 画面サイズに合わせて自動調整
-    local viewSize = Camera.ViewportSize
-    if isMobileDevice then
-        -- スマホの場合は画面の短い方の40%程度にする (上限150px、下限120px)
-        MAP_WIDTH = math.clamp(math.min(viewSize.X, viewSize.Y) * 0.4, 120, 150)
-    else
-        MAP_WIDTH = 300
+    -- 初回または手動設定なしの場合のみ自動計算
+    if not manualSizeSet then
+        local viewSize = Camera.ViewportSize
+        if isMobileDevice then
+            MAP_WIDTH = math.clamp(math.min(viewSize.X, viewSize.Y) * 0.45, 120, 160)
+        else
+            MAP_WIDTH = 300
+        end
+        MAP_HEIGHT = MAP_WIDTH
     end
-    MAP_HEIGHT = MAP_WIDTH
 
     if CoreGui:FindFirstChild("GoogleMinimap") then CoreGui.GoogleMinimap:Destroy() end
     tilePool = {}
@@ -1150,6 +1152,7 @@ local function setupMap()
     end)
     frame.InputBegan:Connect(function(input)
         if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+            isMouseOverMap = true -- タッチ開始時は有効とみなす
             local pos = input.Position
             local framePos = frame.AbsolutePosition
             local frameSize = frame.AbsoluteSize
@@ -1167,11 +1170,12 @@ local function setupMap()
             end
         end
     end)
-    frame.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.Touch then touches[input] = nil end
+    
+    local function onInputEnded(input)
         if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+            if input.UserInputType == Enum.UserInputType.Touch then touches[input] = nil end
             dragging = false
-            if not isDragging and (tick() - startTime) < 0.3 then
+            if not isDragging and (tick() - startTime) < 0.3 and isMouseOverMap then
                 local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
                 if not root then return end
                 local pos = input.Position
@@ -1187,7 +1191,15 @@ local function setupMap()
                     scan()
                 end
             end
+            if input.UserInputType == Enum.UserInputType.Touch then isMouseOverMap = false end
         end
+    end
+    
+    frame.InputEnded:Connect(onInputEnded)
+    -- 画面外で離した時もタッチリストをリセット
+    local uisEnded = UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch then touches[input] = nil end
+        if input == dragStart then dragging = false end
     end)
     inputConnMap = UserInputService.InputChanged:Connect(function(input)
         -- ピンチズーム処理
@@ -1238,6 +1250,14 @@ local function setupMap()
             end
         end
     end)
+    
+    local oldRemove = playerRemovingConnMap
+    playerRemovingConnMap = {
+        Disconnect = function()
+            if oldRemove and oldRemove.Disconnect then oldRemove:Disconnect() end
+            if uisEnded then uisEnded:Disconnect() end
+        end
+    }
     scan(true)
 end
 
@@ -6739,6 +6759,7 @@ MapSizeSec:AddSlider({
     Name = "ウィンドウの横幅",
     Min = 100, Max = 1000, Default = 300,
     Callback = function(v)
+        manualSizeSet = true
         local ratio = ZOOM / math.max(MAP_WIDTH, MAP_HEIGHT)
         MAP_WIDTH = v
         ZOOM = math.max(MAP_WIDTH, MAP_HEIGHT) * ratio
@@ -6750,6 +6771,7 @@ MapSizeSec:AddSlider({
     Name = "ウィンドウの縦幅",
     Min = 100, Max = 1000, Default = 300,
     Callback = function(v)
+        manualSizeSet = true
         local ratio = ZOOM / math.max(MAP_WIDTH, MAP_HEIGHT)
         MAP_HEIGHT = v
         ZOOM = math.max(MAP_WIDTH, MAP_HEIGHT) * ratio
