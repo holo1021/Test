@@ -759,11 +759,14 @@ local decoyWalkSpeed = 16
 local decoyNoclip = false
 local decoyFly = false
 
+-- スマホ判定の共通化
+local isMobileDevice = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+
 --------------------------------------------------------------------------------
 -- [GPS Minimap 機能] (mapTP.lua と完全一致のロジック)
 --------------------------------------------------------------------------------
-local MAP_WIDTH = 300
-local MAP_HEIGHT = 300
+local MAP_WIDTH = isMobileDevice and 180 or 300
+local MAP_HEIGHT = isMobileDevice and 180 or 300
 local ZOOM = 250
 local curQualIdx = 2
 local qualities = { {n="低", s=15}, {n="中", s=25}, {n="高", s=40}, {n="最高", s=60}, {n="極限", s=80}, {n="詳細", s=100} }
@@ -802,6 +805,7 @@ local function setupMap()
     if inputConnMap then inputConnMap:Disconnect() end
     if playerRemovingConnMap then playerRemovingConnMap:Disconnect() end
 
+    local touches = {} -- ピンチズーム用のタッチ座標管理
     local dragging, isDragging, dragStart, startTime, isMouseOverMap = false, false, nil, 0, false
     local startOffset = Vector3.new(0, 0, 0)
     local pxPerStud = math.max(MAP_WIDTH, MAP_HEIGHT) / (ZOOM * 2)
@@ -1135,6 +1139,7 @@ local function setupMap()
     end)
     frame.InputBegan:Connect(function(input)
         if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) and isMouseOverMap then
+            if input.UserInputType == Enum.UserInputType.Touch then touches[input] = input.Position end
             local pos = input.Position
             local relY = (pos.Y - frame.AbsolutePosition.Y) / frame.AbsoluteSize.Y
             if relY > (MAP_HEIGHT / frame.AbsoluteSize.Y) then return end
@@ -1146,6 +1151,7 @@ local function setupMap()
         end
     end)
     frame.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch then touches[input] = nil end
         if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
             dragging = false
             if not isDragging and (tick() - startTime) < 0.3 then
@@ -1167,7 +1173,22 @@ local function setupMap()
         end
     end)
     inputConnMap = UserInputService.InputChanged:Connect(function(input)
-        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        -- ピンチズーム処理
+        if input.UserInputType == Enum.UserInputType.Touch then
+            touches[input] = input.Position
+            local t = {}
+            for _, pos in pairs(touches) do table.insert(t, pos) end
+            if #t == 2 then
+                local dist = (t[1] - t[2]).Magnitude
+                if lastPinchDist then
+                    local change = dist - lastPinchDist
+                    ZOOM = math.clamp(ZOOM - (change * (ZOOM / 100)), 50, 1500)
+                    if UIElements.MapZoomSlider then UIElements.MapZoomSlider:Set(ZOOM) end
+                    scan()
+                end
+                lastPinchDist = dist
+            end
+        elseif dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
             local delta = input.Position - dragStart
             if delta.Magnitude > 5 then isDragging = true end
             if isDragging then
@@ -3340,7 +3361,7 @@ local function StartHolonHUB()
                     end)
                 end
 
-                -- 回転掴み (固定速度)
+                -- 回転掴み (常に回転)
                 if cfg.GrabMod.Spin and not lastGrabbedPart.Anchored then
                     task.spawn(function()
                         while child and child.Parent and cfg.GrabMod.Spin do
@@ -5185,14 +5206,6 @@ UIElements.SuperStrengthToggle = GrabControlSec:AddToggle({
     end
 })
 
-UIElements.SpinGrabToggle = GrabControlSec:AddToggle({
-    Name = "回転掴む",
-    Default = cfg.GrabMod.Spin,
-    Callback = function(v)
-        cfg.GrabMod.Spin = v
-    end
-})
-
 UIElements.StrengthSlider = GrabControlSec:AddSlider({
     Name = "強さ",
     Min = 400,
@@ -5202,6 +5215,14 @@ UIElements.StrengthSlider = GrabControlSec:AddSlider({
     ValueName = "Power",
     Callback = function(v)
         strengthValue = v
+    end
+})
+
+UIElements.SpinGrabToggle = GrabControlSec:AddToggle({
+    Name = "回転掴む",
+    Default = cfg.GrabMod.Spin,
+    Callback = function(v)
+        cfg.GrabMod.Spin = v
     end
 })
 
