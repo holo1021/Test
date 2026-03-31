@@ -760,13 +760,13 @@ local decoyNoclip = false
 local decoyFly = false
 
 -- スマホ判定の共通化
-local isMobileDevice = UserInputService.TouchEnabled and (Camera.ViewportSize.X < 800 or Camera.ViewportSize.Y < 800)
+local isMobileDevice = UserInputService.TouchEnabled
 
 --------------------------------------------------------------------------------
 -- [GPS Minimap 機能] (mapTP.lua と完全一致のロジック)
 --------------------------------------------------------------------------------
-local MAP_WIDTH = isMobileDevice and 140 or 300
-local MAP_HEIGHT = isMobileDevice and 140 or 300
+local MAP_WIDTH = 300
+local MAP_HEIGHT = 300
 local ZOOM = 250
 local curQualIdx = 2
 local qualities = { {n="低", s=15}, {n="中", s=25}, {n="高", s=40}, {n="最高", s=60}, {n="極限", s=80}, {n="詳細", s=100} }
@@ -798,6 +798,16 @@ local MaterialColors = {
 }
 
 local function setupMap()
+    -- 画面サイズに合わせて自動調整
+    local viewSize = Camera.ViewportSize
+    if isMobileDevice then
+        -- スマホの場合は画面の短い方の40%程度にする (上限150px、下限120px)
+        MAP_WIDTH = math.clamp(math.min(viewSize.X, viewSize.Y) * 0.4, 120, 150)
+    else
+        MAP_WIDTH = 300
+    end
+    MAP_HEIGHT = MAP_WIDTH
+
     if CoreGui:FindFirstChild("GoogleMinimap") then CoreGui.GoogleMinimap:Destroy() end
     tilePool = {}
     otherMarkers = {}
@@ -806,6 +816,7 @@ local function setupMap()
     if playerRemovingConnMap then playerRemovingConnMap:Disconnect() end
 
     local touches = {} -- ピンチズーム用のタッチ座標管理
+    local lastPinchDist = nil
     local dragging, isDragging, dragStart, startTime, isMouseOverMap = false, false, nil, 0, false
     local startOffset = Vector3.new(0, 0, 0)
     local pxPerStud = math.max(MAP_WIDTH, MAP_HEIGHT) / (ZOOM * 2)
@@ -1138,16 +1149,22 @@ local function setupMap()
         end
     end)
     frame.InputBegan:Connect(function(input)
-        if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) and isMouseOverMap then
-            if input.UserInputType == Enum.UserInputType.Touch then touches[input] = input.Position end
+        if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
             local pos = input.Position
-            local relY = (pos.Y - frame.AbsolutePosition.Y) / frame.AbsoluteSize.Y
-            if relY > (MAP_HEIGHT / frame.AbsoluteSize.Y) then return end
-            dragging = true
-            dragStart = input.Position
-            startOffset = mapOffset
-            startTime = tick()
-            isDragging = false
+            local framePos = frame.AbsolutePosition
+            local frameSize = frame.AbsoluteSize
+            
+            -- タッチ位置がフレーム内（かつ下部のドラッグハンドル以外）かチェック
+            if pos.X >= framePos.X and pos.X <= (framePos.X + frameSize.X) and
+               pos.Y >= framePos.Y and pos.Y <= (framePos.Y + MAP_HEIGHT) then
+                
+                if input.UserInputType == Enum.UserInputType.Touch then touches[input] = input.Position end
+                dragging = true
+                dragStart = input.Position
+                startOffset = mapOffset
+                startTime = tick()
+                isDragging = false
+            end
         end
     end)
     frame.InputEnded:Connect(function(input)
