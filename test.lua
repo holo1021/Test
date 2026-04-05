@@ -41,18 +41,25 @@ local IncreaseLineExtend = 3
 
 -- --- チャット・Webhook設定 ---
 local chatEntries = {}
+local allChatData = {} -- サーバーから取得した全データを保持
 local isGlobalChatOn = false
-local DiscordWebhookURL = "https://script.google.com/macros/s/AKfycbxBg26T1Tkn31oK554fmwoEcNXGnQ2UmUPUwtxEyMovWk8E1lTy3YgczQ7wh5-qzYHEqg/exec"
+local DiscordWebhookURL = "https://script.google.com/macros/s/AKfycbzILlYQt7HSFpIKWE4KJjGHVYaPo6yTk2ToDJq0Hg1w7IeR9HD8apxye31WgxoJX0iA3g/exec"
+
+local selectedChatMode = "Global" -- "Global", "Server", "Private"
+local selectedChatTarget = ""     -- 個人チャットの相手
 
 -- --- チャット送信専用関数 ---
-local function sendToExternalChat(user, msg)
+local function sendToExternalChat(user, msg, mode, target)
     if DiscordWebhookURL == "" or DiscordWebhookURL:find("YOUR_WEBHOOK") then return end
     
     task.spawn(function()
         local success, result = pcall(function()
             local data = {
-                ["username"] = user,
-                ["content"] = msg
+                ["user"] = user,
+                ["msg"] = msg,
+                ["mode"] = mode or "Global",
+                ["serverId"] = tostring(game.JobId),
+                ["target"] = target or ""
             }
             
             if httpRequest then
@@ -70,6 +77,42 @@ local function sendToExternalChat(user, msg)
             warn("Holon HUB Chat Send Error: " .. tostring(result))
         end
     end)
+end
+
+-- チャットUIの更新（フィルタリング機能付き）
+local function updateChatUI()
+    if not UIElements.ChatLogPara then return end
+    
+    local myName = LocalPlayer.Name
+    local text = "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+    text = text .. "【現在のモード: " .. (selectedChatMode == "Global" and "世界全体" or selectedChatMode == "Server" and "サーバー内" or "個人: "..selectedChatTarget) .. "】\n"
+    text = text .. "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+
+    for _, entry in ipairs(allChatData) do
+        local shouldShow = false
+        local eMode = entry.mode or "Global"
+        
+        if selectedChatMode == "Global" then
+            if eMode == "Global" then shouldShow = true end
+        elseif selectedChatMode == "Server" then
+            if eMode == "Server" and entry.serverId == tostring(game.JobId) then shouldShow = true end
+        elseif selectedChatMode == "Private" then
+            if eMode == "Private" then
+                -- 自分から相手、または相手から自分へのメッセージのみ表示
+                if (entry.user:find("@" .. myName) and entry.target == selectedChatTarget) or
+                   (entry.user:find("@" .. selectedChatTarget) and entry.target == myName) then
+                    shouldShow = true
+                end
+            end
+        end
+
+        if shouldShow then
+            text = text .. string.format("👤 **%s**  \t\t[%s]\n", entry.user or "Unknown", entry.time or "??:??")
+            text = text .. string.format("   %s\n", entry.msg or "")
+            text = text .. "────────────────────────\n"
+        end
+    end
+    UIElements.ChatLogPara:Set(text)
 end
 
 -- --- 履歴取得用関数 ---
@@ -92,16 +135,8 @@ local function fetchChatHistory()
     if success then
         local success2, data = pcall(function() return HttpService:JSONDecode(result) end)
         if success2 and type(data) == "table" then
-            chatEntries = data
-            if UIElements.ChatLogPara then
-                local text = "━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                for _, entry in ipairs(chatEntries) do
-                    text = text .. string.format("👤 **%s**  \t\t[%s]\n", entry.user or "Unknown", entry.time or "??:??")
-                    text = text .. string.format("   %s\n", entry.msg or "")
-                    text = text .. "────────────────────────\n"
-                end
-                UIElements.ChatLogPara:Set(text)
-            end
+            allChatData = data
+            updateChatUI()
         end
     end
 end
@@ -4013,43 +4048,58 @@ local AuraTab = Window:MakeTab({
 
     local ChatSec = ChatTab:AddSection({ Name = "💬 グローバルチャット" })
     UIElements.ChatLogPara = ChatSec:AddParagraph("チャット履歴 (最新15件)", "メッセージを待機中...")
-    local ChatLogPara = UIElements.ChatLogPara
 
     local currentTypedMsg = ""
 
-    local function updateChatUI()
-        local text = "━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        for _, entry in ipairs(chatEntries) do
-            text = text .. string.format("👤 **%s**  \t\t[%s]\n", entry.user or "Unknown", entry.time or "??:??")
-            text = text .. string.format("   %s\n", entry.msg or "")
-            text = text .. "────────────────────────\n"
-        end
-        ChatLogPara:Set(text)
-    end
-
     local function executeSend()
         if currentTypedMsg == "" then return end
+        local msgToSend = currentTypedMsg
         
-        local msgToSend = currentTypedMsg -- 送信内容を一時変数に保持
+        if selectedChatMode == "Private" and selectedChatTarget == "" then
+            OrionLib:MakeNotification({Name = "エラー", Content = "個人チャットの相手を選択してください", Time = 3})
+            return
+        end
+        
         
         if UIElements.ChatInput then
             UIElements.ChatInput:Set("") -- 送信後に中身を空にする
         end
         
         local displayName = LocalPlayer.DisplayName .. " (@" .. LocalPlayer.Name .. ")"
-        local entry = {
-            time = os.date("%H:%M"),
-            user = displayName,
-            msg = msgToSend
-        }
-
-        table.insert(chatEntries, entry)
-        if #chatEntries > 15 then table.remove(chatEntries, 1) end
-        updateChatUI()
-
-        sendToExternalChat(displayName, msgToSend)
+        sendToExternalChat(displayName, msgToSend, selectedChatMode, selectedChatTarget)
         currentTypedMsg = "" 
+        
+        -- 送信直後に一度履歴を更新して反映を早める
+        task.delay(0.5, fetchChatHistory)
     end
+
+    ChatSec:AddDropdown({
+        Name = "チャット範囲 (モード)",
+        Default = "グローバル",
+        Options = {"グローバル", "サーバー内のみ", "個人チャット"},
+        Callback = function(v)
+            if v == "グローバル" then selectedChatMode = "Global"
+            elseif v == "サーバー内のみ" then selectedChatMode = "Server"
+            else selectedChatMode = "Private" end
+            updateChatUI()
+        end
+    })
+
+    UIElements.ChatRecipientDropdown = ChatSec:AddDropdown({
+        Name = "送信先 (個人チャット用)",
+        Default = "なし",
+        Options = getPList(),
+        Callback = function(v)
+            selectedChatTarget = v:match("@([^)]+)") or ""
+            updateChatUI()
+        end
+    })
+
+    -- プレイヤー追加時に受信先リストを更新
+    Players.PlayerAdded:Connect(function()
+        task.wait(0.5)
+        if UIElements.ChatRecipientDropdown then UIElements.ChatRecipientDropdown:Refresh(getPList(), true) end
+    end)
 
     UIElements.ChatInput = ChatSec:AddTextbox({
         Name = "メッセージを入力...",
