@@ -10,6 +10,9 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local ContextActionService = game:GetService("ContextActionService")
 local TextChatService = game:GetService("TextChatService")
 
+-- Executor独自のHTTPリクエスト関数を定義 (Robloxのブロックを回避するため)
+local httpRequest = (syn and syn.request) or (http and http.request) or http_request or (fluxus and fluxus.request) or request
+
 -- test.luaから持ってきたイベント定義
 local GrabEvents = ReplicatedStorage:WaitForChild("GrabEvents")
 local SetNetworkOwner = GrabEvents:WaitForChild("SetNetworkOwner")
@@ -35,6 +38,73 @@ local perspectiveGrabEnabled = false
 local perspectiveSpeed = 50
 local invisibleLineEnabled = false
 local IncreaseLineExtend = 3
+
+-- --- チャット・Webhook設定 ---
+local chatEntries = {}
+local isGlobalChatOn = false
+local DiscordWebhookURL = "https://script.google.com/macros/s/AKfycbxBg26T1Tkn31oK554fmwoEcNXGnQ2UmUPUwtxEyMovWk8E1lTy3YgczQ7wh5-qzYHEqg/exec"
+
+-- --- チャット送信専用関数 ---
+local function sendToExternalChat(user, msg)
+    if DiscordWebhookURL == "" or DiscordWebhookURL:find("YOUR_WEBHOOK") then return end
+    
+    task.spawn(function()
+        local success, result = pcall(function()
+            local data = {
+                ["username"] = user,
+                ["content"] = msg
+            }
+            
+            if httpRequest then
+                return httpRequest({
+                    Url = DiscordWebhookURL,
+                    Method = "POST",
+                    Headers = {["Content-Type"] = "application/json"},
+                    Body = HttpService:JSONEncode(data)
+                })
+            else
+                return HttpService:PostAsync(DiscordWebhookURL, HttpService:JSONEncode(data))
+            end
+        end)
+        if not success then
+            warn("Holon HUB Chat Send Error: " .. tostring(result))
+        end
+    end)
+end
+
+-- --- 履歴取得用関数 ---
+local function fetchChatHistory()
+    if DiscordWebhookURL == "" or DiscordWebhookURL:find("YOUR_WEBHOOK") then return end
+    
+    local success, result = pcall(function()
+        if httpRequest then
+            local response = httpRequest({
+                Url = DiscordWebhookURL .. "?action=getHistory",
+                Method = "GET"
+            })
+            return response.Body
+        else
+            -- 注意: RobloxクライアントからGoogleドメインへの直接GETはブロックされる場合があります
+            return HttpService:GetAsync(DiscordWebhookURL .. "?action=getHistory")
+        end
+    end)
+    
+    if success then
+        local success2, data = pcall(function() return HttpService:JSONDecode(result) end)
+        if success2 and type(data) == "table" then
+            chatEntries = data
+            if UIElements.ChatLogPara then
+                local text = "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                for _, entry in ipairs(chatEntries) do
+                    text = text .. string.format("👤 **%s**  \t\t[%s]\n", entry.user or "Unknown", entry.time or "??:??")
+                    text = text .. string.format("   %s\n", entry.msg or "")
+                    text = text .. "────────────────────────\n"
+                end
+                UIElements.ChatLogPara:Set(text)
+            end
+        end
+    end
+end
 -- --------------------------------------------
 
 -- リンク集を表示する共通関数（認証画面とメイン画面で使い回せます）
@@ -3934,6 +4004,74 @@ local AuraTab = Window:MakeTab({
     Name = "オーラ",
     Icon = "rbxassetid://116620312917084"
 })
+
+    -- --- TAB: ONLINE CHAT ---
+    local ChatTab = Window:MakeTab({
+        Name = "チャット",
+        Icon = "rbxassetid://7733955511"
+    })
+
+    local ChatSec = ChatTab:AddSection({ Name = "💬 グローバルチャット" })
+    UIElements.ChatLogPara = ChatSec:AddParagraph("チャット履歴 (最新15件)", "メッセージを待機中...")
+    local ChatLogPara = UIElements.ChatLogPara
+
+    local currentTypedMsg = ""
+
+    local function updateChatUI()
+        local text = "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        for _, entry in ipairs(chatEntries) do
+            text = text .. string.format("👤 **%s**  \t\t[%s]\n", entry.user or "Unknown", entry.time or "??:??")
+            text = text .. string.format("   %s\n", entry.msg or "")
+            text = text .. "────────────────────────\n"
+        end
+        ChatLogPara:Set(text)
+    end
+
+    local function executeSend()
+        if currentTypedMsg == "" then return end
+        
+        local msgToSend = currentTypedMsg -- 送信内容を一時変数に保持
+        
+        if UIElements.ChatInput then
+            UIElements.ChatInput:Set("") -- 送信後に中身を空にする
+        end
+        
+        local displayName = LocalPlayer.DisplayName .. " (@" .. LocalPlayer.Name .. ")"
+        local entry = {
+            time = os.date("%H:%M"),
+            user = displayName,
+            msg = msgToSend
+        }
+
+        table.insert(chatEntries, entry)
+        if #chatEntries > 15 then table.remove(chatEntries, 1) end
+        updateChatUI()
+
+        sendToExternalChat(displayName, msgToSend)
+        currentTypedMsg = "" 
+    end
+
+    UIElements.ChatInput = ChatSec:AddTextbox({
+        Name = "メッセージを入力...",
+        Default = "",
+        TextDisappear = false,
+        Callback = function(v) currentTypedMsg = v end
+    })
+
+    ChatSec:AddButton({
+        Name = "メッセージを送信 🚀",
+        Callback = executeSend
+    })
+
+    ChatSec:AddLabel("※送信すると開発者のDiscordに履歴が保存されます")
+
+    -- 自動更新ループの開始
+    task.spawn(function()
+        while true do
+            fetchChatHistory()
+            task.wait(5)
+        end
+    end)
 
 local PianoTab = Window:MakeTab({
     Name = "ピアノ",
