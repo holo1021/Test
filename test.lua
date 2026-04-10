@@ -44,13 +44,16 @@ local IncreaseLineExtend = 3
 local chatEntries = {}
 local allChatData = {} -- サーバーから取得した全データを保持
 local isGlobalChatOn = false
-local DiscordWebhookURL = "https://script.google.com/macros/s/AKfycbzILlYQt7HSFpIKWE4KJjGHVYaPo6yTk2ToDJq0Hg1w7IeR9HD8apxye31WgxoJX0iA3g/exec"
+local DiscordWebhookURL = "https://script.google.com/macros/s/AKfycbyIvL6_iSp77HH25mvWT8PTcpcAieVhkc0vmf6p_5crcpHTwbc7B_3LKdP4gQdgL4O_/exec"
 
 local selectedChatMode = "Global" -- "Global", "Server", "Private"
 local selectedChatTarget = ""     -- 個人チャットの相手
 local chatNotifyEnabled = true
+chatTickerEnabled = false
+chatTickerQueue = {}
 local seenChatMessageKeys = {}
 local hasInitializedChatHistory = false
+HolonLastChatHistoryPayload = HolonLastChatHistoryPayload or nil
 
 local function getChatEntryKey(entry)
     return table.concat({
@@ -81,12 +84,49 @@ local function isChatEntryVisibleInCurrentMode(entry)
     return false
 end
 
+function formatChatTickerMessage(entry)
+    local user = entry.user or entry.username or entry.Name or "Player"
+    local msg = tostring(entry.msg or entry.content or ""):gsub("[%c\r\n]+", " ")
+    if #msg > 80 then
+        msg = msg:sub(1, 80) .. "..."
+    end
+    return string.format("%s : %s", user, msg)
+end
+
+function enqueueChatTickerEntry(entry)
+    if not entry or not isChatEntryVisibleInCurrentMode(entry) then
+        return
+    end
+    local text = formatChatTickerMessage(entry)
+    if text == "" then
+        return
+    end
+    table.insert(chatTickerQueue, text)
+    while #chatTickerQueue > 20 do
+        table.remove(chatTickerQueue, 1)
+    end
+end
+
+function getLatestChatTickerMessage()
+    for i = #allChatData, 1, -1 do
+        local entry = allChatData[i]
+        if isChatEntryVisibleInCurrentMode(entry) then
+            return formatChatTickerMessage(entry)
+        end
+    end
+    return nil
+end
+
 local function notifyNewChatEntries(newEntries)
     if not chatNotifyEnabled or not OrionLib then
+        for _, entry in ipairs(newEntries) do
+            enqueueChatTickerEntry(entry)
+        end
         return
     end
 
     for _, entry in ipairs(newEntries) do
+        enqueueChatTickerEntry(entry)
         local user = entry.user or entry.username or entry.Name or "Player"
         local msg = tostring(entry.msg or entry.content or "")
         if not user:find("@" .. LocalPlayer.Name, 1, true) and isChatEntryVisibleInCurrentMode(entry) then
@@ -228,9 +268,14 @@ local function fetchChatHistory()
         end
     end)
     
-    if success then
+    if success and type(result) == "string" and result ~= "" then
+        if result == HolonLastChatHistoryPayload then
+            return
+        end
+
         local success2, data = pcall(function() return HttpService:JSONDecode(result) end)
         if success2 and type(data) == "table" then
+            HolonLastChatHistoryPayload = result
             local newEntries = {}
             for _, entry in ipairs(data) do
                 local key = getChatEntryKey(entry)
@@ -916,7 +961,8 @@ local defaultConfig = {
     Star = { Size = 10, Speed = 2, Height = 5, Back = 0 },
     Vortex = { Size = 30, Speed = 10, Height = 20, Back = 0 },
     Sphere = { Size = 30, Speed = 30, Height = 5, Back = 0 },
-    Rotate = { Size = 15, Speed = 6, Height = 7, Back = 0, Wave = false, WaveSpeed = 2, WaveAmp = 2 },
+    Rotate = { Size = 15, Speed = 6, Height = 7, Back = 0, Wave = false, WaveSpeed = 2, WaveAmp = 2, FerrisWheel = false },
+    Cat = { Size = 26, Speed = 30, Height = 18, Back = 3 },
     Pet = { Size = 8, Speed = 2, Height = 4, Back = 12, Count = 2, Joints = 3, Gap = 13 },
     Text = { Size = 10, Speed = 5, Height = 6, Back = 2, Content = "HELLO", Mirror = false },
     MagicCircle = { Size = 12, Speed = 2, Height = -3, Back = 0 },
@@ -926,11 +972,12 @@ local defaultConfig = {
     Merkaba = { Size = 8, Speed = 2, Height = 7, Back = 0 },
     Cube = { Size = 5, Speed = 1, Height = 5, Back = 0 },
     Pyramid = { Size = 5, Speed = 1, Height = 5, Back = 0 },
-    MirrorPlayer = { Size = 60, Speed = 10, Height = 0, Back = 0, Scale = 1, EdgeSpacing = 1 },
+    MirrorPlayer = { Size = 30, Speed = 25, Height = 15, Back = 0, Scale = 1, EdgeSpacing = 1 },
     Beam = { Size = 60, Speed = 50, Height = 0.5, Back = 0, Count = 8 },
     BackGuard = { Size = 10, Speed = 2, Height = 2, Back = 15 },
     Tornado = { Size = 20, Speed = 15, Height = 0, Back = 0, Radius = 5, TopRadius = 20 },
     Gyro = { Size = 20, Speed = 5, Height = 5, Back = 0, InnerSize = 12, CenterType = "Sphere" },
+    Draw3D = { Size = 12, Speed = 30, Height = 8, Back = 0, Depth = 18, MinDistance = 0.03, Wave = 0.4, Preview = true },
     Combined = {
         Mode1 = "Wing", Mode1Count = 15, Mode1Speed = 6, Mode1Size = 30, Mode1Height = 0, Mode1Back = 0, Mode1RotX = 0, Mode1RotY = -90, Mode1RotZ = 0, Mode1Item = "メインと同期",
         Mode2 = "Rotate", Mode2Count = 15, Mode2Speed = 2, Mode2Size = 15, Mode2Height = 15, Mode2Back = 0, Mode2RotX = 0, Mode2RotY = -90, Mode2RotZ = 0, Mode2Item = "メインと同期",
@@ -958,6 +1005,64 @@ local cfg = deepCopy(defaultConfig)
 local useOtherToys = false
 local isEnabled, currentMode, combinedActive = false, "Wing", false
 local followMethod = "プレイヤー"
+_G.HolonFollowMethodAliases = _G.HolonFollowMethodAliases or {
+    player = {
+        ["プレイヤー"] = true, ["Player"] = true, ["Jugador"] = true, ["Joueur"] = true,
+        ["اللاعب"] = true, ["প্লেয়ার"] = true, ["Spieler"] = true, ["플레이어"] = true,
+        ["Игрок"] = true, ["Oyuncu"] = true
+    },
+    fixed = {
+        ["固定"] = true, ["Fixed"] = true, ["Fijo"] = true, ["Fixe"] = true,
+        ["ثابت"] = true, ["স্থির"] = true, ["Fixiert"] = true, ["고정"] = true,
+        ["Фиксированный"] = true, ["Sabit"] = true
+    },
+    look = {
+        ["視線の先"] = true, ["Look Direction"] = true, ["Direccion de mirada"] = true,
+        ["Direction du regard"] = true, ["اتجاه النظر"] = true, ["দৃষ্টির সামনে"] = true,
+        ["Blickrichtung"] = true, ["시선 방향"] = true, ["По направлению взгляда"] = true,
+        ["Bakis yonu"] = true
+    }
+}
+_G.HolonAllToysSelectionAliases = _G.HolonAllToysSelectionAliases or {
+    ["全てのおもちゃ"] = true, ["All Toys"] = true, ["Todos los juguetes"] = true,
+    ["Tous les jouets"] = true, ["Alle Spielzeuge"] = true, ["كل الألعاب"] = true,
+    ["সব খেলনা"] = true, ["모든 장난감"] = true, ["Все игрушки"] = true,
+    ["Tum oyuncaklar"] = true
+}
+_G.HolonSyncWithMainSelectionAliases = _G.HolonSyncWithMainSelectionAliases or {
+    ["メインと同期"] = true, ["Sync with Main"] = true, ["Sincronizar con principal"] = true,
+    ["Synchroniser avec le principal"] = true, ["Mit Hauptziel synchronisieren"] = true,
+    ["مزامنة مع الرئيسي"] = true, ["মূলと同期"] = true, ["মূলের সাথে সিঙ্ক"] = true,
+    ["메인과 동기화"] = true, ["Синхронизировать с основной"] = true,
+    ["Ana ile senkronize"] = true, ["Startと同期"] = true
+}
+_G.HolonGetNormalizedFollowMethod = _G.HolonGetNormalizedFollowMethod or function(value)
+    local key = tostring(value or "")
+    if _G.HolonFollowMethodAliases.look[key] then
+        return "look"
+    end
+    if _G.HolonFollowMethodAliases.fixed[key] then
+        return "fixed"
+    end
+    return "player"
+end
+_G.HolonIsAllToysSelection = _G.HolonIsAllToysSelection or function(value)
+    return _G.HolonAllToysSelectionAliases[tostring(value or "")] == true
+end
+_G.HolonIsSyncWithMainSelection = _G.HolonIsSyncWithMainSelection or function(value)
+    return _G.HolonSyncWithMainSelectionAliases[tostring(value or "")] == true
+end
+_G.HolonMirrorPlayerCache = _G.HolonMirrorPlayerCache or {
+    R6 = { "Head", "Torso", "Left Arm", "Right Arm", "Left Leg", "Right Leg" },
+    R15 = {
+        "Head",
+        "UpperTorso", "LowerTorso",
+        "LeftUpperArm", "LeftLowerArm", "LeftHand",
+        "RightUpperArm", "RightLowerArm", "RightHand",
+        "LeftUpperLeg", "LeftLowerLeg", "LeftFoot",
+        "RightUpperLeg", "RightLowerLeg", "RightFoot"
+    }
+}
 local lastBaseCF = nil
 local targetMain, targetSub = LocalPlayer, LocalPlayer    
 local autoWidth = true
@@ -977,6 +1082,630 @@ local decoyFly = false
 
 -- スマホ判定の共通化
 local isMobileDevice = UserInputService.TouchEnabled
+local stopEffect
+
+local draw3DState = {
+    Strokes = {},
+    SegmentLengths = {},
+    TotalLength = 0,
+    OverlayGui = nil,
+    PreviewFolder = nil,
+    PreviewParts = {},
+    PreviewConnection = nil,
+    InputConnections = {},
+    IsCaptureArmed = false,
+    IsStrokeActive = false,
+    ActiveInput = nil,
+    LastStrokePosition = nil,
+    ActiveInputType = nil,
+    CurrentStrokeIndex = nil,
+    LastCommittedScreenPosition = nil,
+    Canvas = nil,
+    CanvasGuide = nil,
+    CanvasDots = {},
+    CanvasLines = {},
+}
+
+function getDraw3DTargetRoot()
+    local char = targetMain and targetMain.Character
+    return char and char:FindFirstChild("HumanoidRootPart") or nil
+end
+
+function getDraw3DBaseCFrame()
+    local root = getDraw3DTargetRoot()
+    if root then
+        local previewDepth = math.max(4, cfg.Draw3D.Depth or 18)
+        return root.CFrame * CFrame.new(0, 0, -previewDepth)
+    end
+    return CFrame.new()
+end
+
+function rebuildDraw3DLengths()
+    local total = 0
+    draw3DState.SegmentLengths = {}
+    for strokeIndex, stroke in ipairs(draw3DState.Strokes) do
+        for pointIndex = 2, #stroke do
+            local startPoint = stroke[pointIndex - 1]
+            local endPoint = stroke[pointIndex]
+            local segmentLength = (endPoint - startPoint).Magnitude
+            draw3DState.SegmentLengths[#draw3DState.SegmentLengths + 1] = {
+                StrokeIndex = strokeIndex,
+                SegmentIndex = pointIndex - 1,
+                StartDistance = total,
+                EndDistance = total + segmentLength,
+            }
+            total = total + segmentLength
+        end
+    end
+    draw3DState.TotalLength = total
+end
+
+function getDraw3DPointCount()
+    local total = 0
+    for _, stroke in ipairs(draw3DState.Strokes) do
+        total = total + #stroke
+    end
+    return total
+end
+
+function sampleDraw3DPath(progress)
+    if #draw3DState.Strokes == 0 then
+        return Vector3.zero
+    end
+    if draw3DState.TotalLength <= 0 then
+        for _, stroke in ipairs(draw3DState.Strokes) do
+            if #stroke > 0 then
+                return stroke[1]
+            end
+        end
+        return Vector3.zero
+    end
+
+    local targetDist = math.clamp(progress, 0, 1) * draw3DState.TotalLength
+    for _, segment in ipairs(draw3DState.SegmentLengths) do
+        if targetDist <= segment.EndDistance then
+            local stroke = draw3DState.Strokes[segment.StrokeIndex]
+            local idx = segment.SegmentIndex + 1
+            local segLength = math.max(0.001, segment.EndDistance - segment.StartDistance)
+            local alpha = (targetDist - segment.StartDistance) / segLength
+            local p0 = stroke[math.max(1, idx - 2)] or stroke[idx - 1]
+            local p1 = stroke[idx - 1]
+            local p2 = stroke[idx]
+            local p3 = stroke[math.min(#stroke, idx + 1)] or stroke[idx]
+            local t = alpha
+            local t2 = t * t
+            local t3 = t2 * t
+            return 0.5 * (
+                (2 * p1) +
+                (-p0 + p2) * t +
+                (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 +
+                (-p0 + 3 * p1 - 3 * p2 + p3) * t3
+            )
+        end
+    end
+
+    for strokeIndex = #draw3DState.Strokes, 1, -1 do
+        local stroke = draw3DState.Strokes[strokeIndex]
+        if #stroke > 0 then
+            return stroke[#stroke]
+        end
+    end
+    return Vector3.zero
+end
+
+function destroyDraw3DPreview()
+    if draw3DState.PreviewConnection then
+        draw3DState.PreviewConnection:Disconnect()
+        draw3DState.PreviewConnection = nil
+    end
+    for _, part in ipairs(draw3DState.PreviewParts) do
+        if part and part.Parent then
+            part:Destroy()
+        end
+    end
+    draw3DState.PreviewParts = {}
+    if draw3DState.PreviewFolder then
+        draw3DState.PreviewFolder:Destroy()
+        draw3DState.PreviewFolder = nil
+    end
+end
+
+function clearDraw3DCanvasPreview()
+    for _, dot in ipairs(draw3DState.CanvasDots) do
+        if dot and dot.Parent then
+            dot:Destroy()
+        end
+    end
+    for _, line in ipairs(draw3DState.CanvasLines) do
+        if line and line.Parent then
+            line:Destroy()
+        end
+    end
+    draw3DState.CanvasDots = {}
+    draw3DState.CanvasLines = {}
+end
+
+function draw3DPointToCanvas(point, width, height)
+    local size = math.min(width, height)
+    local offsetX = (width - size) * 0.5
+    local offsetY = (height - size) * 0.5
+    local x = offsetX + ((point.X + 1) * 0.5) * size
+    local y = offsetY + ((1 - (point.Y + 1) * 0.5)) * size
+    return x, y
+end
+
+function canvasPositionToDraw3DPoint(screenPosition, canvas)
+    local canvasPos = canvas.AbsolutePosition
+    local canvasSize = canvas.AbsoluteSize
+    local width = canvasSize.X
+    local height = canvasSize.Y
+    local size = math.min(width, height)
+    local offsetX = (width - size) * 0.5
+    local offsetY = (height - size) * 0.5
+    local relX = math.clamp((screenPosition.X - canvasPos.X - offsetX) / size, 0, 1)
+    local relY = math.clamp((screenPosition.Y - canvasPos.Y - offsetY) / size, 0, 1)
+    return Vector3.new(
+        (relX - 0.5) * 2,
+        (0.5 - relY) * 2,
+        0
+    )
+end
+
+function refreshDraw3DCanvasPreview()
+    clearDraw3DCanvasPreview()
+    local canvas = draw3DState.Canvas
+    if not canvas or #draw3DState.Strokes == 0 then
+        return
+    end
+
+    local width = canvas.AbsoluteSize.X
+    local height = canvas.AbsoluteSize.Y
+    if width <= 0 or height <= 0 then
+        return
+    end
+    local brushSize = 14
+    local stampStep = math.max(2, math.floor(brushSize * 0.45))
+
+    for _, stroke in ipairs(draw3DState.Strokes) do
+        local lastPos = nil
+        for _, point in ipairs(stroke) do
+            local x, y = draw3DPointToCanvas(point, width, height)
+            local currentPos = Vector2.new(x, y)
+
+            if lastPos then
+                local delta = currentPos - lastPos
+                local length = delta.Magnitude
+                local steps = math.max(1, math.floor(length / stampStep))
+                for step = 1, steps do
+                    local alpha = step / steps
+                    local stampPos = lastPos:Lerp(currentPos, alpha)
+                    local dot = Instance.new("Frame")
+                    dot.Size = UDim2.new(0, brushSize, 0, brushSize)
+                    dot.AnchorPoint = Vector2.new(0.5, 0.5)
+                    dot.Position = UDim2.new(0, stampPos.X, 0, stampPos.Y)
+                    dot.BackgroundColor3 = Color3.fromRGB(0, 220, 255)
+                    dot.BorderSizePixel = 0
+                    dot.BackgroundTransparency = 0.08
+                    dot.ZIndex = 53
+                    dot.Parent = canvas
+                    Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
+                    table.insert(draw3DState.CanvasDots, dot)
+                end
+            end
+
+            local dot = Instance.new("Frame")
+            dot.Size = UDim2.new(0, brushSize, 0, brushSize)
+            dot.AnchorPoint = Vector2.new(0.5, 0.5)
+            dot.Position = UDim2.new(0, x, 0, y)
+            dot.BackgroundColor3 = Color3.fromRGB(0, 220, 255)
+            dot.BorderSizePixel = 0
+            dot.BackgroundTransparency = 0.08
+            dot.ZIndex = 53
+            dot.Parent = canvas
+            Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
+            table.insert(draw3DState.CanvasDots, dot)
+            lastPos = currentPos
+        end
+    end
+end
+
+function ensureDraw3DPreview()
+    if draw3DState.PreviewFolder and draw3DState.PreviewFolder.Parent then
+        return
+    end
+
+    local folder = Instance.new("Folder")
+    folder.Name = "HolonDraw3DPreview"
+    folder.Parent = Workspace
+    draw3DState.PreviewFolder = folder
+end
+
+function refreshDraw3DPreview()
+    destroyDraw3DPreview()
+    if #draw3DState.Strokes == 0 or cfg.Draw3D.Preview == false then
+        return
+    end
+
+    ensureDraw3DPreview()
+    local previewCount = math.min(math.max(1, #draw3DState.SegmentLengths * 2), 90)
+    for _ = 1, previewCount do
+        local part = Instance.new("Part")
+        part.Name = "Draw3DPoint"
+        part.Shape = Enum.PartType.Ball
+        part.Size = Vector3.new(0.45, 0.45, 0.45)
+        part.Material = Enum.Material.Neon
+        part.Color = Color3.fromRGB(0, 255, 255)
+        part.Anchored = true
+        part.CanCollide = false
+        part.CanTouch = false
+        part.CanQuery = false
+        part.Transparency = 0.15
+        part.Parent = draw3DState.PreviewFolder
+        table.insert(draw3DState.PreviewParts, part)
+    end
+
+    draw3DState.PreviewConnection = RunService.RenderStepped:Connect(function()
+        local baseCF = getDraw3DBaseCFrame()
+        local scale = cfg.Draw3D.Size or 1
+        local offset = Vector3.new(0, cfg.Draw3D.Height or 0, cfg.Draw3D.Back or 0)
+        if #draw3DState.Strokes == 0 then
+            return
+        end
+
+        for index, part in ipairs(draw3DState.PreviewParts) do
+            local progress = (#draw3DState.PreviewParts == 1) and 0 or ((index - 1) / (#draw3DState.PreviewParts - 1))
+            local localPos = (sampleDraw3DPath(progress) * scale) + offset
+            part.Position = baseCF:PointToWorldSpace(localPos)
+        end
+    end)
+end
+
+function clearDraw3DPath()
+    draw3DState.Strokes = {}
+    draw3DState.LastCommittedScreenPosition = nil
+    rebuildDraw3DLengths()
+    destroyDraw3DPreview()
+    clearDraw3DCanvasPreview()
+    if currentMode == "Draw3D" and isEnabled then
+        stopEffect()
+        if UIElements.EffectToggle then
+            pcall(function()
+                UIElements.EffectToggle:Set(false)
+            end)
+        end
+    end
+end
+
+function setDraw3DPreviewVisible(state)
+    cfg.Draw3D.Preview = state and true or false
+    refreshDraw3DPreview()
+end
+
+function appendDraw3DPoint(screenPosition)
+    local canvas = draw3DState.Canvas
+    if not canvas then
+        return
+    end
+    local canvasSize = canvas.AbsoluteSize
+    if canvasSize.X <= 0 or canvasSize.Y <= 0 then
+        return
+    end
+    local localPoint = canvasPositionToDraw3DPoint(screenPosition, canvas)
+    local minDistance = math.max(0.005, cfg.Draw3D.MinDistance or 0.03)
+    local minPixelDistance = 4
+    local strokeIndex = draw3DState.CurrentStrokeIndex
+    local stroke = strokeIndex and draw3DState.Strokes[strokeIndex] or nil
+    if not stroke then
+        draw3DState.Strokes[#draw3DState.Strokes + 1] = {}
+        draw3DState.CurrentStrokeIndex = #draw3DState.Strokes
+        stroke = draw3DState.Strokes[draw3DState.CurrentStrokeIndex]
+        draw3DState.LastCommittedScreenPosition = nil
+    end
+    local lastPoint = stroke[#stroke]
+
+    if lastPoint then
+        local lastScreenPos = draw3DState.LastCommittedScreenPosition
+        if lastScreenPos and (Vector2.new(screenPosition.X, screenPosition.Y) - lastScreenPos).Magnitude < minPixelDistance then
+            return
+        end
+        local distance = (localPoint - lastPoint).Magnitude
+        if distance < minDistance then
+            return
+        end
+        local inserts = math.max(1, math.floor(distance / minDistance))
+        for step = 1, inserts do
+            table.insert(stroke, lastPoint:Lerp(localPoint, step / inserts))
+        end
+    else
+        table.insert(stroke, localPoint)
+        draw3DState.LastCommittedScreenPosition = Vector2.new(screenPosition.X, screenPosition.Y)
+        rebuildDraw3DLengths()
+        refreshDraw3DPreview()
+        refreshDraw3DCanvasPreview()
+        return
+    end
+    draw3DState.LastCommittedScreenPosition = Vector2.new(screenPosition.X, screenPosition.Y)
+    rebuildDraw3DLengths()
+    refreshDraw3DPreview()
+    refreshDraw3DCanvasPreview()
+end
+
+function setDraw3DCaptureArmed(state)
+    draw3DState.IsCaptureArmed = state
+    draw3DState.IsStrokeActive = false
+    draw3DState.ActiveInput = nil
+    draw3DState.ActiveInputType = nil
+    draw3DState.CurrentStrokeIndex = nil
+    draw3DState.LastCommittedScreenPosition = nil
+end
+
+function updateDraw3DOverlay()
+    if not draw3DState.OverlayGui then
+        return
+    end
+
+    local panel = draw3DState.OverlayGui:FindFirstChild("Panel")
+    if not panel then
+        return
+    end
+
+    local infoLabel = panel:FindFirstChild("InfoLabel")
+    if infoLabel and infoLabel:IsA("TextLabel") then
+        infoLabel.Text = string.format("長押ししたまま手書き | プレビューは目の前 | ポイント: %d", getDraw3DPointCount())
+    end
+end
+
+function isPointInsideGui(guiObject, screenPosition)
+    if not guiObject then
+        return false
+    end
+    local pos = guiObject.AbsolutePosition
+    local size = guiObject.AbsoluteSize
+    return screenPosition.X >= pos.X and screenPosition.X <= (pos.X + size.X)
+        and screenPosition.Y >= pos.Y and screenPosition.Y <= (pos.Y + size.Y)
+end
+
+function setDraw3DOverlayVisible(state)
+    if state then
+        ensureDraw3DOverlay()
+        if draw3DState.OverlayGui then
+            draw3DState.OverlayGui.Enabled = true
+        end
+        updateDraw3DOverlay()
+    else
+        if draw3DState.OverlayGui then
+            draw3DState.OverlayGui.Enabled = false
+        end
+        setDraw3DCaptureArmed(false)
+        updateDraw3DOverlay()
+    end
+end
+
+function ensureDraw3DOverlay()
+    if draw3DState.OverlayGui and draw3DState.OverlayGui.Parent then
+        draw3DState.OverlayGui.Enabled = true
+        updateDraw3DOverlay()
+        return
+    end
+
+    local parentGui = CoreGui
+    local existing = parentGui:FindFirstChild("HolonDraw3DOverlay")
+    if existing then
+        existing:Destroy()
+    end
+
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "HolonDraw3DOverlay"
+    screenGui.ResetOnSpawn = false
+    screenGui.IgnoreGuiInset = true
+    screenGui.DisplayOrder = 999999
+    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    screenGui.Parent = parentGui
+    draw3DState.OverlayGui = screenGui
+
+    local panel = Instance.new("Frame")
+    panel.Name = "Panel"
+    panel.Size = UDim2.new(0, isMobileDevice and 320 or 360, 0, isMobileDevice and 300 or 340)
+    panel.Position = UDim2.new(0, isMobileDevice and 18 or 32, 0, isMobileDevice and 90 or 110)
+    panel.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+    panel.BackgroundTransparency = 0.18
+    panel.BorderSizePixel = 0
+    panel.Active = true
+    panel.ZIndex = 50
+    panel.Parent = screenGui
+    Instance.new("UICorner", panel).CornerRadius = UDim.new(0, 12)
+
+    local dragHandle = Instance.new("Frame")
+    dragHandle.Name = "DragHandle"
+    dragHandle.Size = UDim2.new(1, 0, 0, 28)
+    dragHandle.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
+    dragHandle.BorderSizePixel = 0
+    dragHandle.ZIndex = 51
+    dragHandle.Parent = panel
+    Instance.new("UICorner", dragHandle).CornerRadius = UDim.new(0, 12)
+
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(1, -50, 0, 24)
+    title.Position = UDim2.new(0, 8, 0, 2)
+    title.BackgroundTransparency = 1
+    title.Text = "3Dお絵描きウィンドウ"
+    title.TextColor3 = Color3.fromRGB(255, 255, 255)
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 16
+    title.ZIndex = 52
+    title.Parent = panel
+
+    local closeButton = Instance.new("TextButton")
+    closeButton.Size = UDim2.new(0, 28, 0, 22)
+    closeButton.Position = UDim2.new(1, -34, 0, 3)
+    closeButton.BackgroundColor3 = Color3.fromRGB(160, 55, 55)
+    closeButton.Text = "X"
+    closeButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+    closeButton.Font = Enum.Font.GothamBold
+    closeButton.TextSize = 14
+    closeButton.ZIndex = 52
+    closeButton.Parent = panel
+    Instance.new("UICorner", closeButton).CornerRadius = UDim.new(0, 8)
+
+    local infoLabel = Instance.new("TextLabel")
+    infoLabel.Name = "InfoLabel"
+    infoLabel.Size = UDim2.new(1, -12, 0, 18)
+    infoLabel.Position = UDim2.new(0, 6, 0, 34)
+    infoLabel.BackgroundTransparency = 1
+    infoLabel.TextColor3 = Color3.fromRGB(180, 220, 255)
+    infoLabel.Font = Enum.Font.Gotham
+    infoLabel.TextSize = 13
+    infoLabel.ZIndex = 52
+    infoLabel.Parent = panel
+
+    local canvas = Instance.new("Frame")
+    canvas.Name = "Canvas"
+    canvas.Size = UDim2.new(1, -16, 0, isMobileDevice and 206 or 236)
+    canvas.Position = UDim2.new(0, 8, 0, 58)
+    canvas.BackgroundColor3 = Color3.fromRGB(12, 18, 24)
+    canvas.BorderSizePixel = 0
+    canvas.ClipsDescendants = true
+    canvas.Active = true
+    canvas.ZIndex = 51
+    canvas.Parent = panel
+    draw3DState.Canvas = canvas
+    Instance.new("UICorner", canvas).CornerRadius = UDim.new(0, 12)
+
+    local canvasStroke = Instance.new("UIStroke")
+    canvasStroke.Color = Color3.fromRGB(0, 180, 255)
+    canvasStroke.Thickness = 1.5
+    canvasStroke.Transparency = 0.2
+    canvasStroke.Parent = canvas
+
+    local canvasHint = Instance.new("TextLabel")
+    canvasHint.Size = UDim2.new(1, -12, 0, 20)
+    canvasHint.Position = UDim2.new(0, 6, 0, 6)
+    canvasHint.BackgroundTransparency = 1
+    canvasHint.Text = "長押ししたまま手書き"
+    canvasHint.TextColor3 = Color3.fromRGB(180, 180, 180)
+    canvasHint.Font = Enum.Font.Gotham
+    canvasHint.TextSize = 13
+    canvasHint.ZIndex = 52
+    canvasHint.Parent = canvas
+    draw3DState.CanvasGuide = canvasHint
+
+    local function createButton(name, text, y, callback)
+        local button = Instance.new("TextButton")
+        button.Name = name
+        button.Size = UDim2.new(0.32, -6, 0, isMobileDevice and 30 or 26)
+        button.Position = UDim2.new(0, 6, 0, y)
+        button.BackgroundColor3 = Color3.fromRGB(55, 55, 55)
+        button.TextColor3 = Color3.fromRGB(255, 255, 255)
+        button.Font = Enum.Font.GothamBold
+        button.TextSize = isMobileDevice and 14 or 13
+        button.Text = text
+        button.ZIndex = 52
+        button.Parent = panel
+        Instance.new("UICorner", button).CornerRadius = UDim.new(0, 8)
+        button.MouseButton1Click:Connect(callback)
+        return button
+    end
+
+    local clearButton = createButton("ClearButton", "クリア", 0, function()
+        clearDraw3DPath()
+        updateDraw3DOverlay()
+    end)
+    clearButton.Size = UDim2.new(0.48, -8, 0, isMobileDevice and 30 or 26)
+    clearButton.Position = UDim2.new(0, 6, 1, -34)
+
+    local closeBottomButton = createButton("CloseButtonBottom", "閉じる", 0, function()
+        setDraw3DOverlayVisible(false)
+        if UIElements.Draw3DWindowToggle then
+            UIElements.Draw3DWindowToggle:Set(false)
+        end
+    end)
+    closeBottomButton.Size = UDim2.new(0.48, -8, 0, isMobileDevice and 30 or 26)
+    closeBottomButton.Position = UDim2.new(0.52, 2, 1, -34)
+
+    closeButton.MouseButton1Click:Connect(function()
+        setDraw3DOverlayVisible(false)
+        if UIElements.Draw3DWindowToggle then
+            UIElements.Draw3DWindowToggle:Set(false)
+        end
+    end)
+
+    local windowDragging = false
+    local windowDragStart = nil
+    local windowStartPos = nil
+    dragHandle.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            windowDragging = true
+            windowDragStart = input.Position
+            windowStartPos = panel.Position
+        end
+    end)
+
+    if #draw3DState.InputConnections == 0 then
+        table.insert(draw3DState.InputConnections, canvas.InputBegan:Connect(function(input)
+            if not draw3DState.OverlayGui or not draw3DState.OverlayGui.Enabled then
+                return
+            end
+            if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then
+                return
+            end
+
+            setDraw3DCaptureArmed(true)
+            draw3DState.IsStrokeActive = true
+            draw3DState.ActiveInput = input
+            draw3DState.ActiveInputType = input.UserInputType
+            draw3DState.LastStrokePosition = input.Position
+            currentMode = "Draw3D"
+            if UIElements.ModeDropdown then
+                UIElements.ModeDropdown:Set(modeNames.Draw3D)
+            end
+            appendDraw3DPoint(input.Position)
+            updateDraw3DOverlay()
+        end))
+
+        table.insert(draw3DState.InputConnections, UserInputService.InputChanged:Connect(function(input, gameProcessed)
+            if windowDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) and windowDragStart and windowStartPos then
+                local delta = input.Position - windowDragStart
+                panel.Position = UDim2.new(windowStartPos.X.Scale, windowStartPos.X.Offset + delta.X, windowStartPos.Y.Scale, windowStartPos.Y.Offset + delta.Y)
+                return
+            end
+            if not draw3DState.IsStrokeActive then
+                return
+            end
+            if draw3DState.ActiveInputType == Enum.UserInputType.Touch then
+                if input ~= draw3DState.ActiveInput or input.UserInputType ~= Enum.UserInputType.Touch then
+                    return
+                end
+                draw3DState.LastStrokePosition = input.Position
+            elseif draw3DState.ActiveInputType == Enum.UserInputType.MouseButton1 and input.UserInputType == Enum.UserInputType.MouseMovement then
+                draw3DState.LastStrokePosition = input.Position
+            else
+                return
+            end
+            if draw3DState.Canvas and not isPointInsideGui(draw3DState.Canvas, draw3DState.LastStrokePosition) then
+                return
+            end
+            appendDraw3DPoint(draw3DState.LastStrokePosition)
+            updateDraw3DOverlay()
+        end))
+
+        table.insert(draw3DState.InputConnections, UserInputService.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                windowDragging = false
+            end
+            if input == draw3DState.ActiveInput then
+                draw3DState.IsStrokeActive = false
+                draw3DState.ActiveInput = nil
+                draw3DState.ActiveInputType = nil
+                draw3DState.LastStrokePosition = nil
+                draw3DState.IsCaptureArmed = false
+                updateDraw3DOverlay()
+            end
+        end))
+    end
+
+    refreshDraw3DCanvasPreview()
+    updateDraw3DOverlay()
+end
 
 --------------------------------------------------------------------------------
 -- [GPS Minimap 機能] (mapTP.lua と完全一致のロジック)
@@ -1005,6 +1734,27 @@ local SHOW_TARGET_ONLY = false
 local mapTargetPlayer = nil
 local minimapActive = false
 local mapContent = nil
+local player3DState = {
+    Enabled = false,
+    Gui = nil,
+    Frame = nil,
+    TopBar = nil,
+    Viewport = nil,
+    WorldModel = nil,
+    Camera = nil,
+    UpdateConnection = nil,
+    InputConnections = {},
+    DragInput = nil,
+    DragInputType = nil,
+    WindowDragging = false,
+    WindowDragStart = nil,
+    WindowStartPos = nil,
+    OrbitYaw = 30,
+    OrbitPitch = 28,
+    Distance = 22,
+    Radius = 35,
+    LastRefresh = 0,
+}
 
 local MaterialColors = {
     [Enum.Material.Grass] = Color3.fromRGB(75, 120, 60), [Enum.Material.Sand] = Color3.fromRGB(200, 180, 130),
@@ -1013,6 +1763,391 @@ local MaterialColors = {
     [Enum.Material.WoodPlanks] = Color3.fromRGB(120, 90, 60), [Enum.Material.Snow] = Color3.fromRGB(240, 240, 240),
     [Enum.Material.Concrete] = Color3.fromRGB(120, 120, 120),
 }
+
+function destroyPlayer3DWindow()
+    if player3DState.UpdateConnection then
+        player3DState.UpdateConnection:Disconnect()
+        player3DState.UpdateConnection = nil
+    end
+    for _, conn in ipairs(player3DState.InputConnections) do
+        if conn then
+            conn:Disconnect()
+        end
+    end
+    player3DState.InputConnections = {}
+    if player3DState.Gui then
+        player3DState.Gui:Destroy()
+        player3DState.Gui = nil
+    end
+    player3DState.Frame = nil
+    player3DState.TopBar = nil
+    player3DState.Viewport = nil
+    player3DState.WorldModel = nil
+    player3DState.Camera = nil
+    player3DState.DragInput = nil
+    player3DState.DragInputType = nil
+    player3DState.WindowDragging = false
+end
+
+function clearPlayer3DWorld()
+    if player3DState.WorldModel then
+        player3DState.WorldModel:ClearAllChildren()
+    end
+end
+
+function clonePartForPlayer3D(part, relativeTo, parent, tintColor, transparencyOverride)
+    if not part or not part:IsA("BasePart") then
+        return nil
+    end
+    if part.Name == "HumanoidRootPart" or part.Transparency >= 0.95 then
+        return nil
+    end
+    local clone = part:Clone()
+    for _, desc in ipairs(clone:GetDescendants()) do
+        if desc:IsA("Script") or desc:IsA("LocalScript") or desc:IsA("ModuleScript") then
+            desc:Destroy()
+        elseif desc:IsA("Weld") or desc:IsA("Motor6D") or desc:IsA("WeldConstraint") or desc:IsA("Constraint") then
+            desc:Destroy()
+        end
+    end
+    clone.Anchored = true
+    clone.CanCollide = false
+    clone.CanTouch = false
+    clone.CanQuery = false
+    clone.Massless = true
+    clone.CFrame = relativeTo:ToObjectSpace(part.CFrame)
+    if tintColor then
+        clone.Color = tintColor
+    end
+    if transparencyOverride ~= nil then
+        clone.Transparency = transparencyOverride
+    end
+    clone.Parent = parent
+    return clone
+end
+
+function addPlayer3DWireBox(parent, size)
+    local half = size * 0.5
+    local thickness = 0.15
+    local edges = {
+        {Vector3.new(0, half.Y, half.Z), Vector3.new(size.X, thickness, thickness)},
+        {Vector3.new(0, -half.Y, half.Z), Vector3.new(size.X, thickness, thickness)},
+        {Vector3.new(0, half.Y, -half.Z), Vector3.new(size.X, thickness, thickness)},
+        {Vector3.new(0, -half.Y, -half.Z), Vector3.new(size.X, thickness, thickness)},
+        {Vector3.new(half.X, 0, half.Z), Vector3.new(thickness, size.Y, thickness)},
+        {Vector3.new(-half.X, 0, half.Z), Vector3.new(thickness, size.Y, thickness)},
+        {Vector3.new(half.X, 0, -half.Z), Vector3.new(thickness, size.Y, thickness)},
+        {Vector3.new(-half.X, 0, -half.Z), Vector3.new(thickness, size.Y, thickness)},
+        {Vector3.new(half.X, half.Y, 0), Vector3.new(thickness, thickness, size.Z)},
+        {Vector3.new(-half.X, half.Y, 0), Vector3.new(thickness, thickness, size.Z)},
+        {Vector3.new(half.X, -half.Y, 0), Vector3.new(thickness, thickness, size.Z)},
+        {Vector3.new(-half.X, -half.Y, 0), Vector3.new(thickness, thickness, size.Z)},
+    }
+    for _, edge in ipairs(edges) do
+        local part = Instance.new("Part")
+        part.Name = "Player3DWire"
+        part.Size = edge[2]
+        part.CFrame = CFrame.new(edge[1])
+        part.Anchored = true
+        part.CanCollide = false
+        part.CanTouch = false
+        part.CanQuery = false
+        part.Material = Enum.Material.Neon
+        part.Color = Color3.fromRGB(0, 220, 255)
+        part.Transparency = 0.15
+        part.Parent = parent
+    end
+end
+
+function refreshPlayer3DScene()
+    if not player3DState.WorldModel or not player3DState.Camera or not player3DState.Enabled then
+        return
+    end
+    local targetPlayer = targetSub or LocalPlayer
+    local targetChar = targetPlayer and targetPlayer.Character
+    local targetRoot = targetChar and targetChar:FindFirstChild("HumanoidRootPart")
+    if not targetRoot then
+        clearPlayer3DWorld()
+        return
+    end
+
+    clearPlayer3DWorld()
+    local worldModel = player3DState.WorldModel
+    local floorY = -3
+    local boxHalfSize = player3DState.Radius
+    local boxHeight = 40
+
+    local floor = Instance.new("Part")
+    floor.Name = "Player3DFloor"
+    floor.Size = Vector3.new(boxHalfSize * 2, 0.2, boxHalfSize * 2)
+    floor.CFrame = CFrame.new(0, floorY, 0)
+    floor.Anchored = true
+    floor.CanCollide = false
+    floor.CanTouch = false
+    floor.CanQuery = false
+    floor.Material = Enum.Material.SmoothPlastic
+    floor.Color = Color3.fromRGB(35, 55, 70)
+    floor.Transparency = 0.15
+    floor.Parent = worldModel
+
+    local targetFolder = Instance.new("Folder")
+    targetFolder.Name = "TargetCharacter"
+    targetFolder.Parent = worldModel
+
+    for _, desc in ipairs(targetChar:GetDescendants()) do
+        if desc:IsA("BasePart") then
+            clonePartForPlayer3D(desc, targetRoot.CFrame, targetFolder, nil, nil)
+        end
+    end
+    addPlayer3DWireBox(worldModel, Vector3.new(boxHalfSize * 2, boxHeight, boxHalfSize * 2))
+
+    local floorBorder = Instance.new("Part")
+    floorBorder.Name = "Player3DFloorBorder"
+    floorBorder.Size = Vector3.new(boxHalfSize * 2, 0.05, boxHalfSize * 2)
+    floorBorder.CFrame = CFrame.new(0, floorY + 0.12, 0)
+    floorBorder.Anchored = true
+    floorBorder.CanCollide = false
+    floorBorder.CanTouch = false
+    floorBorder.CanQuery = false
+    floorBorder.Material = Enum.Material.SmoothPlastic
+    floorBorder.Color = Color3.fromRGB(55, 75, 92)
+    floorBorder.Transparency = 0.55
+    floorBorder.Parent = worldModel
+
+    local overlap = OverlapParams.new()
+    overlap.FilterType = Enum.RaycastFilterType.Exclude
+    overlap.FilterDescendantsInstances = {targetChar}
+    local nearbyParts = Workspace:GetPartBoundsInBox(
+        targetRoot.CFrame,
+        Vector3.new(boxHalfSize * 2, boxHeight, boxHalfSize * 2),
+        overlap
+    )
+    local addedCharacters = {}
+    local addedParts = 0
+    local myChar = LocalPlayer.Character
+
+    for _, part in ipairs(nearbyParts) do
+        if addedParts >= 140 then
+            break
+        end
+        local model = part:FindFirstAncestorOfClass("Model")
+        local hum = model and model:FindFirstChildOfClass("Humanoid")
+        if hum and model ~= targetChar and not addedCharacters[model] then
+            addedCharacters[model] = true
+            local otherFolder = Instance.new("Folder")
+            otherFolder.Name = "NearbyCharacter"
+            otherFolder.Parent = worldModel
+            for _, desc in ipairs(model:GetDescendants()) do
+                if desc:IsA("BasePart") then
+                    clonePartForPlayer3D(desc, targetRoot.CFrame, otherFolder, nil, nil)
+                end
+            end
+            addedParts = addedParts + 1
+        elseif not hum and not part:IsDescendantOf(targetChar) and not (myChar and part:IsDescendantOf(myChar)) then
+            local size = part.Size
+            local isGroundLike = size.Y <= 12 and (size.X >= 20 or size.Z >= 20)
+            if size.Magnitude <= 180 or isGroundLike then
+                clonePartForPlayer3D(part, targetRoot.CFrame, worldModel, Color3.fromRGB(90, 210, 140), math.clamp(part.Transparency + 0.05, 0, 0.35))
+                addedParts = addedParts + 1
+            end
+        end
+    end
+
+    local yaw = math.rad(player3DState.OrbitYaw)
+    local pitch = math.rad(player3DState.OrbitPitch)
+    local distance = player3DState.Distance
+    local offset = Vector3.new(
+        math.cos(pitch) * math.sin(yaw),
+        math.sin(pitch),
+        math.cos(pitch) * math.cos(yaw)
+    ) * distance
+    player3DState.Camera.CFrame = CFrame.lookAt(offset, Vector3.new(0, 3, 0))
+end
+
+function setPlayer3DEnabled(state)
+    player3DState.Enabled = state and true or false
+    if not player3DState.Enabled then
+        destroyPlayer3DWindow()
+        return
+    end
+
+    destroyPlayer3DWindow()
+
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "HolonPlayer3D"
+    screenGui.ResetOnSpawn = false
+    screenGui.IgnoreGuiInset = true
+    screenGui.DisplayOrder = 999998
+    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    screenGui.Parent = CoreGui
+    player3DState.Gui = screenGui
+
+    local frame = Instance.new("Frame")
+    frame.Name = "Main"
+    frame.Size = UDim2.new(0, isMobileDevice and 320 or 360, 0, isMobileDevice and 320 or 360)
+    frame.Position = UDim2.new(1, isMobileDevice and -340 or -390, 0, isMobileDevice and 90 or 110)
+    frame.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
+    frame.BackgroundTransparency = 0.1
+    frame.BorderSizePixel = 0
+    frame.Active = true
+    frame.ZIndex = 60
+    frame.Parent = screenGui
+    player3DState.Frame = frame
+    Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 12)
+
+    local topBar = Instance.new("Frame")
+    topBar.Size = UDim2.new(1, 0, 0, 28)
+    topBar.BackgroundColor3 = Color3.fromRGB(26, 26, 30)
+    topBar.BorderSizePixel = 0
+    topBar.ZIndex = 61
+    topBar.Parent = frame
+    player3DState.TopBar = topBar
+    Instance.new("UICorner", topBar).CornerRadius = UDim.new(0, 12)
+
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(1, -40, 1, 0)
+    title.Position = UDim2.new(0, 8, 0, 0)
+    title.BackgroundTransparency = 1
+    title.Text = "プレイヤー3D"
+    title.TextColor3 = Color3.new(1, 1, 1)
+    title.Font = Enum.Font.GothamBold
+    title.TextSize = 14
+    title.TextXAlignment = Enum.TextXAlignment.Left
+    title.ZIndex = 62
+    title.Parent = topBar
+
+    local closeButton = Instance.new("TextButton")
+    closeButton.Size = UDim2.new(0, 24, 0, 20)
+    closeButton.Position = UDim2.new(1, -30, 0, 4)
+    closeButton.BackgroundColor3 = Color3.fromRGB(160, 55, 55)
+    closeButton.Text = "X"
+    closeButton.TextColor3 = Color3.new(1, 1, 1)
+    closeButton.Font = Enum.Font.GothamBold
+    closeButton.TextSize = 12
+    closeButton.ZIndex = 62
+    closeButton.Parent = topBar
+    Instance.new("UICorner", closeButton).CornerRadius = UDim.new(0, 6)
+
+    local info = Instance.new("TextLabel")
+    info.Size = UDim2.new(1, -16, 0, 18)
+    info.Position = UDim2.new(0, 8, 0, 34)
+    info.BackgroundTransparency = 1
+    info.Text = "ドラッグで回転 / 上バーで移動 / 中心が対象"
+    info.TextColor3 = Color3.fromRGB(180, 220, 255)
+    info.Font = Enum.Font.Gotham
+    info.TextSize = 12
+    info.TextXAlignment = Enum.TextXAlignment.Left
+    info.ZIndex = 61
+    info.Parent = frame
+
+    local viewport = Instance.new("ViewportFrame")
+    viewport.Name = "Viewport"
+    viewport.Size = UDim2.new(1, -16, 1, -84)
+    viewport.Position = UDim2.new(0, 8, 0, 56)
+    viewport.BackgroundColor3 = Color3.fromRGB(18, 28, 40)
+    viewport.Ambient = Color3.fromRGB(170, 170, 170)
+    viewport.LightColor = Color3.fromRGB(255, 255, 255)
+    viewport.LightDirection = Vector3.new(-1, -1, -0.5)
+    viewport.BorderSizePixel = 0
+    viewport.ZIndex = 61
+    viewport.Parent = frame
+    Instance.new("UICorner", viewport).CornerRadius = UDim.new(0, 12)
+
+    local viewportStroke = Instance.new("UIStroke")
+    viewportStroke.Color = Color3.fromRGB(0, 220, 255)
+    viewportStroke.Thickness = 1.6
+    viewportStroke.Transparency = 0.12
+    viewportStroke.Parent = viewport
+
+    local worldModel = Instance.new("WorldModel")
+    worldModel.Parent = viewport
+    local viewportCamera = Instance.new("Camera")
+    viewport.CurrentCamera = viewportCamera
+    viewportCamera.Parent = viewport
+    player3DState.Viewport = viewport
+    player3DState.WorldModel = worldModel
+    player3DState.Camera = viewportCamera
+
+    table.insert(player3DState.InputConnections, closeButton.MouseButton1Click:Connect(handlePlayer3DClose))
+    table.insert(player3DState.InputConnections, topBar.InputBegan:Connect(beginPlayer3DWindowDrag))
+    table.insert(player3DState.InputConnections, viewport.InputBegan:Connect(beginPlayer3DViewportDrag))
+    table.insert(player3DState.InputConnections, UserInputService.InputChanged:Connect(handlePlayer3DInputChanged))
+    table.insert(player3DState.InputConnections, UserInputService.InputEnded:Connect(handlePlayer3DInputEnded))
+
+    player3DState.UpdateConnection = RunService.RenderStepped:Connect(updatePlayer3DWindow)
+
+    refreshPlayer3DScene()
+end
+
+function handlePlayer3DToggle(value)
+    setPlayer3DEnabled(value)
+end
+
+function handlePlayer3DClose()
+    setPlayer3DEnabled(false)
+    if UIElements.Player3DToggle then
+        UIElements.Player3DToggle:Set(false)
+    end
+end
+
+function beginPlayer3DWindowDrag(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        player3DState.WindowDragging = true
+        player3DState.WindowDragStart = input.Position
+        player3DState.WindowStartPos = player3DState.Frame and player3DState.Frame.Position or nil
+    end
+end
+
+function beginPlayer3DViewportDrag(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        player3DState.DragInput = input
+        player3DState.DragInputType = input.UserInputType
+    end
+end
+
+function handlePlayer3DInputChanged(input)
+    if player3DState.WindowDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) and player3DState.WindowDragStart and player3DState.WindowStartPos and player3DState.Frame then
+        local delta = input.Position - player3DState.WindowDragStart
+        player3DState.Frame.Position = UDim2.new(
+            player3DState.WindowStartPos.X.Scale,
+            player3DState.WindowStartPos.X.Offset + delta.X,
+            player3DState.WindowStartPos.Y.Scale,
+            player3DState.WindowStartPos.Y.Offset + delta.Y
+        )
+        return
+    end
+
+    if player3DState.DragInputType == Enum.UserInputType.Touch and player3DState.DragInput and input == player3DState.DragInput and input.UserInputType == Enum.UserInputType.Touch then
+        player3DState.OrbitYaw = player3DState.OrbitYaw - (input.Delta.X * 0.35)
+        player3DState.OrbitPitch = math.clamp(player3DState.OrbitPitch + (input.Delta.Y * 0.2), -75, 75)
+        refreshPlayer3DScene()
+    elseif player3DState.DragInputType == Enum.UserInputType.MouseButton1 and input.UserInputType == Enum.UserInputType.MouseMovement then
+        player3DState.OrbitYaw = player3DState.OrbitYaw - (input.Delta.X * 0.35)
+        player3DState.OrbitPitch = math.clamp(player3DState.OrbitPitch + (input.Delta.Y * 0.2), -75, 75)
+        refreshPlayer3DScene()
+    end
+end
+
+function handlePlayer3DInputEnded(input)
+    if input == player3DState.DragInput then
+        player3DState.DragInput = nil
+        player3DState.DragInputType = nil
+    end
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        player3DState.WindowDragging = false
+    end
+end
+
+function updatePlayer3DWindow()
+    if not player3DState.Enabled then
+        return
+    end
+    local now = tick()
+    if now - player3DState.LastRefresh >= 0.08 then
+        player3DState.LastRefresh = now
+        refreshPlayer3DScene()
+    end
+end
 
 local function setupMap()
     -- 初回または手動設定なしの場合のみ自動計算
@@ -1530,6 +2665,9 @@ local noclip = false
 local antiFire = false
 local antiGrab = false
 local counterMode = "Repulsion"
+_G.AntiLag = false
+_G.AntiLoop = false
+_G.AntiNetwork = false
 _G.AutoAttacker = false
 _G.AntiKickToy = false
 _G.DeathAura = false
@@ -1537,6 +2675,89 @@ _G.AttractionAura = false
 _G.FlingAura = false
 _G.FlingStrength = 400
 _G.FlingTarget = "プレイヤー"
+
+_G.HolonAntiNetworkState = {
+    toysFolder = nil,
+    menuToys = nil,
+    spawnRemote = nil,
+    holdEvents = nil,
+    useRemote = nil,
+    burger = nil,
+    holdPart = nil,
+    holdRemote = nil,
+    dropRemote = nil,
+    parts = nil,
+    nextItemRefresh = 0,
+    nextPartRefresh = 0,
+    nextOwnerRefresh = 0,
+}
+
+function resetAntiNetworkBurgerCache()
+    _G.HolonAntiNetworkState.burger = nil
+    _G.HolonAntiNetworkState.holdPart = nil
+    _G.HolonAntiNetworkState.holdRemote = nil
+    _G.HolonAntiNetworkState.dropRemote = nil
+    _G.HolonAntiNetworkState.parts = nil
+    _G.HolonAntiNetworkState.nextPartRefresh = 0
+    _G.HolonAntiNetworkState.nextOwnerRefresh = 0
+end
+
+function getAntiNetworkStaticRefs()
+    if not _G.HolonAntiNetworkState.toysFolder or _G.HolonAntiNetworkState.toysFolder.Parent ~= Workspace then
+        _G.HolonAntiNetworkState.toysFolder = Workspace:FindFirstChild(LocalPlayer.Name .. "SpawnedInToys")
+        resetAntiNetworkBurgerCache()
+    end
+
+    if not _G.HolonAntiNetworkState.menuToys or _G.HolonAntiNetworkState.menuToys.Parent ~= ReplicatedStorage then
+        _G.HolonAntiNetworkState.menuToys = ReplicatedStorage:FindFirstChild("MenuToys")
+        _G.HolonAntiNetworkState.spawnRemote = _G.HolonAntiNetworkState.menuToys and _G.HolonAntiNetworkState.menuToys:FindFirstChild("SpawnToyRemoteFunction") or nil
+    elseif not _G.HolonAntiNetworkState.spawnRemote or _G.HolonAntiNetworkState.spawnRemote.Parent ~= _G.HolonAntiNetworkState.menuToys then
+        _G.HolonAntiNetworkState.spawnRemote = _G.HolonAntiNetworkState.menuToys:FindFirstChild("SpawnToyRemoteFunction")
+    end
+
+    if not _G.HolonAntiNetworkState.holdEvents or _G.HolonAntiNetworkState.holdEvents.Parent ~= ReplicatedStorage then
+        _G.HolonAntiNetworkState.holdEvents = ReplicatedStorage:FindFirstChild("HoldEvents")
+        _G.HolonAntiNetworkState.useRemote = _G.HolonAntiNetworkState.holdEvents and _G.HolonAntiNetworkState.holdEvents:FindFirstChild("Use") or nil
+    elseif not _G.HolonAntiNetworkState.useRemote or _G.HolonAntiNetworkState.useRemote.Parent ~= _G.HolonAntiNetworkState.holdEvents then
+        _G.HolonAntiNetworkState.useRemote = _G.HolonAntiNetworkState.holdEvents:FindFirstChild("Use")
+    end
+end
+
+function refreshAntiNetworkBurger(now)
+    if now < (_G.HolonAntiNetworkState.nextItemRefresh or 0) and _G.HolonAntiNetworkState.burger and _G.HolonAntiNetworkState.burger.Parent then
+        return _G.HolonAntiNetworkState.burger
+    end
+
+    _G.HolonAntiNetworkState.nextItemRefresh = now + 0.2
+    getAntiNetworkStaticRefs()
+
+    local toysFolder = _G.HolonAntiNetworkState.toysFolder
+    local burger = toysFolder and toysFolder:FindFirstChild("FoodHamburger") or nil
+
+    if burger ~= _G.HolonAntiNetworkState.burger then
+        resetAntiNetworkBurgerCache()
+        _G.HolonAntiNetworkState.burger = burger
+    end
+
+    if burger and (not _G.HolonAntiNetworkState.holdPart or _G.HolonAntiNetworkState.holdPart.Parent ~= burger) then
+        _G.HolonAntiNetworkState.holdPart = burger:FindFirstChild("HoldPart")
+        _G.HolonAntiNetworkState.holdRemote = _G.HolonAntiNetworkState.holdPart and _G.HolonAntiNetworkState.holdPart:FindFirstChild("HoldItemRemoteFunction") or nil
+        _G.HolonAntiNetworkState.dropRemote = _G.HolonAntiNetworkState.holdPart and _G.HolonAntiNetworkState.holdPart:FindFirstChild("DropItemRemoteFunction") or nil
+    end
+
+    if burger and (not _G.HolonAntiNetworkState.parts or now >= (_G.HolonAntiNetworkState.nextPartRefresh or 0)) then
+        local parts = {}
+        for _, d in ipairs(burger:GetDescendants()) do
+            if d:IsA("BasePart") then
+                parts[#parts + 1] = d
+            end
+        end
+        _G.HolonAntiNetworkState.parts = parts
+        _G.HolonAntiNetworkState.nextPartRefresh = now + 0.5
+    end
+
+    return _G.HolonAntiNetworkState.burger
+end
 
 --------------------------------------------------------------------------------
 -- [計算ロジック] 各モードの座標計算
@@ -1688,6 +2909,10 @@ local function getPositionForMode(mode, i, count, time, override)
         waveY = math.sin(time * (c.WaveSpeed or 2) + i * 0.5) * (c.WaveAmp or 2)
     end
     
+    if c.FerrisWheel then
+        return Vector3.new(rotX * c.Size, c.Height + (rotY * c.Size) + waveY, c.Back)
+    end
+
     return Vector3.new(rotX * c.Size, c.Height + waveY, rotY * c.Size + c.Back)
 
 elseif mode == "MagicCircle2" then
@@ -1738,6 +2963,177 @@ elseif mode == "MagicCircle3" then
     local rotZ = p.X * math.sin(rotAngle) + p.Y * math.cos(rotAngle)
     
     return Vector3.new(rotX * c.Size, c.Height, rotZ * c.Size + c.Back)
+
+    elseif mode == "Cat" then
+        local baseSize = c.Size
+        local bob = math.sin(time * (c.Speed or 1.5)) * 0.35
+        local facePts = {}
+        for n = 0, 40 do
+            local ang = math.rad((n / 40) * 360)
+            local cosA = math.cos(ang)
+            local sinA = math.sin(ang)
+            local pointScale = 0.72 + 0.28 * math.abs(cosA)
+            facePts[#facePts + 1] = Vector2.new(
+                cosA * baseSize * pointScale,
+                sinA * baseSize * 0.72
+            )
+        end
+
+        local leftEarPts = {
+            Vector2.new(-baseSize * 0.54, baseSize * 0.46),
+            Vector2.new(-baseSize * 0.92, baseSize * 1.2),
+            Vector2.new(-baseSize * 0.22, baseSize * 0.76),
+            Vector2.new(-baseSize * 0.54, baseSize * 0.46),
+        }
+        local rightEarPts = {
+            Vector2.new(baseSize * 0.54, baseSize * 0.46),
+            Vector2.new(baseSize * 0.92, baseSize * 1.2),
+            Vector2.new(baseSize * 0.22, baseSize * 0.76),
+            Vector2.new(baseSize * 0.54, baseSize * 0.46),
+        }
+        local whiskerPaths = {
+            { Vector2.new(-baseSize * 0.1, baseSize * 0.08), Vector2.new(-baseSize * 0.92, baseSize * 0.3) },
+            { Vector2.new(-baseSize * 0.08, -baseSize * 0.02), Vector2.new(-baseSize * 1.0, -baseSize * 0.02) },
+            { Vector2.new(-baseSize * 0.1, -baseSize * 0.12), Vector2.new(-baseSize * 0.92, -baseSize * 0.34) },
+            { Vector2.new(baseSize * 0.1, baseSize * 0.08), Vector2.new(baseSize * 0.92, baseSize * 0.3) },
+            { Vector2.new(baseSize * 0.08, -baseSize * 0.02), Vector2.new(baseSize * 1.0, -baseSize * 0.02) },
+            { Vector2.new(baseSize * 0.1, -baseSize * 0.12), Vector2.new(baseSize * 0.92, -baseSize * 0.34) },
+        }
+        local nosePts = {
+            Vector2.new(0, baseSize * 0.08),
+            Vector2.new(-baseSize * 0.16, -baseSize * 0.08),
+            Vector2.new(baseSize * 0.16, -baseSize * 0.08),
+            Vector2.new(0, baseSize * 0.08),
+        }
+        local leftEyePts = {}
+        local rightEyePts = {}
+        for n = 0, 20 do
+            local ang = math.rad((n / 20) * 360)
+            local cosA = math.cos(ang)
+            local sinA = math.sin(ang)
+            local pointScale = 0.72 + 0.28 * math.abs(cosA)
+            leftEyePts[#leftEyePts + 1] = Vector2.new(
+                -baseSize * 0.42 + cosA * baseSize * 0.18 * pointScale,
+                baseSize * 0.22 + sinA * baseSize * 0.12
+            )
+            rightEyePts[#rightEyePts + 1] = Vector2.new(
+                baseSize * 0.42 + cosA * baseSize * 0.18 * pointScale,
+                baseSize * 0.22 + sinA * baseSize * 0.12
+            )
+        end
+        local leftPupilPts = {
+            Vector2.new(-baseSize * 0.42, baseSize * 0.32),
+            Vector2.new(-baseSize * 0.42, baseSize * 0.12),
+        }
+        local rightPupilPts = {
+            Vector2.new(baseSize * 0.42, baseSize * 0.32),
+            Vector2.new(baseSize * 0.42, baseSize * 0.12),
+        }
+        local leftMouthPts = {
+            Vector2.new(0, -baseSize * 0.04),
+            Vector2.new(-baseSize * 0.14, -baseSize * 0.16),
+            Vector2.new(-baseSize * 0.28, -baseSize * 0.1),
+        }
+        local rightMouthPts = {
+            Vector2.new(0, -baseSize * 0.04),
+            Vector2.new(baseSize * 0.14, -baseSize * 0.16),
+            Vector2.new(baseSize * 0.28, -baseSize * 0.1),
+        }
+
+        local eyeEach = math.max(1, math.floor(count * 0.05))
+        local pupilEach = math.max(1, math.floor(count * 0.025))
+        local mouthEach = math.max(1, math.floor(count * 0.03))
+        local noseCount = math.max(1, math.floor(count * 0.05))
+        local whiskerEach = math.max(1, math.floor(count * 0.035))
+        local whiskerTotal = math.min(count - 9, whiskerEach * 6)
+        if whiskerTotal < 6 and count >= 12 then
+            whiskerTotal = 6
+        end
+        whiskerEach = math.max(1, math.floor(whiskerTotal / 6))
+        whiskerTotal = whiskerEach * 6
+
+        local eyeTotal = eyeEach * 2
+        local pupilTotal = pupilEach * 2
+        local mouthTotal = mouthEach * 2
+        local reservedFaceParts = whiskerTotal + noseCount + mouthTotal + eyeTotal + pupilTotal
+        local remainAfterWhiskers = math.max(3, count - reservedFaceParts)
+        local earCount = math.max(2, math.floor(remainAfterWhiskers * 0.16))
+        local maxEarTotal = math.max(2, remainAfterWhiskers - 3)
+        local earEach = math.max(1, math.min(math.floor(maxEarTotal / 2), earCount))
+        local faceCount = math.max(1, count - whiskerTotal - noseCount - mouthTotal - eyeTotal - pupilTotal - earEach * 2)
+
+        local pts
+        local localIndex
+        local localCount
+        local isClosedPath = true
+
+        if i <= faceCount then
+            pts = facePts
+            localIndex = i
+            localCount = faceCount
+        elseif i <= faceCount + earEach then
+            pts = leftEarPts
+            localIndex = i - faceCount
+            localCount = earEach
+        elseif i <= faceCount + earEach * 2 then
+            pts = rightEarPts
+            localIndex = i - faceCount - earEach
+            localCount = earEach
+        elseif i <= faceCount + earEach * 2 + whiskerTotal then
+            local whiskerOffset = i - faceCount - earEach * 2
+            local whiskerIndex = math.min(6, math.ceil(whiskerOffset / math.max(1, whiskerEach)))
+            pts = whiskerPaths[whiskerIndex]
+            localIndex = ((whiskerOffset - 1) % math.max(1, whiskerEach)) + 1
+            localCount = whiskerEach
+            isClosedPath = false
+        elseif i <= faceCount + earEach * 2 + whiskerTotal + eyeEach then
+            pts = leftEyePts
+            localIndex = i - faceCount - earEach * 2 - whiskerTotal
+            localCount = eyeEach
+        elseif i <= faceCount + earEach * 2 + whiskerTotal + eyeEach * 2 then
+            pts = rightEyePts
+            localIndex = i - faceCount - earEach * 2 - whiskerTotal - eyeEach
+            localCount = eyeEach
+        elseif i <= faceCount + earEach * 2 + whiskerTotal + eyeTotal + pupilEach then
+            pts = leftPupilPts
+            localIndex = i - faceCount - earEach * 2 - whiskerTotal - eyeTotal
+            localCount = pupilEach
+            isClosedPath = false
+        elseif i <= faceCount + earEach * 2 + whiskerTotal + eyeTotal + pupilEach * 2 then
+            pts = rightPupilPts
+            localIndex = i - faceCount - earEach * 2 - whiskerTotal - eyeTotal - pupilEach
+            localCount = pupilEach
+            isClosedPath = false
+        elseif i <= faceCount + earEach * 2 + whiskerTotal + eyeTotal + pupilTotal + noseCount then
+            pts = nosePts
+            localIndex = i - faceCount - earEach * 2 - whiskerTotal - eyeTotal - pupilTotal
+            localCount = noseCount
+        elseif i <= faceCount + earEach * 2 + whiskerTotal + eyeTotal + pupilTotal + noseCount + mouthEach then
+            pts = leftMouthPts
+            localIndex = i - faceCount - earEach * 2 - whiskerTotal - eyeTotal - pupilTotal - noseCount
+            localCount = mouthEach
+            isClosedPath = false
+        else
+            pts = rightMouthPts
+            localIndex = i - faceCount - earEach * 2 - whiskerTotal - eyeTotal - pupilTotal - noseCount - mouthEach
+            localCount = mouthEach
+            isClosedPath = false
+        end
+
+        local localRatio = (localIndex - 1) / math.max(1, localCount - 1)
+        local cycle = (time * (c.Speed or 1.5) * 0.12 + localRatio) % 1
+        if not isClosedPath then
+            cycle = 1 - math.abs(cycle * 2 - 1)
+        end
+        local step = cycle * math.max(1, #pts - 1)
+        local idx1 = math.floor(step) + 1
+        local idx2 = math.min(idx1 + 1, #pts)
+        local alpha = step % 1
+        local p1 = pts[idx1] or pts[1]
+        local p2 = pts[idx2] or pts[#pts]
+        local p = p1:Lerp(p2, alpha)
+
+        return Vector3.new(p.X, p.Y + c.Height + bob, c.Back)
 
     elseif mode == "Pet" then
         -- 設定から各種パラメータを取得
@@ -1817,6 +3213,17 @@ elseif mode == "MagicCircle3" then
         local z = math.sin(rTime * 1.2 + i * 2.2) * spread + cfg[mode].Back
         
         return Vector3.new(x, y, z)
+
+    elseif mode == "Draw3D" then
+        if getDraw3DPointCount() == 0 then
+            return Vector3.new(0, -1000, 0)
+        end
+
+        local loopT = ((time * (c.Speed or 0) * 0.04) + ratio) % 2
+        local flow = 1 - math.abs(loopT - 1)
+        local basePoint = sampleDraw3DPath(flow) * (c.Size or 1)
+        local wave = math.sin((time * math.max(0.1, c.Speed or 1)) + (ratio * math.pi * 4)) * (c.Wave or 0)
+        return basePoint + Vector3.new(0, (c.Height or 0) + wave, c.Back or 0)
 
 -- [Textモードの計算ロジック抜粋] 
 
@@ -1959,53 +3366,92 @@ elseif mode == "MagicCircle3" then
         local root = char:FindFirstChild("HumanoidRootPart")
         if not root then return Vector3.new(0,0,0) end
 
-        -- 1. R6パーツ定義（サイズと名前をセット）
-        local bodyParts = {
-            { name = "Head",      size = Vector3.new(1.2, 1.2, 1.2) },
-            { name = "Torso",     size = Vector3.new(2, 2, 1) },
-            { name = "Left Arm",  size = Vector3.new(1, 2, 1) },
-            { name = "Right Arm", size = Vector3.new(1, 2, 1) },
-            { name = "Left Leg",  size = Vector3.new(1, 2, 1) },
-            { name = "Right Leg", size = Vector3.new(1, 2, 1) }
-        }
+        local humanoid = char:FindFirstChildOfClass("Humanoid")
+        local mirrorCache = _G.HolonMirrorPlayerCache
+        local bodyParts = humanoid and humanoid.RigType == Enum.HumanoidRigType.R15 and mirrorCache.R15 or mirrorCache.R6
 
-        local toysPerPart = math.max(1, math.floor(count / #bodyParts))
-        local partIdx = math.min(math.ceil(i / toysPerPart), #bodyParts)
-        local localIdx = ((i - 1) % toysPerPart) + 1
-        local data = bodyParts[partIdx]
-        
-        -- 対象の部位を特定
-        local targetPart = char:FindFirstChild(data.name) or root
+        local partCount = #bodyParts
+        local safeCount = math.max(1, count)
+        local partIdx = math.min(partCount, math.floor(((i - 1) * partCount) / safeCount) + 1)
+        local partStart = math.floor(((partIdx - 1) * safeCount) / partCount) + 1
+        local partEnd = math.floor((partIdx * safeCount) / partCount)
+        local localIdx = i - partStart + 1
+        local toysForPart = math.max(1, partEnd - partStart + 1)
+        local targetPart = char:FindFirstChild(bodyParts[partIdx])
+        if not targetPart or not targetPart:IsA("BasePart") then
+            return Vector3.new(0, -1000, 0)
+        end
 
-        -- 2. サイズと形状の計算（ここはおもちゃの形を作る）
-        local s = data.size * c.Size * 0.5
-        local t = (time * c.Speed) % 4
-        local step = t % 1
-        local edge = math.floor(t)
-        local faceIdx = (localIdx - 1) % 6
-        local p = Vector3.new(0,0,0)
+        local relativeCF = root.CFrame:Inverse() * targetPart.CFrame
+        local sizeScale = math.max(0.1, ((c.Size or 20) / 20) * (c.Scale or 1) * 2)
+        local scaledPartSize = targetPart.Size * sizeScale
+        local edgeSpacing = math.max(0, (c.EdgeSpacing or 1) * 0.18 * sizeScale)
+        local isHeadPart = targetPart.Name == "Head"
+        local headMinSize = math.min(scaledPartSize.X, scaledPartSize.Y, scaledPartSize.Z)
+        local headMaxSize = math.max(scaledPartSize.X, scaledPartSize.Y, scaledPartSize.Z)
+        local headHalfSize = (headMinSize + headMaxSize) * 0.25
+        local hx = math.max(0.15, ((isHeadPart and headHalfSize) or (scaledPartSize.X * 0.5)) + edgeSpacing)
+        local hy = math.max(0.15, ((isHeadPart and headHalfSize) or (scaledPartSize.Y * 0.5)) + edgeSpacing)
+        local hz = math.max(0.15, ((isHeadPart and headHalfSize) or (scaledPartSize.Z * 0.5)) + edgeSpacing)
+        local faceIdx = ((localIdx - 1) % 6) + 1
+        local laneIdx = math.floor((localIdx - 1) / 6)
+        local lanesPerFace = math.max(1, math.ceil(toysForPart / 6))
+        local lanePhase = (laneIdx + 0.5) / lanesPerFace
+        local totalProgress = (time * math.max(0.05, c.Speed or 0) * 0.35) + (lanePhase * 4) + (faceIdx * 0.07) + (partIdx * 0.11)
+        local edgeIdx = math.floor(totalProgress) % 4
+        local step = totalProgress % 1
+        local cubePoint
 
-        if faceIdx == 0 then p = (edge==0 and Vector3.new(-s.X+s.X*2*step,-s.Y,s.Z) or edge==1 and Vector3.new(s.X,-s.Y+s.Y*2*step,s.Z) or edge==2 and Vector3.new(s.X-s.X*2*step,s.Y,s.Z) or Vector3.new(-s.X,s.Y-s.Y*2*step,s.Z))
-        elseif faceIdx == 1 then p = (edge==0 and Vector3.new(-s.X+s.X*2*step,-s.Y,-s.Z) or edge==1 and Vector3.new(s.X,-s.Y+s.Y*2*step,-s.Z) or edge==2 and Vector3.new(s.X-s.X*2*step,s.Y,-s.Z) or Vector3.new(-s.X,s.Y-s.Y*2*step,-s.Z))
-        elseif faceIdx == 2 then p = (edge==0 and Vector3.new(s.X,-s.Y,-s.Z+s.Z*2*step) or edge==1 and Vector3.new(s.X,-s.Y+s.Y*2*step,s.Z) or edge==2 and Vector3.new(s.X,s.Y,s.Z-s.Z*2*step) or Vector3.new(s.X,s.Y-s.Y*2*step,-s.Z))
-        elseif faceIdx == 3 then p = (edge==0 and Vector3.new(-s.X,-s.Y,-s.Z+s.Z*2*step) or edge==1 and Vector3.new(-s.X,-s.Y+s.Y*2*step,s.Z) or edge==2 and Vector3.new(-s.X,s.Y,s.Z-s.Z*2*step) or Vector3.new(-s.X,s.Y-s.Y*2*step,-s.Z))
-        elseif faceIdx == 4 then p = (edge==0 and Vector3.new(-s.X+s.X*2*step,s.Y,-s.Z) or edge==1 and Vector3.new(s.X,s.Y,-s.Z+s.Z*2*step) or edge==2 and Vector3.new(s.X-s.X*2*step,s.Y,s.Z) or Vector3.new(-s.X,s.Y,s.Z-s.Z*2*step))
-        else p = (edge==0 and Vector3.new(-s.X+s.X*2*step,-s.Y,-s.Z) or edge==1 and Vector3.new(s.X,-s.Y,-s.Z+s.Z*2*step) or edge==2 and Vector3.new(s.X-s.X*2*step,-s.Y,s.Z) or Vector3.new(-s.X,-s.Y,s.Z-s.Z*2*step)) end
+        if faceIdx == 1 then
+            cubePoint = (
+                edgeIdx == 0 and Vector3.new(-hx + hx * 2 * step, -hy, hz) or
+                edgeIdx == 1 and Vector3.new(hx, -hy + hy * 2 * step, hz) or
+                edgeIdx == 2 and Vector3.new(hx - hx * 2 * step, hy, hz) or
+                Vector3.new(-hx, hy - hy * 2 * step, hz)
+            )
+        elseif faceIdx == 2 then
+            cubePoint = (
+                edgeIdx == 0 and Vector3.new(-hx + hx * 2 * step, -hy, -hz) or
+                edgeIdx == 1 and Vector3.new(hx, -hy + hy * 2 * step, -hz) or
+                edgeIdx == 2 and Vector3.new(hx - hx * 2 * step, hy, -hz) or
+                Vector3.new(-hx, hy - hy * 2 * step, -hz)
+            )
+        elseif faceIdx == 3 then
+            cubePoint = (
+                edgeIdx == 0 and Vector3.new(hx, -hy, -hz + hz * 2 * step) or
+                edgeIdx == 1 and Vector3.new(hx, -hy + hy * 2 * step, hz) or
+                edgeIdx == 2 and Vector3.new(hx, hy, hz - hz * 2 * step) or
+                Vector3.new(hx, hy - hy * 2 * step, -hz)
+            )
+        elseif faceIdx == 4 then
+            cubePoint = (
+                edgeIdx == 0 and Vector3.new(-hx, -hy, -hz + hz * 2 * step) or
+                edgeIdx == 1 and Vector3.new(-hx, -hy + hy * 2 * step, hz) or
+                edgeIdx == 2 and Vector3.new(-hx, hy, hz - hz * 2 * step) or
+                Vector3.new(-hx, hy - hy * 2 * step, -hz)
+            )
+        elseif faceIdx == 5 then
+            cubePoint = (
+                edgeIdx == 0 and Vector3.new(-hx + hx * 2 * step, hy, -hz) or
+                edgeIdx == 1 and Vector3.new(hx, hy, -hz + hz * 2 * step) or
+                edgeIdx == 2 and Vector3.new(hx - hx * 2 * step, hy, hz) or
+                Vector3.new(-hx, hy, hz - hz * 2 * step)
+            )
+        else
+            cubePoint = (
+                edgeIdx == 0 and Vector3.new(-hx + hx * 2 * step, -hy, -hz) or
+                edgeIdx == 1 and Vector3.new(hx, -hy, -hz + hz * 2 * step) or
+                edgeIdx == 2 and Vector3.new(hx - hx * 2 * step, -hy, hz) or
+                Vector3.new(-hx, -hy, hz - hz * 2 * step)
+            )
+        end
 
-        -- 3. 【これが「位置」を直す魔法の式】
-        -- 自分の各部位が「RootPartから見てどこにいるか」というオフセットを計算
-        -- PointToObjectSpace を使うことで、エモート等でズレた位置も自動計算されます
-        local partRelativePos = root.CFrame:PointToObjectSpace(targetPart.Position)
-        
-        -- 背後距離(Back)と高さ(Height)のオフセット
-        local extraOffset = Vector3.new(0, c.Height, -c.Back)
-        
-        -- 回転情報を適用（部位が傾けばおもちゃの枠も傾く）
-        local rotatedBoxPoint = (root.CFrame:Inverse() * targetPart.CFrame).Rotation * p
+        -- 体のコピー.lua の考え方を維持しつつ、少しだけ外側へ広げて重なりを防ぐ
+        local partRelativePos = relativeCF.Position * (sizeScale * (1 + ((c.EdgeSpacing or 1) * 0.08)))
+        local extraOffset = Vector3.new(0, c.Height or 0, c.Back or 0)
+        local rotatedCubePoint = relativeCF.Rotation * cubePoint
 
-        -- 全部を足して返す
-        -- [部位の相対位置] + [一筆書きの頂点] + [ユーザー設定のズレ]
-        return partRelativePos + rotatedBoxPoint + extraOffset
+        return partRelativePos + rotatedCubePoint + extraOffset
 
     elseif mode == "Beam" then
         -- Y方向の光の柱
@@ -2160,7 +3606,7 @@ end
 --------------------------------------------------------------------------------
 -- [メイン機能] エフェクト制御 (Start / Stop / Update)
 --------------------------------------------------------------------------------
-local function stopEffect()
+stopEffect = function()
     isEnabled = false
     if updateConnection then 
         updateConnection:Disconnect()
@@ -2200,6 +3646,13 @@ local function startEffect()
     if not targetMain or not targetMain.Character then return end
     local root = targetMain.Character:FindFirstChild("HumanoidRootPart")
     if not root then return end
+    if not combinedActive and currentMode == "Draw3D" and getDraw3DPointCount() == 0 then
+        warn("3Dお絵描きの線がありません。")
+        if OrionLib then
+            OrionLib:MakeNotification({ Name = "3Dお絵描き", Content = "先に線を描いてください", Time = 3 })
+        end
+        return
+    end
     
     local fws = {}
     local myName = LocalPlayer.Name
@@ -2282,13 +3735,13 @@ local function startEffect()
             local rawTargetItem = cfg.Combined[slotName.."Item"] or "メインと同期"
             
             -- 同期設定の解決
-            local effectiveItem = (rawTargetItem == "メインと同期") and selectedItemName or rawTargetItem
+            local effectiveItem = _G.HolonIsSyncWithMainSelection(rawTargetItem) and selectedItemName or rawTargetItem
             
             if mode ~= "なし" and count > 0 then
                 local foundForSlot = 0
                 for _, item in ipairs(allMyItems) do
                     if foundForSlot >= count then break end
-                    if item:IsA("Model") and item.PrimaryPart and (effectiveItem == "全てのおもちゃ" or item.Name == effectiveItem) then
+                    if item:IsA("Model") and item.PrimaryPart and (_G.HolonIsAllToysSelection(effectiveItem) or item.Name == effectiveItem) then
                         if not table.find(fws, item) then -- 重複を避ける
                             table.insert(fws, item)
                             foundForSlot = foundForSlot + 1
@@ -2301,7 +3754,7 @@ local function startEffect()
         -- 通常モード：メインの選択に従って収集
         for _, item in ipairs(allMyItems) do
             if #fws >= maxCount then break end
-            if item:IsA("Model") and item.PrimaryPart and (selectedItemName == "全てのおもちゃ" or item.Name == selectedItemName) then
+            if item:IsA("Model") and item.PrimaryPart and (_G.HolonIsAllToysSelection(selectedItemName) or item.Name == selectedItemName) then
                 table.insert(fws, item)
             end
         end
@@ -2389,7 +3842,8 @@ local function startEffect()
             end
             if m and m ~= "なし" then
                 local relativePos = getPositionForMode(m, relIdx, relTotal, tick(), override)
-                pp.CFrame = root.CFrame:ToWorldSpace(CFrame.new(relativePos))
+                local startBaseCF = (m == "Draw3D") and getDraw3DBaseCFrame() or root.CFrame
+                pp.CFrame = startBaseCF:ToWorldSpace(CFrame.new(relativePos))
             end
         end
         
@@ -2457,10 +3911,11 @@ local function startEffect()
         if not lastBaseCF then lastBaseCF = rootPart.CFrame end
         baseCF = lastBaseCF
     else
-        if followMethod == "プレイヤー" then
+        local resolvedFollowMethod = _G.HolonGetNormalizedFollowMethod(followMethod)
+        if resolvedFollowMethod == "player" then
             baseCF = rootPart.CFrame
             lastBaseCF = baseCF
-        elseif followMethod == "視線の先" then
+        elseif resolvedFollowMethod == "look" then
             local rayOrigin = Camera.CFrame.Position
             local rayDirection = Camera.CFrame.LookVector * 1000
             local rayParams = RaycastParams.new()
@@ -2474,7 +3929,7 @@ local function startEffect()
             else
                 baseCF = lastBaseCF or (Camera.CFrame * CFrame.new(0, 0, -20))
             end
-        else -- "固定"
+        else -- "fixed"
             if not lastBaseCF then lastBaseCF = rootPart.CFrame end
             baseCF = lastBaseCF
         end
@@ -2554,7 +4009,8 @@ local function startEffect()
 
         if m and m ~= "なし" then
             local relativePos, dragWeight = getPositionForMode(m, relIdx, relTotal, t, override)
-            local worldPos = rotatedBaseCF:PointToWorldSpace(relativePos)
+            local modeBaseCF = (m == "Draw3D") and getDraw3DBaseCFrame() or rotatedBaseCF
+            local worldPos = modeBaseCF:PointToWorldSpace(relativePos)
 
             if cfg.Global.MoveDelay and (m == "Wing" or m == "Pet") then
                 local dragFactor = dragWeight or (math.abs(relativePos.X) * 0.1)
@@ -2565,20 +4021,22 @@ local function startEffect()
             
             fw.AP.Position = worldPos
             if m == "BackGuard" then
-                fw.AO.CFrame = CFrame.lookAt(worldPos, rotatedBaseCF.Position) * currentIndividualRotation
-            elseif m == "Rotate" or m == "MagicCircle" or m == "FloatStone" or m == "Merkaba" or m == "Cube" or m == "Tornado" or m == "Pyramid" or m == "Gyro" then
+                fw.AO.CFrame = CFrame.lookAt(worldPos, modeBaseCF.Position) * currentIndividualRotation
+            elseif m == "Rotate" or m == "MagicCircle" or m == "FloatStone" or m == "Merkaba" or m == "Cube" or m == "Tornado" or m == "Pyramid" or m == "Gyro" or m == "Draw3D" then
                 local lookCfg = deepCopy(override or cfg[m] or cfg.Wing)
                 if (lookCfg.Speed or 0) == 0 then lookCfg.Speed = 1 end
-                local nextPos = rotatedBaseCF:PointToWorldSpace(getPositionForMode(m, relIdx, relTotal, t + 0.05, lookCfg))
+                local ferrisWheel = m == "Rotate" and lookCfg.FerrisWheel
+                local lookUp = ferrisWheel and modeBaseCF.LookVector or nil
+                local nextPos = modeBaseCF:PointToWorldSpace(getPositionForMode(m, relIdx, relTotal, t + 0.05, lookCfg))
                 if nextPos.Y < -85 then nextPos = Vector3.new(nextPos.X, -85, nextPos.Z) end
 
                 if (worldPos - nextPos).Magnitude < 0.001 then
-                    fw.AO.CFrame = rotatedBaseCF * currentIndividualRotation
+                    fw.AO.CFrame = modeBaseCF * currentIndividualRotation
                 else
-                    fw.AO.CFrame = CFrame.lookAt(worldPos, nextPos) * currentIndividualRotation
+                    fw.AO.CFrame = (lookUp and CFrame.lookAt(worldPos, nextPos, lookUp) or CFrame.lookAt(worldPos, nextPos)) * currentIndividualRotation
                 end
             else
-                fw.AO.CFrame = rotatedBaseCF * currentIndividualRotation
+                fw.AO.CFrame = modeBaseCF * currentIndividualRotation
             end
         else
             fw.AP.Position = Vector3.new(0, -10000, 0)
@@ -3148,9 +4606,15 @@ UserInputService.JumpRequest:Connect(function()
 end)
 
 RunService.Stepped:Connect(function(time, deltaTime)
-    if not LocalPlayer.Character then return end
-    local hum = LocalPlayer.Character:FindFirstChild("Humanoid")
-    local root = LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not (decoyNoclip or useWalkSpeed or useJumpPower or antiFire or antiGrab or noclip) then
+        return
+    end
+
+    local char = LocalPlayer.Character
+    if not char then return end
+
+    local hum = (useWalkSpeed or useJumpPower or antiGrab) and char:FindFirstChild("Humanoid") or nil
+    local root = useWalkSpeed and char:FindFirstChild("HumanoidRootPart") or nil
 
     -- YouDecoy Noclip logic
     if decoyNoclip then
@@ -3179,44 +4643,41 @@ RunService.Stepped:Connect(function(time, deltaTime)
     end
     
     if antiFire then
-        for _, v in ipairs(LocalPlayer.Character:GetDescendants()) do
+        for _, v in ipairs(char:GetDescendants()) do
             if v:IsA("Fire") then v:Destroy() end
         end
     end
     
     if antiGrab then
-        local char = LocalPlayer.Character
-        if char then
-            -- Cosmic style Anti-Grab Loop
-            local head = char:FindFirstChild("Head")
-            local isHeldVal = LocalPlayer:FindFirstChild("IsHeld")
-            local isHeld = (head and head:FindFirstChild("PartOwner")) or (isHeldVal and isHeldVal.Value)
-            local struggleEvt = ReplicatedStorage:FindFirstChild("CharacterEvents") and ReplicatedStorage.CharacterEvents:FindFirstChild("Struggle")
+        -- Cosmic style Anti-Grab Loop
+        local head = char:FindFirstChild("Head")
+        local isHeldVal = LocalPlayer:FindFirstChild("IsHeld")
+        local isHeld = (head and head:FindFirstChild("PartOwner")) or (isHeldVal and isHeldVal.Value)
+        local struggleEvt = ReplicatedStorage:FindFirstChild("CharacterEvents") and ReplicatedStorage.CharacterEvents:FindFirstChild("Struggle")
 
-            if isHeld then
-                -- 掴まれている間、固定して抵抗し続ける
+        if isHeld then
+            -- 掴まれている間、固定して抵抗し続ける
+            for _, p in ipairs(char:GetChildren()) do
+                if p:IsA("BasePart") then p.Anchored = true end
+            end
+            
+            if struggleEvt then
+                struggleEvt:FireServer(LocalPlayer) -- 引数追加
+            end
+        else
+            -- 掴まれていない、かつアンチ爆発(ラグドール)中でなければ固定解除
+            local isRagdolled = antiExplosion and hum and hum:FindFirstChild("Ragdolled") and hum.Ragdolled.Value
+            if not isRagdolled then
                 for _, p in ipairs(char:GetChildren()) do
-                    if p:IsA("BasePart") then p.Anchored = true end
-                end
-                
-                if struggleEvt then
-                    struggleEvt:FireServer(LocalPlayer) -- 引数追加
-                end
-            else
-                -- 掴まれていない、かつアンチ爆発(ラグドール)中でなければ固定解除
-                local isRagdolled = antiExplosion and char:FindFirstChild("Humanoid") and char.Humanoid:FindFirstChild("Ragdolled") and char.Humanoid.Ragdolled.Value
-                if not isRagdolled then
-                    for _, p in ipairs(char:GetChildren()) do
-                        if p:IsA("BasePart") then p.Anchored = false end
-                    end
+                    if p:IsA("BasePart") then p.Anchored = false end
                 end
             end
         end
     end
 
     -- Noclip
-    if noclip and LocalPlayer.Character then
-        for _, part in ipairs(LocalPlayer.Character:GetDescendants()) do
+    if noclip then
+        for _, part in ipairs(char:GetDescendants()) do
             if part:IsA("BasePart") and part.CanCollide then
                 part.CanCollide = false
             end
@@ -3238,9 +4699,212 @@ end)
 local extOriginalCFrame = nil
 local extPart = nil
 
+function setAntiLagEnabled(enabled)
+    _G.AntiLag = enabled
+
+    _G.HolonAntiLag = _G.HolonAntiLag or {
+        States = setmetatable({}, { __mode = "k" }),
+        Conns = {}
+    }
+
+    for _, conn in ipairs(_G.HolonAntiLag.Conns) do
+        conn:Disconnect()
+    end
+    table.clear(_G.HolonAntiLag.Conns)
+
+    if enabled then
+        _G.CrazyLine = false
+        _G.RainbowLine = false
+        invisibleLineEnabled = false
+        if UIElements.LineToggle and UIElements.LineToggle.Set then pcall(function() UIElements.LineToggle:Set(false) end) end
+        if UIElements.RainbowLineToggle and UIElements.RainbowLineToggle.Set then pcall(function() UIElements.RainbowLineToggle:Set(false) end) end
+        if UIElements.InvisibleLineToggle and UIElements.InvisibleLineToggle.Set then pcall(function() UIElements.InvisibleLineToggle:Set(false) end) end
+        for _, p in ipairs(Players:GetPlayers()) do
+            local root = p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart")
+            if root then
+                pcall(function()
+                    GrabEvents.DestroyGrabLine:FireServer(root)
+                end)
+            end
+        end
+
+        local function handle(inst, restore)
+            if not inst then return end
+            local state = _G.HolonAntiLag.States[inst]
+
+            if restore then
+                if not state or not inst.Parent then return end
+                pcall(function()
+                    if state.Enabled ~= nil then inst.Enabled = state.Enabled end
+                    if state.Transparency ~= nil then inst.Transparency = state.Transparency end
+                    if state.BlastPressure ~= nil then inst.BlastPressure = state.BlastPressure end
+                    if state.BlastRadius ~= nil then inst.BlastRadius = state.BlastRadius end
+                    if state.Visible ~= nil then inst.Visible = state.Visible end
+                end)
+                _G.HolonAntiLag.States[inst] = nil
+                return
+            end
+
+            if state == nil then
+                state = {}
+                _G.HolonAntiLag.States[inst] = state
+            end
+
+            if inst:IsA("ParticleEmitter") or inst:IsA("Trail") or inst:IsA("Beam")
+                or inst:IsA("Smoke") or inst:IsA("Fire") or inst:IsA("Sparkles")
+                or (inst:IsA("Highlight") and inst.Name:find("Line")) then
+                if state.Enabled == nil then state.Enabled = inst.Enabled end
+                inst.Enabled = false
+            elseif inst:IsA("Explosion") then
+                if state.BlastPressure == nil then
+                    state.BlastPressure = inst.BlastPressure
+                    state.BlastRadius = inst.BlastRadius
+                    state.Visible = inst.Visible
+                end
+                inst.BlastPressure = 0
+                inst.BlastRadius = 0
+                inst.Visible = false
+            elseif inst:IsA("Decal") or inst:IsA("Texture") then
+                if state.Transparency == nil then state.Transparency = inst.Transparency end
+                inst.Transparency = 1
+            elseif inst:IsA("BloomEffect")
+                or inst:IsA("BlurEffect")
+                or inst:IsA("SunRaysEffect")
+                or inst:IsA("ColorCorrectionEffect")
+                or inst:IsA("DepthOfFieldEffect") then
+                if state.Enabled == nil then state.Enabled = inst.Enabled end
+                inst.Enabled = false
+            end
+        end
+
+        for _, root in ipairs({Workspace, game:GetService("Lighting")}) do
+            for _, inst in ipairs(root:GetDescendants()) do
+                handle(inst, false)
+            end
+            table.insert(_G.HolonAntiLag.Conns, root.DescendantAdded:Connect(function(inst)
+                handle(inst, false)
+            end))
+        end
+    else
+        for inst in pairs(_G.HolonAntiLag.States) do
+            local function handleRestore(target)
+                if not target then return end
+                local state = _G.HolonAntiLag.States[target]
+                if not state or not target.Parent then return end
+                pcall(function()
+                    if state.Enabled ~= nil then target.Enabled = state.Enabled end
+                    if state.Transparency ~= nil then target.Transparency = state.Transparency end
+                    if state.BlastPressure ~= nil then target.BlastPressure = state.BlastPressure end
+                    if state.BlastRadius ~= nil then target.BlastRadius = state.BlastRadius end
+                    if state.Visible ~= nil then target.Visible = state.Visible end
+                end)
+                _G.HolonAntiLag.States[target] = nil
+            end
+            handleRestore(inst)
+        end
+    end
+end
+
+function setAntiLoopEnabled(enabled)
+    _G.AntiLoop = enabled
+
+    if _G.HolonAntiLoopConn then
+        _G.HolonAntiLoopConn:Disconnect()
+        _G.HolonAntiLoopConn = nil
+    end
+
+    if not enabled then return end
+
+    _G.HolonAntiLoopConn = RunService.Heartbeat:Connect(function()
+        local char = LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if _G.AntiLoop and root and hum and hum.Health > 0 then
+            root.CFrame = CFrame.new(515, 82, -346)
+            root.AssemblyLinearVelocity = Vector3.zero
+        end
+    end)
+end
+
+function setAntiNetworkEnabled(enabled)
+    _G.AntiNetwork = enabled
+
+    if _G.HolonAntiNetworkConn then
+        _G.HolonAntiNetworkConn:Disconnect()
+        _G.HolonAntiNetworkConn = nil
+    end
+
+    if not enabled then return end
+
+    _G.HolonAntiNetworkNext = 0
+    _G.HolonAntiNetworkState.nextItemRefresh = 0
+    _G.HolonAntiNetworkState.nextPartRefresh = 0
+    _G.HolonAntiNetworkState.nextOwnerRefresh = 0
+    resetAntiNetworkBurgerCache()
+    _G.HolonAntiNetworkConn = RunService.Heartbeat:Connect(function()
+        local char = LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if not (_G.AntiNetwork and char and root) then return end
+
+        local now = tick()
+        local burger = refreshAntiNetworkBurger(now)
+
+        if not burger and now >= (_G.HolonAntiNetworkNext or 0) then
+            local spawnRemote = _G.HolonAntiNetworkState.spawnRemote
+            if spawnRemote then
+                pcall(function()
+                    spawnRemote:InvokeServer("FoodHamburger", root.CFrame * CFrame.new(0, 4, -3), Vector3.zero)
+                end)
+            end
+            _G.HolonAntiNetworkNext = now + 0.75
+            return
+        end
+
+        if not burger then return end
+
+        if now >= (_G.HolonAntiNetworkState.nextOwnerRefresh or 0) then
+            local parts = _G.HolonAntiNetworkState.parts
+            if parts then
+                for i = 1, #parts do
+                    local part = parts[i]
+                    if part and part.Parent then
+                        SetNetworkOwner:FireServer(part, root.CFrame)
+                    end
+                end
+            end
+            _G.HolonAntiNetworkState.nextOwnerRefresh = now + 0.12
+        end
+
+        if now >= (_G.HolonAntiNetworkNext or 0) then
+            local holdRemote = _G.HolonAntiNetworkState.holdRemote
+            local dropRemote = _G.HolonAntiNetworkState.dropRemote
+            if holdRemote then
+                pcall(function()
+                    holdRemote:InvokeServer(burger, char)
+                end)
+            end
+            if _G.HolonAntiNetworkState.useRemote then
+                pcall(function()
+                    _G.HolonAntiNetworkState.useRemote:FireServer(burger)
+                end)
+            end
+            if dropRemote then
+                pcall(function()
+                    dropRemote:InvokeServer(burger, root.CFrame * CFrame.new(0, 6, 0), Vector3.new(0, 6, 0))
+                end)
+            end
+            _G.HolonAntiNetworkNext = now + 0.25
+        end
+    end)
+end
+
 task.spawn(function()
     while true do
-        task.wait(0.1)
+        if not (antiExplosion or antiFire) then
+            task.wait(0.5)
+        else
+            task.wait(0.1)
+        end
         local char = LocalPlayer.Character
         if char then
             -- Anti-Explosion: Ragdoll Anchor (修正: 解除処理を追加)
@@ -3310,6 +4974,9 @@ local function syncVarsFromCfg()
     antiExplosion = ls.AntiExplosion or false
     antiFire = ls.AntiFire or false
     antiGrab = ls.AntiGrab or false
+    setAntiLagEnabled(ls.AntiLag or false)
+    setAntiLoopEnabled(ls.AntiLoop or false)
+    setAntiNetworkEnabled(ls.AntiNetwork or false)
     _G.AntiKickToy = ls.AntiKick or false
     _G.AutoAttacker = ls.AutoAttacker or false
     counterMode = ls.CounterMode or "Repulsion"
@@ -3357,6 +5024,9 @@ local function saveConfigToFile(path)
         AntiExplosion = antiExplosion,
         AntiFire = antiFire,
         AntiGrab = antiGrab,
+        AntiLag = _G.AntiLag,
+        AntiLoop = _G.AntiLoop,
+        AntiNetwork = _G.AntiNetwork,
         AntiGucci = _G.AntiGucci, -- 仮定
         AntiKick = _G.AntiKickToy,
         AutoAttacker = _G.AutoAttacker,
@@ -3451,6 +5121,9 @@ local function applyConfigData(data)
         s(UIElements.FollowMethodDropdown, followMethod)
         s(UIElements.ModeDropdown, modeNames[currentMode] or currentMode)
         s(UIElements.DefenseAntiKickToggle, _G.AntiKickToy)
+        s(UIElements.DefenseAntiLagToggle, _G.AntiLag)
+        s(UIElements.DefenseAntiLoopToggle, _G.AntiLoop)
+        s(UIElements.DefenseAntiNetworkToggle, _G.AntiNetwork)
         s(UIElements.SilentAimToggle, saEnabled)
         s(UIElements.MapPlayersToggle, SHOW_PLAYERS)
         s(UIElements.MapNamesToggle, SHOW_NAMES)
@@ -3612,9 +5285,654 @@ end
 --------------------------------------------------------------------------------
 -- [UI 構築] orion lib
 --------------------------------------------------------------------------------
-local KeyFileName = "HolonHub_Key.txt"
-local CorrectKey = "holox"
-local OrionUrl = "https://raw.githubusercontent.com/hololove1021/HolonHUB/refs/heads/main/important/source/original.txt"
+KeyFileName = "HolonHub_Key.txt"
+CorrectKey = "holox"
+OrionUrl = "https://raw.githubusercontent.com/hololove1021/HolonHUB/refs/heads/main/important/source/original.txt"
+topBarFlowMessages = {
+    "Welcome to Holon HUB",
+    "discord.gg/EHBXqgZZYN"
+}
+centerFlowPixelsPerSecond = 220
+topBarFlowPixelsPerSecond = 120
+topBarFlowTextSize = 20
+topBarFlowHeight = 24
+topBarFlowBaseWidth = 420
+topBarFlowStartY = 16
+topBarFlowLeftInset = 280
+topBarFlowRightInset = 100
+topBarFlowTravelPadding = 20
+topBarFlowExitOffset = 20
+
+-- プレイヤーリスト取得関数
+function formatPlayerOption(player)
+    return player.DisplayName .. " (@" .. player.Name .. ")"
+end
+
+function getPList(includeNone)
+    local plist = {}
+    if includeNone then
+        table.insert(plist, "なし")
+    end
+    for _, p in ipairs(Players:GetPlayers()) do
+        table.insert(plist, formatPlayerOption(p))
+    end
+    return plist
+end
+
+function parseSelectedPlayerName(v)
+    if not v or v == "選択してください" or v == "なし" or v == "..." then
+        return ""
+    end
+    return v:match("@([^)]+)") or ""
+end
+
+function getPlayerDropdownIcon(v)
+    local name = parseSelectedPlayerName(v)
+    local player = name ~= "" and Players:FindFirstChild(name) or nil
+    if not player then
+        return nil
+    end
+    return string.format("rbxthumb://type=AvatarHeadShot&id=%d&w=100&h=100", player.UserId)
+end
+
+function withPlayerDropdownStyle(config)
+    config.Options = config.Options or getPList(config.IncludeNone)
+    config.IconProvider = getPlayerDropdownIcon
+    config.OptionIconProvider = getPlayerDropdownIcon
+    config.SelectedIconProvider = getPlayerDropdownIcon
+    config.HeaderHeight = 52
+    config.OptionHeight = 40
+    config.MaxVisibleOptions = 8
+    config.OptionTextSize = 15
+    config.SelectedTextSize = 15
+    config.IconSize = 24
+    return config
+end
+
+registeredPlayerDropdowns = registeredPlayerDropdowns or {}
+playerDropdownIconRefreshTokens = playerDropdownIconRefreshTokens or setmetatable({}, { __mode = "k" })
+playerDropdownIconConnections = playerDropdownIconConnections or setmetatable({}, { __mode = "k" })
+
+function isPlayerDropdownAlive(dropdown)
+    return dropdown
+        and dropdown.Instance
+        and type(dropdown.Refresh) == "function"
+        and type(dropdown.Set) == "function"
+end
+
+local function applyPlayerIconToDropdownText(textObject)
+    if not (textObject and (textObject:IsA("TextLabel") or textObject:IsA("TextButton"))) then
+        return
+    end
+
+    local iconImage = getPlayerDropdownIcon(textObject.Text)
+    local existingIcon = textObject:FindFirstChild("HolonPlayerOptionIcon")
+    local existingPadding = textObject:FindFirstChild("HolonPlayerOptionPadding")
+
+    if not iconImage then
+        if existingIcon then
+            existingIcon.Visible = false
+        end
+        return
+    end
+
+    if not existingPadding then
+        existingPadding = Instance.new("UIPadding")
+        existingPadding.Name = "HolonPlayerOptionPadding"
+        existingPadding.PaddingLeft = UDim.new(0, 28)
+        existingPadding.Parent = textObject
+    end
+
+    if not existingIcon then
+        existingIcon = Instance.new("ImageLabel")
+        existingIcon.Name = "HolonPlayerOptionIcon"
+        existingIcon.BackgroundTransparency = 1
+        existingIcon.AnchorPoint = Vector2.new(0, 0.5)
+        existingIcon.Position = UDim2.new(0, 4, 0.5, 0)
+        existingIcon.Size = UDim2.new(0, 20, 0, 20)
+        existingIcon.ZIndex = textObject.ZIndex + 1
+        existingIcon.Parent = textObject
+    end
+
+    existingIcon.Image = iconImage
+    existingIcon.Visible = true
+end
+
+local function refreshDropdownPlayerIcons(dropdown)
+    local root = dropdown and dropdown.Instance
+    if not root then
+        return
+    end
+
+    for _, descendant in ipairs(root:GetDescendants()) do
+        if descendant:IsA("TextLabel") or descendant:IsA("TextButton") then
+            applyPlayerIconToDropdownText(descendant)
+        end
+    end
+end
+
+function scheduleDropdownPlayerIconRefresh(dropdown, delayTime)
+    if not isPlayerDropdownAlive(dropdown) then
+        return
+    end
+
+    local token = (playerDropdownIconRefreshTokens[dropdown] or 0) + 1
+    playerDropdownIconRefreshTokens[dropdown] = token
+
+    task.spawn(function()
+        if delayTime and delayTime > 0 then
+            task.wait(delayTime)
+        end
+
+        if playerDropdownIconRefreshTokens[dropdown] ~= token then
+            return
+        end
+
+        if isPlayerDropdownAlive(dropdown) then
+            pcall(refreshDropdownPlayerIcons, dropdown)
+        end
+    end)
+end
+
+function bindPlayerDropdownIconRefresh(dropdown)
+    if not isPlayerDropdownAlive(dropdown) or playerDropdownIconConnections[dropdown] then
+        return
+    end
+
+    playerDropdownIconConnections[dropdown] = dropdown.Instance.DescendantAdded:Connect(function(descendant)
+        if descendant:IsA("TextLabel") or descendant:IsA("TextButton") then
+            task.defer(applyPlayerIconToDropdownText, descendant)
+        end
+    end)
+end
+
+function hookPlayerDropdownMethods(dropdown)
+    if not isPlayerDropdownAlive(dropdown) or dropdown._HolonPlayerIconHooksApplied then
+        return
+    end
+
+    dropdown._HolonPlayerIconHooksApplied = true
+
+    local originalRefresh = dropdown.Refresh
+    dropdown.Refresh = function(self, ...)
+        local results = { originalRefresh(self, ...) }
+        scheduleDropdownPlayerIconRefresh(self, 0.03)
+        return table.unpack(results)
+    end
+
+    local originalSet = dropdown.Set
+    dropdown.Set = function(self, ...)
+        local results = { originalSet(self, ...) }
+        scheduleDropdownPlayerIconRefresh(self, 0.03)
+        return table.unpack(results)
+    end
+end
+
+function registerPlayerDropdown(dropdown, optionsProvider)
+    table.insert(registeredPlayerDropdowns, {
+        dropdown = dropdown,
+        optionsProvider = optionsProvider or getPList
+    })
+
+    hookPlayerDropdownMethods(dropdown)
+    bindPlayerDropdownIconRefresh(dropdown)
+    scheduleDropdownPlayerIconRefresh(dropdown, 0.05)
+
+    return dropdown
+end
+
+function refreshRegisteredPlayerDropdowns()
+    for i = #registeredPlayerDropdowns, 1, -1 do
+        local entry = registeredPlayerDropdowns[i]
+        local dropdown = entry.dropdown
+        if not isPlayerDropdownAlive(dropdown) then
+            local conn = playerDropdownIconConnections[dropdown]
+            if conn then
+                conn:Disconnect()
+                playerDropdownIconConnections[dropdown] = nil
+            end
+            playerDropdownIconRefreshTokens[dropdown] = nil
+            table.remove(registeredPlayerDropdowns, i)
+        else
+            local currentValue = dropdown.Value
+            dropdown:Refresh(entry.optionsProvider(), true)
+            if currentValue and currentValue ~= "" and currentValue ~= "..." then
+                local selectedName = parseSelectedPlayerName(currentValue)
+                if selectedName ~= "" then
+                    local selectedPlayer = Players:FindFirstChild(selectedName)
+                    if selectedPlayer then
+                        currentValue = formatPlayerOption(selectedPlayer)
+                    end
+                end
+                dropdown:Set(currentValue)
+            end
+            scheduleDropdownPlayerIconRefresh(dropdown, 0.03)
+        end
+    end
+end
+
+-- 翻訳テーブル
+modeNames = {
+    ["Wing"] = "翼 (Wing)", ["Heart"] = "ハート (Heart)", ["Star"] = "星 (Star)", ["Vortex"] = "渦 (Vortex)",
+    ["Sphere"] = "球体 (Sphere)", ["Rotate"] = "回転 (Rotate)", ["Cat"] = "猫 (Cat)", ["Pet"] = "ペット (Pet)", ["Text"] = "文字 (Text)",
+    ["MagicCircle"] = "魔法陣 (MagicCircle)", ["MagicCircle2"] = "魔法陣2 (MagicCircle2)", ["MagicCircle3"] = "魔法陣3 (MagicCircle3)",
+    ["FloatStone"] = "浮遊石 (FloatStone)", ["Merkaba"] = "マカバ (Merkaba)", ["Cube"] = "立方体 (Cube)",
+    ["Pyramid"] = "ピラミッド (Pyramid)", ["MirrorPlayer"] = "分身 (MirrorPlayer)", ["Beam"] = "ビーム (Beam)",
+    ["BackGuard"] = "背後ガード (BackGuard)", ["Tornado"] = "竜巻 (Tornado)", ["Gyro"] = "ジャイロ (Gyro)",
+    ["Draw3D"] = "3Dお絵描き (Draw3D)", ["なし"] = "なし"
+}
+modeKeys = {}
+for k, v in pairs(modeNames) do modeKeys[v] = k end
+
+function getModeList()
+    local list = {}
+    local order = {"Wing","Heart","Star","Vortex","Sphere","Rotate","Cat","Pet","Text","MagicCircle","MagicCircle2","MagicCircle3","FloatStone","Merkaba","Cube","Pyramid","MirrorPlayer","Beam","BackGuard","Tornado","Gyro","Draw3D"}
+    for _, k in ipairs(order) do
+        table.insert(list, modeNames[k])
+    end
+    return list
+end
+
+function startHolonOverlayLoops()
+    _G.HolonOverlayLoopToken = (_G.HolonOverlayLoopToken or 0) + 1
+    local overlayToken = _G.HolonOverlayLoopToken
+
+    task.spawn(function()
+        local titleInfoLabel = nil
+        local topBarFlowFrame = nil
+        local topBarFlowClipFrame = nil
+        local topBarFlowLabel = nil
+        local centerFlowGui = nil
+        local centerFlowFrame = nil
+        local centerFlowLabel = nil
+        local cachedTitleObject = nil
+        local cachedBaseTitle = nil
+
+        local function getMainFrame()
+            local ui = CoreGui:FindFirstChild("HorionUI")
+            if not ui then return nil end
+            local main = ui:FindFirstChild("Main")
+            if not main then
+                for _, child in ipairs(ui:GetChildren()) do
+                    if child:IsA("Frame") and child:FindFirstChild("TopBar") then
+                        main = child
+                        break
+                    end
+                end
+            end
+            return main
+        end
+
+        local function getTopBar()
+            local main = getMainFrame()
+            return main and main:FindFirstChild("TopBar")
+        end
+
+        local function getTopBarFlowWidth()
+            local topBar = getTopBar()
+            if not topBar then
+                return 220
+            end
+            return math.max(120, topBar.AbsoluteSize.X - topBarFlowLeftInset - topBarFlowRightInset)
+        end
+
+        local function isOrionExpanded()
+            local main = getMainFrame()
+            local topBar = getTopBar()
+            if not main or not topBar then
+                return false
+            end
+            if not main.Visible or not topBar.Visible then
+                return false
+            end
+
+            return main.AbsoluteSize.Y > (topBar.AbsoluteSize.Y + 12)
+        end
+
+        local function getTitleObject()
+            if cachedTitleObject and cachedTitleObject.Parent then
+                return cachedTitleObject
+            end
+
+            local topBar = getTopBar()
+            if not topBar then
+                return nil
+            end
+
+            for _, desc in ipairs(topBar:GetDescendants()) do
+                if (desc:IsA("TextLabel") or desc:IsA("TextButton")) and type(desc.Text) == "string" then
+                    if desc.Text:find("Holon HUB", 1, true) then
+                        cachedTitleObject = desc
+                        cachedBaseTitle = desc.Text
+                        return desc
+                    end
+                end
+            end
+
+            return nil
+        end
+
+        local function ensureTitleInfoLabel()
+            if titleInfoLabel and titleInfoLabel.Parent then
+                return titleInfoLabel
+            end
+
+            local topBar = getTopBar()
+            if not topBar then
+                return nil
+            end
+
+            titleInfoLabel = topBar:FindFirstChild("HolonTitleInfoLabel")
+            if titleInfoLabel then
+                return titleInfoLabel
+            end
+
+            titleInfoLabel = Instance.new("TextLabel")
+            titleInfoLabel.Name = "HolonTitleInfoLabel"
+            titleInfoLabel.Parent = topBar
+            titleInfoLabel.BackgroundTransparency = 1
+            titleInfoLabel.Size = UDim2.new(0, 180, 0, 18)
+            titleInfoLabel.Position = UDim2.new(0, 175, 0, 16)
+            titleInfoLabel.Font = Enum.Font.GothamBold
+            titleInfoLabel.TextSize = 13
+            titleInfoLabel.TextXAlignment = Enum.TextXAlignment.Left
+            titleInfoLabel.TextColor3 = Color3.fromRGB(210, 210, 210)
+            titleInfoLabel.Text = ""
+            titleInfoLabel.ZIndex = 10
+            return titleInfoLabel
+        end
+
+        local function ensureTopBarFlowLabel()
+            if topBarFlowLabel and topBarFlowLabel.Parent then
+                return topBarFlowLabel
+            end
+
+            local topBar = getTopBar()
+            if not topBar then
+                return nil
+            end
+
+            topBarFlowFrame = topBar:FindFirstChild("HolonTopBarFlowFrame")
+            if not topBarFlowFrame then
+                topBarFlowFrame = Instance.new("Frame")
+                topBarFlowFrame.Name = "HolonTopBarFlowFrame"
+                topBarFlowFrame.Parent = topBar
+                topBarFlowFrame.BackgroundTransparency = 1
+                topBarFlowFrame.BorderSizePixel = 0
+                topBarFlowFrame.ClipsDescendants = false
+                topBarFlowFrame.Size = UDim2.new(0, getTopBarFlowWidth(), 0, topBarFlowHeight)
+                topBarFlowFrame.Position = UDim2.new(0, topBarFlowLeftInset, 0, topBarFlowStartY)
+                topBarFlowFrame.ZIndex = 10
+            end
+
+            topBarFlowClipFrame = topBarFlowFrame:FindFirstChild("HolonTopBarFlowClip")
+            if not topBarFlowClipFrame then
+                topBarFlowClipFrame = Instance.new("Frame")
+                topBarFlowClipFrame.Name = "HolonTopBarFlowClip"
+                topBarFlowClipFrame.Parent = topBarFlowFrame
+                topBarFlowClipFrame.BackgroundTransparency = 1
+                topBarFlowClipFrame.BorderSizePixel = 0
+                topBarFlowClipFrame.ClipsDescendants = true
+                topBarFlowClipFrame.Size = UDim2.new(1, 0, 1, 0)
+                topBarFlowClipFrame.Position = UDim2.new(0, 0, 0, 0)
+                topBarFlowClipFrame.ZIndex = 10
+            end
+
+            topBarFlowLabel = topBarFlowClipFrame:FindFirstChild("HolonTopBarFlowLabel")
+            if topBarFlowLabel then
+                return topBarFlowLabel
+            end
+
+            topBarFlowLabel = Instance.new("TextLabel")
+            topBarFlowLabel.Name = "HolonTopBarFlowLabel"
+            topBarFlowLabel.Parent = topBarFlowClipFrame
+            topBarFlowLabel.BackgroundTransparency = 1
+            topBarFlowLabel.BorderSizePixel = 0
+            topBarFlowLabel.Size = UDim2.new(0, topBarFlowBaseWidth, 1, 0)
+            topBarFlowLabel.Position = UDim2.new(0, 0, 0, 0)
+            topBarFlowLabel.Font = Enum.Font.GothamBlack
+            topBarFlowLabel.TextSize = topBarFlowTextSize
+            topBarFlowLabel.TextXAlignment = Enum.TextXAlignment.Left
+            topBarFlowLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+            topBarFlowLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+            topBarFlowLabel.TextStrokeTransparency = 0
+            topBarFlowLabel.TextTransparency = 0
+            topBarFlowLabel.Text = ""
+            topBarFlowLabel.ZIndex = 10
+            return topBarFlowLabel
+        end
+
+        local function ensureCenterFlowLabel()
+            if centerFlowLabel and centerFlowLabel.Parent then
+                return centerFlowLabel
+            end
+
+            if centerFlowGui and centerFlowGui.Parent == nil then
+                centerFlowGui = nil
+            end
+
+            if not centerFlowGui then
+                pcall(function()
+                    local existing = CoreGui:FindFirstChild("HolonCenterFlowGui")
+                    if existing then
+                        existing:Destroy()
+                    end
+                end)
+
+                centerFlowGui = Instance.new("ScreenGui")
+                centerFlowGui.Name = "HolonCenterFlowGui"
+                centerFlowGui.ResetOnSpawn = false
+                centerFlowGui.IgnoreGuiInset = true
+                centerFlowGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+                centerFlowGui.Parent = CoreGui
+            end
+
+            centerFlowFrame = centerFlowGui:FindFirstChild("HolonCenterFlowFrame")
+            if not centerFlowFrame then
+                centerFlowFrame = Instance.new("Frame")
+                centerFlowFrame.Name = "HolonCenterFlowFrame"
+                centerFlowFrame.Parent = centerFlowGui
+                centerFlowFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+                centerFlowFrame.Position = UDim2.new(0.5, 0, 0.18, 0)
+                centerFlowFrame.Size = UDim2.new(0, 820, 0, 64)
+                centerFlowFrame.BackgroundColor3 = Color3.fromRGB(255, 140, 0)
+                centerFlowFrame.BackgroundTransparency = 0.72
+                centerFlowFrame.BorderSizePixel = 0
+                centerFlowFrame.ClipsDescendants = true
+                centerFlowFrame.ZIndex = 48
+
+                local frameStroke = Instance.new("UIStroke")
+                frameStroke.Color = Color3.fromRGB(255, 170, 64)
+                frameStroke.Thickness = 2
+                frameStroke.Transparency = 0.2
+                frameStroke.Parent = centerFlowFrame
+
+                local frameCorner = Instance.new("UICorner")
+                frameCorner.CornerRadius = UDim.new(0, 10)
+                frameCorner.Parent = centerFlowFrame
+            end
+
+            centerFlowLabel = centerFlowFrame:FindFirstChild("HolonCenterFlowLabel")
+            if centerFlowLabel then
+                return centerFlowLabel
+            end
+
+            centerFlowLabel = Instance.new("TextLabel")
+            centerFlowLabel.Name = "HolonCenterFlowLabel"
+            centerFlowLabel.Parent = centerFlowFrame
+            centerFlowLabel.AnchorPoint = Vector2.new(0, 0.5)
+            centerFlowLabel.BackgroundTransparency = 1
+            centerFlowLabel.BorderSizePixel = 0
+            centerFlowLabel.Position = UDim2.new(1, 0, 0.5, 0)
+            centerFlowLabel.Size = UDim2.new(0, 700, 0, 64)
+            centerFlowLabel.Font = Enum.Font.GothamBlack
+            centerFlowLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+            centerFlowLabel.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+            centerFlowLabel.TextStrokeTransparency = 0
+            centerFlowLabel.TextSize = 34
+            centerFlowLabel.TextTransparency = 0
+            centerFlowLabel.TextWrapped = false
+            centerFlowLabel.TextXAlignment = Enum.TextXAlignment.Center
+            centerFlowLabel.ZIndex = 50
+            return centerFlowLabel
+        end
+
+        task.spawn(function()
+            while _G.HolonOverlayLoopToken == overlayToken do
+                local label = ensureCenterFlowLabel()
+                if label then
+                    local isChatTickerActive = chatTickerEnabled == true
+                    if centerFlowFrame then
+                        centerFlowFrame.Visible = isChatTickerActive
+                    end
+                    label.Visible = isChatTickerActive
+
+                    if isChatTickerActive then
+                        local message = table.remove(chatTickerQueue, 1) or "チャット待機中..."
+                        label.Text = message
+                        RunService.Heartbeat:Wait()
+
+                        local frameWidth = centerFlowFrame and centerFlowFrame.AbsoluteSize.X or 820
+                        local textWidth = math.max(700, label.TextBounds.X + 120)
+                        label.Size = UDim2.new(0, textWidth, 0, 64)
+                        label.Position = UDim2.new(0, frameWidth + 40, 0.5, 0)
+
+                        local travelDistance = frameWidth + textWidth + 80
+                        local travelTime = travelDistance / centerFlowPixelsPerSecond
+                        local travelTween = TweenService:Create(
+                            label,
+                            TweenInfo.new(travelTime, Enum.EasingStyle.Linear, Enum.EasingDirection.Out),
+                            {Position = UDim2.new(0, -textWidth - 40, 0.5, 0)}
+                        )
+                        travelTween:Play()
+
+                        local startTime = tick()
+                        while tick() - startTime < travelTime do
+                            if _G.HolonOverlayLoopToken ~= overlayToken then
+                                travelTween:Cancel()
+                                return
+                            end
+                            if label.Parent == nil then
+                                break
+                            end
+                            if chatTickerEnabled ~= true then
+                                travelTween:Cancel()
+                                break
+                            end
+                            task.wait(0.1)
+                        end
+
+                        travelTween:Cancel()
+                    else
+                        task.wait(0.1)
+                    end
+                else
+                    task.wait(0.1)
+                end
+                task.wait(0.02)
+            end
+        end)
+
+        task.spawn(function()
+            local messageIndex = 1
+            while _G.HolonOverlayLoopToken == overlayToken do
+                local label = ensureTopBarFlowLabel()
+                local frame = topBarFlowFrame
+                if label and frame then
+                    local message = topBarFlowMessages[messageIndex] or topBarFlowMessages[1]
+                    if not message or message == "" then
+                        label.Visible = false
+                        frame.Visible = false
+                        task.wait(0.15)
+                    else
+                    label.Text = message
+                    label.Visible = isOrionExpanded()
+                    frame.Visible = isOrionExpanded()
+                    RunService.Heartbeat:Wait()
+                    local flowWidth = getTopBarFlowWidth()
+                    frame.Size = UDim2.new(0, flowWidth, 0, topBarFlowHeight)
+                    frame.Position = UDim2.new(0, topBarFlowLeftInset, 0, topBarFlowStartY)
+                    if topBarFlowClipFrame then
+                        topBarFlowClipFrame.Size = UDim2.new(1, 0, 1, 0)
+                    end
+                    label.TextSize = topBarFlowTextSize
+                    local textWidth = math.max(label.TextBounds.X + 60, topBarFlowBaseWidth, flowWidth)
+                    label.Size = UDim2.new(0, textWidth, 1, 0)
+                    label.Position = UDim2.new(0, flowWidth, 0, 0)
+                    local travelDistance = flowWidth + textWidth + topBarFlowTravelPadding
+                    local travelTime = travelDistance / topBarFlowPixelsPerSecond
+
+                    local travelTween = TweenService:Create(
+                        label,
+                        TweenInfo.new(travelTime, Enum.EasingStyle.Linear, Enum.EasingDirection.Out),
+                        {Position = UDim2.new(0, -textWidth - topBarFlowExitOffset, 0, 0)}
+                    )
+                    travelTween:Play()
+
+                    local startTime = tick()
+                    while tick() - startTime < travelTime do
+                        if _G.HolonOverlayLoopToken ~= overlayToken then
+                            travelTween:Cancel()
+                            return
+                        end
+                        if label.Parent == nil or frame.Parent == nil then
+                            break
+                        end
+                        local visible = isOrionExpanded()
+                        label.Visible = visible
+                        frame.Visible = visible
+                        task.wait(0.1)
+                    end
+
+                    travelTween:Cancel()
+                    messageIndex = (messageIndex % math.max(#topBarFlowMessages, 1)) + 1
+                    end
+                end
+                task.wait(0.15)
+            end
+        end)
+
+        local fpsAccumulator = 0
+        local frameCount = 0
+        while _G.HolonOverlayLoopToken == overlayToken do
+            local dt = RunService.Heartbeat:Wait()
+            fpsAccumulator = fpsAccumulator + dt
+            frameCount = frameCount + 1
+
+            if fpsAccumulator >= 0.5 then
+                local fps = math.floor(frameCount / fpsAccumulator + 0.5)
+                local color
+                if fps >= 55 then
+                    color = Color3.fromRGB(85, 255, 127)
+                elseif fps >= 35 then
+                    color = Color3.fromRGB(255, 221, 87)
+                else
+                    color = Color3.fromRGB(255, 107, 107)
+                end
+
+                local titleObject = getTitleObject()
+                if titleObject then
+                    local baseTitle = cachedBaseTitle or titleObject.Text or "Holon HUB v1.5.5"
+                    if baseTitle:find(" | FPS ", 1, true) then
+                        baseTitle = baseTitle:match("^(.-) | FPS ") or baseTitle
+                        cachedBaseTitle = baseTitle
+                    end
+                    titleObject.Text = string.format("%s | FPS %d", baseTitle, fps)
+                else
+                    local titleLabel = ensureTitleInfoLabel()
+                    if titleLabel then
+                        titleLabel.Visible = isOrionExpanded()
+                        titleLabel.Text = string.format("| FPS %d", fps)
+                        titleLabel.TextColor3 = color
+                    end
+                end
+
+                fpsAccumulator = 0
+                frameCount = 0
+            end
+        end
+    end)
+end
 
 -- [[ 1. メイン画面の関数 ]]
 local function StartHolonHUB()
@@ -3637,14 +5955,9 @@ local function StartHolonHUB()
         IntroText = "Holon HUB Load!"
     })
 
+    startHolonOverlayLoops()
+
     -- test.luaベースの掴み機能
-    local superStrengthEnabled = false
-    local strengthValue = 400
-    local deathGrabEnabled = false
-    local noclipGrabEnabled = false
-    local perspectiveGrabEnabled = false
-    local perspectiveSpeed = 50
-    local invisibleLineEnabled = false
 
     local lastGrabbedPart = nil
     local noclipOriginalCollisions = {}
@@ -4386,127 +6699,8 @@ local function StartHolonHUB()
         end
         return objects
     end
-
--- プレイヤーリスト取得関数
-local function formatPlayerOption(player)
-    return player.DisplayName .. " (@" .. player.Name .. ")"
-end
-
-local function getPList(includeNone)
-    local plist = {}
-    if includeNone then
-        table.insert(plist, "なし")
-    end
-    for _, p in ipairs(Players:GetPlayers()) do
-        table.insert(plist, formatPlayerOption(p))
-    end
-    return plist
-end
-
-local function parseSelectedPlayerName(v)
-    if not v or v == "選択してください" or v == "なし" or v == "..." then
-        return ""
-    end
-    return v:match("@([^)]+)") or ""
-end
-
-local function getPlayerDropdownIcon(v)
-    local name = parseSelectedPlayerName(v)
-    local player = name ~= "" and Players:FindFirstChild(name) or nil
-    if not player then
-        return nil
-    end
-    return "https://www.roblox.com/headshot-thumbnail/image?userId=" .. player.UserId .. "&width=100&height=100&format=png"
-end
-
-local function withPlayerDropdownStyle(config)
-    config.Options = config.Options or getPList(config.IncludeNone)
-    config.IconProvider = getPlayerDropdownIcon
-    config.SelectedIconProvider = getPlayerDropdownIcon
-    config.HeaderHeight = 52
-    config.OptionHeight = 40
-    config.MaxVisibleOptions = 8
-    config.OptionTextSize = 15
-    config.SelectedTextSize = 15
-    config.IconSize = 24
-    return config
-end
-
-local registeredPlayerDropdowns = {}
-
-local function registerPlayerDropdown(dropdown, optionsProvider)
-    table.insert(registeredPlayerDropdowns, {
-        dropdown = dropdown,
-        optionsProvider = optionsProvider or getPList
-    })
-    return dropdown
-end
-
-local function refreshRegisteredPlayerDropdowns()
-    for i = #registeredPlayerDropdowns, 1, -1 do
-        local entry = registeredPlayerDropdowns[i]
-        local dropdown = entry.dropdown
-        if not (dropdown and dropdown.Refresh and dropdown.Set) then
-            table.remove(registeredPlayerDropdowns, i)
-        else
-            local currentValue = dropdown.Value
-            dropdown:Refresh(entry.optionsProvider(), true)
-            if currentValue and currentValue ~= "" and currentValue ~= "..." then
-                local selectedName = parseSelectedPlayerName(currentValue)
-                if selectedName ~= "" then
-                    local selectedPlayer = Players:FindFirstChild(selectedName)
-                    if selectedPlayer then
-                        currentValue = formatPlayerOption(selectedPlayer)
-                    end
-                end
-                dropdown:Set(currentValue)
-            end
-        end
-    end
-end
-
-local function buildPlayerListSignature()
-    local signature = {}
-    for _, player in ipairs(Players:GetPlayers()) do
-        table.insert(signature, player.Name .. ":" .. player.DisplayName)
-    end
-    table.sort(signature)
-    return table.concat(signature, "|")
-end
-
-local lastPlayerListSignature = ""
-
-task.spawn(function()
-    while true do
-        local signature = buildPlayerListSignature()
-        if signature ~= lastPlayerListSignature then
-            lastPlayerListSignature = signature
-            refreshRegisteredPlayerDropdowns()
-        end
-        task.wait(1)
-    end
-end)
-
 -- UI要素を管理するテーブル
 UIElements = {}
-
--- 翻訳テーブル
-local modeNames = {
-    ["Wing"] = "翼 (Wing)", ["Heart"] = "ハート (Heart)", ["Star"] = "星 (Star)", ["Vortex"] = "渦 (Vortex)",
-    ["Sphere"] = "球体 (Sphere)", ["Rotate"] = "回転 (Rotate)", ["Pet"] = "ペット (Pet)", ["Text"] = "文字 (Text)",
-    ["MagicCircle"] = "魔法陣 (MagicCircle)", ["MagicCircle2"] = "魔法陣2 (MagicCircle2)", ["MagicCircle3"] = "魔法陣3 (MagicCircle3)",
-    ["FloatStone"] = "浮遊石 (FloatStone)", ["Merkaba"] = "マカバ (Merkaba)", ["Cube"] = "立方体 (Cube)",
-    ["Pyramid"] = "ピラミッド (Pyramid)", ["MirrorPlayer"] = "分身 (MirrorPlayer)", ["Beam"] = "ビーム (Beam)",
-    ["BackGuard"] = "背後ガード (BackGuard)", ["Tornado"] = "竜巻 (Tornado)", ["Gyro"] = "ジャイロ (Gyro)", ["なし"] = "なし"
-}
-local modeKeys = {}
-for k, v in pairs(modeNames) do modeKeys[v] = k end
-local function getModeList()
-    local list = {}
-    local order = {"Wing","Heart","Star","Vortex","Sphere","Rotate","Pet","Text","MagicCircle","MagicCircle2","MagicCircle3","FloatStone","Merkaba","Cube","Pyramid","MirrorPlayer","Beam","BackGuard","Tornado","Gyro"}
-    for _, k in ipairs(order) do table.insert(list, modeNames[k]) end
-    return list
-end
 
 -- --- TAB: MAIN ---
 local MainTab = Window:MakeTab({
@@ -4544,7 +6738,7 @@ local AuraTab = Window:MakeTab({
     -- --- TAB: ONLINE CHAT ---
     local ChatTab = Window:MakeTab({
         Name = "チャット",
-        Icon = "rbxassetid://7733955511"
+        Icon = "rbxassetid://94899503194205"
     })
 
     local ChatSec = ChatTab:AddSection({ Name = "💬 グローバルチャット" })
@@ -4555,7 +6749,7 @@ local AuraTab = Window:MakeTab({
 
     local function executeSend()
         if currentTypedMsg == "" then return end
-        local msgToSend = currentTypedMsg
+        local msgToSend = currentTypedMsg:gsub("@", "@.")
         
         if selectedChatMode == "Private" and selectedChatTarget == "" then
             OrionLib:MakeNotification({Name = "エラー", Content = "個人チャットの相手を選択してください", Time = 3})
@@ -4605,15 +6799,23 @@ local AuraTab = Window:MakeTab({
         refreshRegisteredPlayerDropdowns()
     end)
 
-    UIElements.ChatInput = ChatSec:AddTextbox({
+    local chatSendRow = ChatSec:AddHorizontalGroup({
+        Height = 38,
+        Padding = 6
+    })
+
+    UIElements.ChatInput = chatSendRow:AddTextbox({
         Name = "メッセージを入力...",
         Default = "",
         TextDisappear = false,
+        Width = 0.88,
         Callback = function(v) currentTypedMsg = v end
     })
 
-    ChatSec:AddButton({
-        Name = "メッセージを送信",
+    chatSendRow:AddButton({
+        Name = "送信",
+        Width = 0.1,
+        Icon = "",
         Callback = executeSend
     })
 
@@ -4622,6 +6824,17 @@ local AuraTab = Window:MakeTab({
         Default = true,
         Callback = function(v)
             chatNotifyEnabled = v
+        end
+    })
+
+    ChatSec:AddToggle({
+        Name = "外部チャットテロップ",
+        Default = false,
+        Callback = function(v)
+            chatTickerEnabled = v
+            if v then
+                chatTickerQueue = {}
+            end
         end
     })
 
@@ -4871,6 +7084,30 @@ UIElements.DefenseAntiGrabToggle = DefenseAntiSec:AddToggle({
     Default = false,
     Callback = function(v)
         antiGrab = v
+    end
+})
+
+UIElements.DefenseAntiLagToggle = DefenseAntiSec:AddToggle({
+    Name = "アンチラグ",
+    Default = false,
+    Callback = function(v)
+        setAntiLagEnabled(v)
+    end
+})
+
+UIElements.DefenseAntiLoopToggle = DefenseAntiSec:AddToggle({
+    Name = "アンチループ",
+    Default = false,
+    Callback = function(v)
+        setAntiLoopEnabled(v)
+    end
+})
+
+UIElements.DefenseAntiNetworkToggle = DefenseAntiSec:AddToggle({
+    Name = "アンチネットワーク",
+    Default = false,
+    Callback = function(v)
+        setAntiNetworkEnabled(v)
     end
 })
 
@@ -5139,6 +7376,9 @@ UIElements.ModeDropdown = MainSec:AddDropdown({
 	Callback = function(v)
 		currentMode = modeKeys[v]
 		combinedActive = false
+        if currentMode == "Draw3D" then
+            updateDraw3DOverlay()
+        end
 	end    
 })
 
@@ -5269,6 +7509,26 @@ UIElements.OtherToysToggle = MainSec:AddToggle({
 -- 起動時に一度実行
 task.spawn(refreshToyList)
 
+local Draw3DSec = MainTab:AddSection({
+    Name = "3Dお絵描き"
+})
+
+UIElements.Draw3DWindowToggle = Draw3DSec:AddToggle({
+    Name = "3Dお絵描きウィンドウ",
+    Default = false,
+    Callback = function(v)
+        setDraw3DOverlayVisible(v)
+    end
+})
+
+UIElements.Draw3DPreviewToggle = Draw3DSec:AddToggle({
+    Name = "3Dプレビュー表示",
+    Default = cfg.Draw3D.Preview ~= false,
+    Callback = function(v)
+        setDraw3DPreviewVisible(v)
+    end
+})
+
 
 -- --- アニメーションセクション ---
 local AnimSec = MainTab:AddSection({
@@ -5378,7 +7638,7 @@ UIElements.CombinedToggle = CombineSec:AddToggle({
 
 local function getModeListWithNone()
     local list = {"なし"}
-    local order = {"Wing","Heart","Star","Vortex","Sphere","Rotate","Pet","Text","MagicCircle","MagicCircle2","MagicCircle3","FloatStone","Merkaba","Cube","Pyramid","MirrorPlayer","Beam","BackGuard","Tornado","Gyro"}
+    local order = {"Wing","Heart","Star","Vortex","Sphere","Rotate","Cat","Pet","Text","MagicCircle","MagicCircle2","MagicCircle3","FloatStone","Merkaba","Cube","Pyramid","MirrorPlayer","Beam","BackGuard","Tornado","Gyro","Draw3D"}
     for _, k in ipairs(order) do table.insert(list, modeNames[k]) end
     return list
 end
@@ -5480,7 +7740,7 @@ local EditSec = ModeSetTab:AddSection({
     Name = "共通設定エディタ"
 })
 
-local modes = {"Wing","Heart","Star","Vortex","Sphere","Rotate","Pet","Text","MagicCircle","MagicCircle2","MagicCircle3","FloatStone","Merkaba","Cube","Pyramid","MirrorPlayer","Beam","BackGuard","Tornado","Gyro"}
+local modes = {"Wing","Heart","Star","Vortex","Sphere","Rotate","Cat","Pet","Text","MagicCircle","MagicCircle2","MagicCircle3","FloatStone","Merkaba","Cube","Pyramid","MirrorPlayer","Beam","BackGuard","Tornado","Gyro","Draw3D"}
 
 local currentEditMode = "Wing"
 local sl_Speed, sl_Size, sl_Height, sl_Back
@@ -5521,7 +7781,7 @@ local AdvTab = ModeSetTab
 
 for _, m in ipairs(modes) do
     -- 固有設定があるモードのみセクションを作成
-    if m == "Wing" or m == "Pet" or m == "Text" or m == "MagicCircle2" or m == "MagicCircle3" or m == "Beam" or m == "FloatStone" or m == "Tornado" or m == "Rotate" then
+    if m == "Wing" or m == "Pet" or m == "Text" or m == "MagicCircle2" or m == "MagicCircle3" or m == "Beam" or m == "FloatStone" or m == "Tornado" or m == "Rotate" or m == "Draw3D" or m == "MirrorPlayer" then
         local s = AdvTab:AddSection({ Name = modeNames[m] or m })
         
         if m == "Wing" then
@@ -5573,6 +7833,18 @@ for _, m in ipairs(modes) do
             s:AddToggle({ Name = "ウェーブ (くねくね)", Default = cfg.Rotate.Wave or false, Callback = function(v) cfg.Rotate.Wave = v end })
             s:AddSlider({ Name = "ウェーブ速度", Min = 1, Max = 20, Default = cfg.Rotate.WaveSpeed or 2, Callback = function(v) cfg.Rotate.WaveSpeed = v end })
             s:AddSlider({ Name = "ウェーブ振幅", Min = 1, Max = 20, Default = cfg.Rotate.WaveAmp or 2, Callback = function(v) cfg.Rotate.WaveAmp = v end })
+            s:AddToggle({ Name = "観覧車", Default = cfg.Rotate.FerrisWheel or false, Callback = function(v) cfg.Rotate.FerrisWheel = v end })
+
+        elseif m == "Draw3D" then
+            s:AddSlider({ Name = "描画距離", Min = 4, Max = 60, Default = cfg.Draw3D.Depth or 18, Callback = function(v) cfg.Draw3D.Depth = v end })
+            s:AddSlider({ Name = "点の間隔", Min = 1, Max = 20, Default = math.floor((cfg.Draw3D.MinDistance or 0.03) * 100), Callback = function(v) cfg.Draw3D.MinDistance = v / 100 end })
+            s:AddSlider({ Name = "ゆらぎ", Min = 0, Max = 20, Default = math.floor((cfg.Draw3D.Wave or 0.4) * 10), Callback = function(v) cfg.Draw3D.Wave = v / 10 end })
+            s:AddToggle({ Name = "3Dプレビュー表示", Default = cfg.Draw3D.Preview ~= false, Callback = function(v) setDraw3DPreviewVisible(v) if UIElements.Draw3DPreviewToggle then UIElements.Draw3DPreviewToggle:Set(v) end end })
+            s:AddButton({ Name = "お絵描き操作パネルを開く", Callback = function() ensureDraw3DOverlay() end })
+            s:AddButton({ Name = "描いた線をクリア", Callback = function() clearDraw3DPath() updateDraw3DOverlay() end })
+
+        elseif m == "MirrorPlayer" then
+            s:AddSlider({ Name = "パーツ間隔", Min = 0, Max = 20, Default = math.floor((cfg.MirrorPlayer.EdgeSpacing or 1) * 10), Callback = function(v) cfg.MirrorPlayer.EdgeSpacing = v / 10 end })
         end
     end
 end
@@ -5817,6 +8089,12 @@ ViewSec:AddToggle({
             end
         end
     end 
+})
+
+UIElements.Player3DToggle = ViewSec:AddToggle({
+    Name = "プレイヤー3D",
+    Default = false,
+    Callback = handlePlayer3DToggle
 })
 
 ViewSec:AddButton({
@@ -6205,14 +8483,788 @@ actionTargetDropdown = registerPlayerDropdown(actionTargetSection:AddDropdown(wi
 
 -- 対象リストは PlayerAdded / PlayerRemoving で自動更新
 
-actionTargetSection:AddButton({
-    Name = "Blobman bring",
-    Callback = function()
-        local target = Players:FindFirstChild(selectedActionTargetName)
-        if not (target and target ~= LocalPlayer and target.Character and target.Character:FindFirstChild("HumanoidRootPart")) then
+local bombMissileLoopEnabled = false
+local bombMissileLoopToken = 0
+local actionExplosionToyName = "BallSnowball"
+local bombMissileState = {
+    CachedToyItem = nil,
+    WorldObject = nil,
+    MainPart = nil,
+    ReferencePart = nil,
+    Parts = nil,
+    RelativeOffsets = nil,
+    LastWorldScan = 0,
+    LastOwnershipRefresh = 0,
+    LastFullSync = 0,
+}
+
+local function clearBombMissileWorldState()
+    bombMissileState.WorldObject = nil
+    bombMissileState.MainPart = nil
+    bombMissileState.ReferencePart = nil
+    bombMissileState.Parts = nil
+    bombMissileState.RelativeOffsets = nil
+    bombMissileState.LastWorldScan = 0
+    bombMissileState.LastOwnershipRefresh = 0
+    bombMissileState.LastFullSync = 0
+end
+
+local function getSelectedActionTarget(showNotification)
+    if showNotification == nil then
+        showNotification = true
+    end
+    local target = Players:FindFirstChild(selectedActionTargetName)
+    if not (target and target ~= LocalPlayer and target.Character and target.Character:FindFirstChild("HumanoidRootPart")) then
+        if showNotification then
             OrionLib:MakeNotification({ Name = "エラー", Content = "対象プレイヤーを選択してください", Time = 3 })
+        end
+        return nil
+    end
+    return target
+end
+
+local function buildActionToyItemFromObject(toy)
+    if not toy then
+        return nil
+    end
+
+    local holdPart = toy:FindFirstChild("HoldPart", true)
+    local holdRemote = holdPart and holdPart:FindFirstChild("HoldItemRemoteFunction")
+    return {
+        Name = toy.Name,
+        Object = toy,
+        RemoteFunction = holdRemote,
+        DropRemoteFunction = holdPart and holdPart:FindFirstChild("DropItemRemoteFunction"),
+    }
+end
+
+local function isActionToyNameMatch(candidateName, toyName)
+    local candidate = string.lower(tostring(candidateName or ""))
+    local target = string.lower(tostring(toyName or ""))
+    if candidate == "" or target == "" then
+        return false
+    end
+    if candidate == target or candidate:find(target, 1, true) or target:find(candidate, 1, true) then
+        return true
+    end
+    if target == "bombmissile" then
+        return candidate:find("bomb", 1, true)
+            or candidate:find("missile", 1, true)
+            or candidate:find("projectile", 1, true)
+            or candidate:find("rocket", 1, true)
+    end
+    if target == "ballsnowball" then
+        return candidate:find("snow", 1, true)
+            or candidate:find("ball", 1, true)
+    end
+    return false
+end
+
+local function isOwnedByLocalPlayerActionObject(obj)
+    local current = obj
+    for _ = 1, 6 do
+        if not current then
+            break
+        end
+
+        local ownerValue = current:FindFirstChild("Owner") or current:FindFirstChild("PartOwner")
+        if ownerValue and ownerValue:IsA("StringValue") then
+            return ownerValue.Value == LocalPlayer.Name
+        end
+
+        current = current.Parent
+    end
+    return false
+end
+
+bombMissileState.IsPartOwned = function(part)
+    if not part then
+        return false
+    end
+    local ownerValue = part:FindFirstChild("PartOwner") or part:FindFirstChild("Owner")
+    return ownerValue and ownerValue:IsA("StringValue") and ownerValue.Value == LocalPlayer.Name
+end
+
+bombMissileState.RequestPartNetworkOwner = function(part, ownerCF, attempts)
+    if not (part and ownerCF) then
+        return false
+    end
+
+    attempts = attempts or 4
+    local myChar = LocalPlayer.Character
+    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    for _ = 1, attempts do
+        pcall(function()
+            part:SetNetworkOwner(LocalPlayer)
+        end)
+        pcall(function()
+            GrabEvents.SetNetworkOwner:FireServer(part, part.CFrame)
+        end)
+        if myRoot then
+            pcall(function()
+                GrabEvents.SetNetworkOwner:FireServer(part, CFrame.lookAt(myRoot.Position, part.Position))
+            end)
+        end
+        pcall(function()
+            GrabEvents.SetNetworkOwner:FireServer(part, ownerCF)
+        end)
+        if bombMissileState.IsPartOwned(part) or isOwnedByLocalPlayerActionObject(part) then
+            return true
+        end
+        RunService.Heartbeat:Wait()
+    end
+
+    return bombMissileState.IsPartOwned(part) or isOwnedByLocalPlayerActionObject(part)
+end
+
+local function findActionToyItemByName(toyName)
+    local cachedItem = bombMissileState.CachedToyItem
+    if cachedItem and cachedItem.Object and cachedItem.Object.Parent and isActionToyNameMatch(cachedItem.Name, toyName) then
+        return cachedItem
+    end
+
+    local spawnedFolder = Workspace:FindFirstChild(LocalPlayer.Name .. "SpawnedInToys")
+    local exactToy = spawnedFolder and spawnedFolder:FindFirstChild(toyName)
+    if exactToy then
+        local exactItem = buildActionToyItemFromObject(exactToy)
+        bombMissileState.CachedToyItem = exactItem
+        return exactItem
+    end
+
+    local bestCandidate = nil
+    local bestScore = -math.huge
+
+    local function considerToyCandidate(obj, scoreBoost)
+        if not (obj and (obj:IsA("Model") or obj:IsA("BasePart"))) then
             return
         end
+        if not isActionToyNameMatch(obj.Name, toyName) then
+            return
+        end
+
+        local score = scoreBoost or 0
+        if string.lower(obj.Name) == string.lower(toyName) then
+            score = score + 100
+        end
+        if obj:IsA("Model") then
+            score = score + 10
+        end
+        if score > bestScore then
+            bestScore = score
+            bestCandidate = obj
+        end
+    end
+
+    for _, obj in ipairs(spawnedFolder and spawnedFolder:GetChildren() or {}) do
+        considerToyCandidate(obj, 50)
+    end
+
+    for _, obj in ipairs(spawnedFolder and spawnedFolder:GetDescendants() or {}) do
+        if obj:IsA("RemoteFunction") and obj.Name == "HoldItemRemoteFunction" then
+            local holdPart = obj.Parent
+            local item = holdPart and holdPart.Parent
+            if holdPart and holdPart.Name == "HoldPart" and item and isActionToyNameMatch(item.Name, toyName) then
+                considerToyCandidate(item, 80)
+            end
+        end
+        considerToyCandidate(obj, 20)
+    end
+
+    for _, obj in ipairs(Workspace:GetChildren()) do
+        if isOwnedByLocalPlayerActionObject(obj) then
+            considerToyCandidate(obj, 5)
+        end
+    end
+
+    local bestItem = buildActionToyItemFromObject(bestCandidate)
+    if bestItem then
+        bombMissileState.CachedToyItem = bestItem
+    end
+    return bestItem
+end
+
+local function ensureActionToyItem(toyName, spawnCF)
+    local item = findActionToyItemByName(toyName)
+    if item then
+        return item
+    end
+
+    local canSpawn = LocalPlayer:FindFirstChild("CanSpawnToy")
+    if canSpawn and not canSpawn.Value then
+        return nil, "今はおもちゃを出せません"
+    end
+
+    local menuToys = ReplicatedStorage:FindFirstChild("MenuToys")
+    local spawnRemote = menuToys and menuToys:FindFirstChild("SpawnToyRemoteFunction")
+    if not spawnRemote then
+        return nil, "SpawnToyRemoteFunctionが見つかりません"
+    end
+
+    local spawnResult = nil
+    local ok, err = pcall(function()
+        spawnResult = spawnRemote:InvokeServer(toyName, spawnCF, Vector3.zero)
+    end)
+    if not ok then
+        return nil, tostring(err)
+    end
+
+    if typeof(spawnResult) == "Instance" then
+        local spawnedItem = buildActionToyItemFromObject(spawnResult)
+        if spawnedItem then
+            bombMissileState.CachedToyItem = spawnedItem
+            return spawnedItem
+        end
+    end
+
+    local started = tick()
+    repeat
+        task.wait(0.1)
+        item = findActionToyItemByName(toyName)
+    until item or tick() - started > 3
+
+    if item then
+        bombMissileState.CachedToyItem = item
+        return item
+    end
+
+    return nil, toyName .. " のスポーン後実体が見つかりません"
+end
+
+local function getActionToyPart(toy)
+    if not toy then return nil end
+    if toy:IsA("BasePart") then return toy end
+    return toy:FindFirstChild("SoundPart", true)
+        or toy:FindFirstChild("Body", true)
+        or toy:FindFirstChild("PositionPart", true)
+        or toy:FindFirstChild("Main", true)
+        or toy:FindFirstChild("Handle", true)
+        or toy:FindFirstChild("Missile", true)
+        or toy:FindFirstChild("Projectile", true)
+        or toy:FindFirstChild("PartHitDetector", true)
+        or toy.PrimaryPart
+        or toy:FindFirstChildWhichIsA("BasePart", true)
+end
+
+local function getActionToyBaseParts(toy)
+    if not toy then
+        return {}
+    end
+
+    if toy:IsA("BasePart") then
+        return {toy}
+    end
+
+    local parts = {}
+    for _, desc in ipairs(toy:GetDescendants()) do
+        if desc:IsA("BasePart") then
+            table.insert(parts, desc)
+        end
+    end
+    return parts
+end
+
+local function cacheBombMissileWorldObject(toy)
+    if not (toy and toy.Parent) then
+        clearBombMissileWorldState()
+        return nil
+    end
+
+    if bombMissileState.WorldObject == toy
+        and bombMissileState.MainPart
+        and bombMissileState.MainPart.Parent
+        and bombMissileState.Parts
+        and #bombMissileState.Parts > 0 then
+        return toy
+    end
+
+    local mainPart = getActionToyPart(toy)
+    local referencePart = toy:IsA("BasePart") and toy
+        or toy:FindFirstChild("SoundPart", true)
+        or toy:FindFirstChild("Body", true)
+        or toy:FindFirstChild("PositionPart", true)
+        or mainPart
+    local parts = getActionToyBaseParts(toy)
+    if not mainPart or not referencePart or #parts == 0 then
+        clearBombMissileWorldState()
+        return nil
+    end
+
+    local pivotCF = referencePart.CFrame
+    local relativeOffsets = {}
+    for _, part in ipairs(parts) do
+        relativeOffsets[part] = pivotCF:ToObjectSpace(part.CFrame)
+    end
+
+    bombMissileState.WorldObject = toy
+    bombMissileState.MainPart = mainPart
+    bombMissileState.ReferencePart = referencePart
+    bombMissileState.Parts = parts
+    bombMissileState.RelativeOffsets = relativeOffsets
+    bombMissileState.LastOwnershipRefresh = 0
+    bombMissileState.LastFullSync = 0
+    return toy
+end
+
+local function findBombMissileWorldObject(referencePosition, forceScan)
+    local cachedObject = bombMissileState.WorldObject
+    if cachedObject and cachedObject.Parent then
+        return cachedObject
+    end
+
+    local now = tick()
+    if not forceScan and now - bombMissileState.LastWorldScan < 0.5 then
+        return nil
+    end
+    bombMissileState.LastWorldScan = now
+
+    local spawnedFolder = Workspace:FindFirstChild(LocalPlayer.Name .. "SpawnedInToys")
+    local bestCandidate = nil
+    local bestScore = -math.huge
+
+    local function considerMissileCandidate(obj, scoreBoost)
+        if not (obj and (obj:IsA("Model") or obj:IsA("BasePart"))) then
+            return
+        end
+        if not isActionToyNameMatch(obj.Name, actionExplosionToyName) then
+            return
+        end
+
+        local isMine = (spawnedFolder and obj:IsDescendantOf(spawnedFolder)) or isOwnedByLocalPlayerActionObject(obj)
+        if not isMine then
+            return
+        end
+
+        local mainPart = getActionToyPart(obj)
+        local distancePenalty = 0
+        if referencePosition and mainPart then
+            distancePenalty = (mainPart.Position - referencePosition).Magnitude * 0.15
+        end
+
+        local score = (scoreBoost or 0) - distancePenalty
+        if string.lower(obj.Name) == string.lower(actionExplosionToyName) then score = score + 100 end
+        if obj:IsA("Model") then score = score + 10 end
+
+        if score > bestScore then
+            bestScore = score
+            bestCandidate = obj
+        end
+    end
+
+    for _, obj in ipairs(spawnedFolder and spawnedFolder:GetChildren() or {}) do
+        considerMissileCandidate(obj, 60)
+    end
+
+    for _, obj in ipairs(spawnedFolder and spawnedFolder:GetDescendants() or {}) do
+        considerMissileCandidate(obj, 20)
+    end
+
+    for _, obj in ipairs(Workspace:GetChildren()) do
+        considerMissileCandidate(obj, 5)
+    end
+
+    if bestCandidate then
+        cacheBombMissileWorldObject(bestCandidate)
+    end
+    return bestCandidate
+end
+
+local function teleportActionToy(toy, targetCF, forceFullSync)
+    if not (toy and toy.Parent) then
+        clearBombMissileWorldState()
+        return false
+    end
+
+    if not cacheBombMissileWorldObject(toy) then
+        return false
+    end
+
+    local basePart = bombMissileState.MainPart
+    local referencePart = bombMissileState.ReferencePart or basePart
+    local parts = bombMissileState.Parts or {}
+    if not (basePart and basePart.Parent and referencePart and referencePart.Parent and #parts > 0) then
+        clearBombMissileWorldState()
+        return false
+    end
+
+    local now = tick()
+    local myChar = LocalPlayer.Character
+    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    local ownerCF = myRoot and myRoot.CFrame or referencePart.CFrame
+    if forceFullSync or now - bombMissileState.LastOwnershipRefresh > 0.35 then
+        bombMissileState.LastOwnershipRefresh = now
+        bombMissileState.RequestPartNetworkOwner(referencePart, ownerCF, 6)
+        if basePart ~= referencePart then
+            bombMissileState.RequestPartNetworkOwner(basePart, ownerCF, 4)
+        end
+        if forceFullSync then
+            for _, part in ipairs(parts) do
+                if part ~= referencePart and part ~= basePart then
+                    bombMissileState.RequestPartNetworkOwner(part, ownerCF, 1)
+                end
+            end
+        end
+    end
+
+    local ok = false
+    local closeEnough = false
+    for attempt = 1, 3 do
+        ok = pcall(function()
+            referencePart.CFrame = targetCF
+        end) or ok
+
+        if forceFullSync or attempt == 1 or now - bombMissileState.LastFullSync > 0.08 then
+            bombMissileState.LastFullSync = tick()
+            local relativeOffsets = bombMissileState.RelativeOffsets or {}
+            for _, part in ipairs(parts) do
+                local offset = relativeOffsets[part]
+                if offset then
+                    pcall(function()
+                        part.CFrame = targetCF * offset
+                    end)
+                end
+                part.AssemblyLinearVelocity = Vector3.zero
+                part.AssemblyAngularVelocity = Vector3.zero
+            end
+        else
+            referencePart.AssemblyLinearVelocity = Vector3.zero
+            referencePart.AssemblyAngularVelocity = Vector3.zero
+            basePart.AssemblyLinearVelocity = Vector3.zero
+            basePart.AssemblyAngularVelocity = Vector3.zero
+        end
+
+        closeEnough = (referencePart.Position - targetCF.Position).Magnitude <= 6
+        if closeEnough then
+            break
+        end
+        if attempt < 3 then
+            RunService.Heartbeat:Wait()
+        end
+    end
+
+    return closeEnough or ok
+end
+
+local function buildBombMissileExplodePayload(toyObject)
+    local model = toyObject
+    if model and model:IsA("BasePart") then
+        model = model:FindFirstAncestorOfClass("Model") or model
+    end
+    if not model then
+        return nil, actionExplosionToyName .. " のモデルが見つかりません"
+    end
+
+    local isSnowball = isActionToyNameMatch(model.Name, "BallSnowball")
+    local soundPart = model:FindFirstChild("SoundPart", true)
+    local hitbox = (isSnowball and soundPart)
+        or model:FindFirstChild("PartHitDetector", true)
+        or model:FindFirstChild("Hitbox", true)
+        or getActionToyPart(model)
+    local positionPart = (isSnowball and soundPart)
+        or model:FindFirstChild("Body", true)
+        or model:FindFirstChild("Main", true)
+        or model:FindFirstChild("Handle", true)
+        or getActionToyPart(model)
+    local payloadModel = (isSnowball and soundPart) or model
+
+    if not hitbox then
+        return nil, actionExplosionToyName .. " の Hitbox が見つかりません"
+    end
+    if not positionPart then
+        return nil, actionExplosionToyName .. " の PositionPart が見つかりません"
+    end
+
+    if isSnowball then
+        return {
+            Type = "SnowPoof",
+            Color = Color3.new(0.972549, 0.972549, 0.972549),
+            TimeLength = 0.5,
+            Radius = 10.807991981506348,
+            Hitbox = hitbox,
+            ExplodesByFire = false,
+            MaxForcePerStudSquared = 0,
+            DestroysModel = true,
+            Model = payloadModel,
+            ExplodesByPointy = false,
+            ImpactSpeed = 18.666661580403645,
+            PositionPart = positionPart,
+        }
+    end
+
+    return {
+        Radius = 17.5,
+        TimeLength = 0.5,
+        MaxForcePerStudSquared = 225,
+        ExplodesByFire = true,
+        ImpactSpeed = 100,
+        Model = payloadModel,
+        Hitbox = hitbox,
+        ExplodesByPointy = false,
+        DestroysModel = true,
+        PositionPart = positionPart,
+    }
+end
+
+local function setActionObjectCFrame(actionObject, targetCF)
+    if not actionObject then
+        return
+    end
+
+    pcall(function()
+        if actionObject:IsA("Model") then
+            actionObject:PivotTo(targetCF)
+        elseif actionObject:IsA("BasePart") then
+            actionObject.CFrame = targetCF
+            actionObject.AssemblyLinearVelocity = Vector3.zero
+            actionObject.AssemblyAngularVelocity = Vector3.zero
+        end
+    end)
+end
+
+local function forceBombMissileExplosionAlignment(payload, targetCF)
+    if not payload then
+        return targetCF.Position
+    end
+
+    local myChar = LocalPlayer.Character
+    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    local ownerCF = myRoot and myRoot.CFrame or targetCF
+
+    if payload.PositionPart and payload.PositionPart:IsA("BasePart") then
+        bombMissileState.RequestPartNetworkOwner(payload.PositionPart, ownerCF, 6)
+    end
+    if payload.Hitbox and payload.Hitbox:IsA("BasePart") then
+        bombMissileState.RequestPartNetworkOwner(payload.Hitbox, ownerCF, 4)
+    end
+
+    if payload.Model then
+        teleportActionToy(payload.Model, targetCF, true)
+    end
+
+    setActionObjectCFrame(payload.PositionPart, targetCF)
+    setActionObjectCFrame(payload.Hitbox, targetCF)
+
+    if payload.PositionPart and payload.PositionPart:IsA("BasePart") then
+        pcall(function()
+            GrabEvents.SetNetworkOwner:FireServer(payload.PositionPart, ownerCF)
+        end)
+    end
+    if payload.Hitbox and payload.Hitbox:IsA("BasePart") then
+        pcall(function()
+            GrabEvents.SetNetworkOwner:FireServer(payload.Hitbox, ownerCF)
+        end)
+    end
+
+    if payload.PositionPart and payload.PositionPart:IsA("BasePart") then
+        return payload.PositionPart.Position
+    end
+    if payload.Hitbox and payload.Hitbox:IsA("BasePart") then
+        return payload.Hitbox.Position
+    end
+    return targetCF.Position
+end
+
+local function runBombMissileAction(loopToken)
+    local target = getSelectedActionTarget(false)
+    local myChar = LocalPlayer.Character
+    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    if not (target and myChar and myRoot) then
+        return false, "対象プレイヤーを選択してください"
+    end
+
+    local item, err = ensureActionToyItem(actionExplosionToyName, myRoot.CFrame * CFrame.new(0, 5, -4))
+    if not item then
+        return false, err or (actionExplosionToyName .. " が見つかりません")
+    end
+    bombMissileState.CachedToyItem = item
+
+    local targetRoot = target.Character and target.Character:FindFirstChild("HumanoidRootPart")
+    if not targetRoot then
+        return false, "対象プレイヤーの HumanoidRootPart が見つかりません"
+    end
+
+    local refreshedItem = findActionToyItemByName(actionExplosionToyName)
+    local toyObject = findBombMissileWorldObject(myRoot.Position, true)
+        or (refreshedItem and refreshedItem.Object)
+        or item.Object
+    if not (toyObject and toyObject.Parent) then
+        return false, actionExplosionToyName .. " の実体が見つかりません"
+    end
+    cacheBombMissileWorldObject(toyObject)
+
+    local targetCF = targetRoot.CFrame
+    if not teleportActionToy(toyObject, targetCF, true) then
+        return false, actionExplosionToyName .. " のテレポートに失敗しました"
+    end
+
+    if not bombMissileLoopEnabled or bombMissileLoopToken ~= loopToken then
+        return true
+    end
+
+    local bombEvents = ReplicatedStorage:FindFirstChild("BombEvents")
+    local bombExplode = bombEvents and bombEvents:FindFirstChild("BombExplode")
+    if not bombExplode then
+        return false, "BombExplode が見つかりません"
+    end
+
+    local payload, payloadErr = buildBombMissileExplodePayload(toyObject)
+    if not payload then
+        return false, payloadErr
+    end
+
+    local liveTarget = getSelectedActionTarget(false)
+    local liveRoot = liveTarget and liveTarget.Character and liveTarget.Character:FindFirstChild("HumanoidRootPart")
+    local finalRoot = liveRoot or targetRoot
+    local explodeCF = finalRoot.CFrame
+    local explodePosition = forceBombMissileExplosionAlignment(payload, explodeCF)
+    local okExplode, explodeErr = pcall(function()
+        bombExplode:FireServer(payload, explodePosition)
+    end)
+    if not okExplode then
+        return false, tostring(explodeErr)
+    end
+
+    return true
+end
+
+UIElements.BombMissileToggle = actionTargetSection:AddToggle({
+    Name = "雪玉当て",
+    Default = false,
+    Callback = function(v)
+        bombMissileLoopEnabled = v
+        bombMissileLoopToken = bombMissileLoopToken + 1
+        local loopToken = bombMissileLoopToken
+
+        if not v then
+            clearBombMissileWorldState()
+            OrionLib:MakeNotification({ Name = "停止", Content = actionExplosionToyName .. " ループを停止しました", Time = 2 })
+            return
+        end
+
+        clearBombMissileWorldState()
+        OrionLib:MakeNotification({ Name = "実行", Content = actionExplosionToyName .. " ループを開始しました", Time = 2 })
+        task.spawn(function()
+            local lastError = nil
+            while bombMissileLoopEnabled and bombMissileLoopToken == loopToken do
+                local ok, err = runBombMissileAction(loopToken)
+                if not bombMissileLoopEnabled or bombMissileLoopToken ~= loopToken then
+                    break
+                end
+
+                if ok then
+                    lastError = nil
+                    task.wait(0.25)
+                else
+                    if err and err ~= lastError then
+                        local notifyName = (err == "対象プレイヤーを選択してください") and "待機" or "エラー"
+                        OrionLib:MakeNotification({ Name = notifyName, Content = err, Time = 2 })
+                        lastError = err
+                    end
+                    task.wait(0.45)
+                end
+            end
+        end)
+    end
+})
+
+bombMissileState.SimpleExplosionLoopEnabled = false
+bombMissileState.SimpleExplosionLoopToken = 0
+
+actionTargetSection:AddToggle({
+    Name = "爆発",
+    Default = false,
+    Callback = function(v)
+        bombMissileState.SimpleExplosionLoopEnabled = v
+        bombMissileState.SimpleExplosionLoopToken = (bombMissileState.SimpleExplosionLoopToken or 0) + 1
+        local loopToken = bombMissileState.SimpleExplosionLoopToken
+
+        if not v then
+            OrionLib:MakeNotification({ Name = "停止", Content = "爆発ループを停止しました", Time = 2 })
+            return
+        end
+
+        OrionLib:MakeNotification({ Name = "実行", Content = "爆発ループを開始しました", Time = 2 })
+        task.spawn(function()
+            local lastError = nil
+            while bombMissileState.SimpleExplosionLoopEnabled and bombMissileState.SimpleExplosionLoopToken == loopToken do
+                local target = getSelectedActionTarget(false)
+                local targetRoot = target and target.Character and target.Character:FindFirstChild("HumanoidRootPart")
+
+                if not targetRoot then
+                    if lastError ~= "対象プレイヤーを選択してください" then
+                        OrionLib:MakeNotification({ Name = "待機", Content = "対象プレイヤーを選択してください", Time = 2 })
+                        lastError = "対象プレイヤーを選択してください"
+                    end
+                    task.wait(0.45)
+                else
+                    local myChar = LocalPlayer.Character
+                    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+                    if not (myChar and myRoot) then
+                        if lastError ~= "自分の HumanoidRootPart が見つかりません" then
+                            OrionLib:MakeNotification({ Name = "エラー", Content = "自分の HumanoidRootPart が見つかりません", Time = 2 })
+                            lastError = "自分の HumanoidRootPart が見つかりません"
+                        end
+                        task.wait(0.45)
+                    else
+                        local item, err = ensureActionToyItem("BombMissile", myRoot.CFrame * CFrame.new(0, 5, -4))
+                        if not item then
+                            local msg = err or "BombMissile が見つかりません"
+                            if lastError ~= msg then
+                                OrionLib:MakeNotification({ Name = "エラー", Content = msg, Time = 2 })
+                                lastError = msg
+                            end
+                            task.wait(0.45)
+                        else
+                            local refreshedItem = findActionToyItemByName("BombMissile")
+                            local toyObject = (refreshedItem and refreshedItem.Object) or item.Object
+                            local hitbox = toyObject and toyObject:FindFirstChild("PartHitDetector", true)
+                            local bombEvents = ReplicatedStorage:FindFirstChild("BombEvents")
+                            local bombExplode = bombEvents and bombEvents:FindFirstChild("BombExplode")
+
+                            if not hitbox then
+                                if lastError ~= "BombMissile の PartHitDetector が見つかりません" then
+                                    OrionLib:MakeNotification({ Name = "エラー", Content = "BombMissile の PartHitDetector が見つかりません", Time = 2 })
+                                    lastError = "BombMissile の PartHitDetector が見つかりません"
+                                end
+                                task.wait(0.45)
+                            elseif not bombExplode then
+                                if lastError ~= "BombExplode が見つかりません" then
+                                    OrionLib:MakeNotification({ Name = "エラー", Content = "BombExplode が見つかりません", Time = 2 })
+                                    lastError = "BombExplode が見つかりません"
+                                end
+                                task.wait(0.45)
+                            else
+                                local ok, fireErr = pcall(function()
+                                    bombExplode:FireServer({
+                                        PositionPart = targetRoot,
+                                        Hitbox = hitbox,
+                                    }, targetRoot.Position)
+                                end)
+
+                                if not ok then
+                                    local msg = tostring(fireErr)
+                                    if lastError ~= msg then
+                                        OrionLib:MakeNotification({ Name = "エラー", Content = msg, Time = 2 })
+                                        lastError = msg
+                                    end
+                                    task.wait(0.45)
+                                else
+                                    lastError = nil
+                                    task.wait(0.25)
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+    end
+})
+
+actionTargetSection:AddButton({
+    Name = "ブロブマン連れてくる",
+    Callback = function()
+        local target = getSelectedActionTarget()
+        if not target then return end
         if not (LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")) then
             return
         end
@@ -6314,7 +9366,7 @@ actionTargetSection:AddButton({
 
 local levitateRunning = false
 UIElements.BlobmanKick = actionTargetSection:AddToggle({
-    Name = "Blobman Kick",
+    Name = "ブロブマンキック",
     Default = false,
     Callback = function(v)
         levitateRunning = v
@@ -6484,6 +9536,18 @@ local allKickCurrentBlob = nil
 local allKickWhiteFriends = {}
 _G.ProtectRealFriends = _G.ProtectRealFriends or false
 _G.ProtectPlayersInPlots = true
+local blobKillWhiteFriends = {}
+local blobKillProtectRealFriends = false
+local blobKillProtectPlayersInPlots = true
+
+local function isPlayerInProtectedPlot(player)
+    if not player then
+        return false
+    end
+    local plotItems = Workspace:FindFirstChild("PlotItems")
+    local playersInPlots = plotItems and plotItems:FindFirstChild("PlayersInPlots")
+    return (playersInPlots and playersInPlots:FindFirstChild(player.Name)) or (player:FindFirstChild("InPlot") and player.InPlot.Value) or false
+end
 
 local function isAllKickWhiteFriend(player)
     if _G.ProtectRealFriends then
@@ -6496,12 +9560,28 @@ local function isAllKickProtected(player)
     if isAllKickWhiteFriend(player) then
         return true
     end
-    if _G.ProtectPlayersInPlots then
-        local plotItems = Workspace:FindFirstChild("PlotItems")
-        local playersInPlots = plotItems and plotItems:FindFirstChild("PlayersInPlots")
-        if (playersInPlots and playersInPlots:FindFirstChild(player.Name)) or (player:FindFirstChild("InPlot") and player.InPlot.Value) then
-            return true
-        end
+    if _G.ProtectPlayersInPlots and isPlayerInProtectedPlot(player) then
+        return true
+    end
+    return false
+end
+
+local function isBlobKillWhiteFriend(player)
+    if blobKillProtectRealFriends then
+        return player:IsFriendsWith(LocalPlayer.UserId)
+    end
+    return blobKillWhiteFriends[player] == true or blobKillWhiteFriends[player.Name] == true
+end
+
+local function isBlobKillProtected(player)
+    if not player or player == LocalPlayer then
+        return false
+    end
+    if isBlobKillWhiteFriend(player) then
+        return true
+    end
+    if blobKillProtectPlayersInPlots and isPlayerInProtectedPlot(player) then
+        return true
     end
     return false
 end
@@ -6643,6 +9723,9 @@ end
 
 local function startThreads(player, userId)
     stopThreads(userId)
+    if isBlobKillProtected(player) then
+        return
+    end
     local state = { active = true }
     playerThreads[userId] = state
 
@@ -6710,7 +9793,11 @@ local function startAura()
                 local pHRP = char and char:FindFirstChild("HumanoidRootPart")
                 local shouldProcess = false
 
-                if pHRP then
+                if isBlobKillProtected(p) then
+                    if auraInRange[p.UserId] then
+                        stopThreads(p.UserId)
+                    end
+                elseif pHRP then
                     if (myPos - pHRP.Position).Magnitude <= AURA_RADIUS then
                         shouldProcess = true
                     elseif auraInRange[p.UserId] then
@@ -6743,6 +9830,11 @@ local function blobmanKill(target)
     end
 
     if target == LocalPlayer then
+        return
+    end
+
+    if isBlobKillProtected(target) then
+        OrionLib:MakeNotification({Name="保護中", Content="このプレイヤーはブロブマンキル保護の対象です", Time=2})
         return
     end
 
@@ -7464,7 +10556,7 @@ blobKillSec:AddToggle({
             task.spawn(function()
                 while bmkLoopKillEnabled do
                     local target = Players:FindFirstChild(selectedBlobTargetName)
-                    if target and target ~= LocalPlayer and not isAllKickProtected(target) then
+                    if target and target ~= LocalPlayer and not isBlobKillProtected(target) then
                         if not blobKillActive then
                             teleportToBlobKillTarget(target)
                             blobmanKill(target)
@@ -7490,7 +10582,7 @@ blobKillSec:AddButton({
         if not myRoot or not hum then return end
         local oldCF = myRoot.CFrame
         for _, p in ipairs(Players:GetPlayers()) do
-            if p ~= LocalPlayer and not isAllKickProtected(p) and p.Character then
+            if p ~= LocalPlayer and not isBlobKillProtected(p) and p.Character then
                 local tRoot = p.Character:FindFirstChild("HumanoidRootPart")
                 if tRoot then
                     if not ensureBlobmanReady() then break end
@@ -7521,6 +10613,22 @@ blobKillSec:AddToggle({
         else
             stopAura()
         end
+    end
+})
+
+blobKillSec:AddToggle({
+    Name = "プロット内のプレイヤーを保護",
+    Default = true,
+    Callback = function(v)
+        blobKillProtectPlayersInPlots = v
+    end
+})
+
+blobKillSec:AddToggle({
+    Name = "フレンド保護",
+    Default = false,
+    Callback = function(v)
+        blobKillProtectRealFriends = v
     end
 })
 
@@ -8413,6 +11521,9 @@ SaveSec:AddButton({
                 AntiExplosion = antiExplosion,
                 AntiFire = antiFire,
                 AntiGrab = antiGrab,
+                AntiLag = _G.AntiLag,
+                AntiLoop = _G.AntiLoop,
+                AntiNetwork = _G.AntiNetwork,
                 CurrentMode = currentMode,
                 CombinedActive = combinedActive,
                 FollowMethod = followMethod,
